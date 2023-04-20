@@ -1,27 +1,28 @@
-﻿using System;
+﻿using Plugin.XFWifiManager.Abstractions;
+using System;
 
-namespace Plugin.Feature1
+namespace Plugin.XFWifiManager
 {
     /// <summary>
     /// Cross Feature1
     /// </summary>
     public static class CrossFeature1
     {
-        static Lazy<IFeature1> implementation = new Lazy<IFeature1>(() => CreateFeature1(), System.Threading.LazyThreadSafetyMode.PublicationOnly);
+        static Lazy<IWiFiNetworkService> implementation = new Lazy<IWiFiNetworkService>(() => CreateFeature1(), System.Threading.LazyThreadSafetyMode.PublicationOnly);
 
         /// <summary>
         /// Gets if the plugin is supported on the current platform.
         /// </summary>
-        public static bool IsSupported => implementation.Value == null ? false : true;
+        public static bool IsSupported => !(implementation.Value == null);
 
         /// <summary>
         /// Current plugin implementation to use
         /// </summary>
-        public static IFeature1 Current
+        public static IWiFiNetworkService Current
         {
             get
             {
-                IFeature1 ret = implementation.Value;
+                IWiFiNetworkService ret = implementation.Value;
                 if (ret == null)
                 {
                     throw NotImplementedInReferenceAssembly();
@@ -30,13 +31,13 @@ namespace Plugin.Feature1
             }
         }
 
-        static IFeature1 CreateFeature1()
+        static IWiFiNetworkService CreateFeature1()
         {
 #if NETSTANDARD1_0 || NETSTANDARD2_0
             return null;
 #else
 #pragma warning disable IDE0022 // Use expression body for methods
-            return new Feature1Implementation();
+            return new WiFiNetworkService();
 #pragma warning restore IDE0022 // Use expression body for methods
 #endif
         }

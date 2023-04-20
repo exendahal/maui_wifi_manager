@@ -10,7 +10,7 @@
     For UWP update the version number with a version number you have installed.
     -->
 		<AssemblyName>Plugin.XFWifiManager</AssemblyName>
-		<RootNamespace>Plugin.Feature1</RootNamespace>
+		<RootNamespace>Plugin.XFWifiManager</RootNamespace>
 		<PackageId>Plugin.Feature1</PackageId>
 
 		<Product>$(AssemblyName) ($(TargetFramework))</Product>
