@@ -1,4 +1,4 @@
-<Project Sdk="MSBuild.Sdk.Extras/3.0.44">
+﻿<Project Sdk="MSBuild.Sdk.Extras/3.0.44">
 
 	<PropertyGroup>
 
@@ -9,7 +9,7 @@
 	
     For UWP update the version number with a version number you have installed.
     -->
-		<AssemblyName>Plugin.Feature1</AssemblyName>
+		<AssemblyName>Plugin.XFWifiManager</AssemblyName>
 		<RootNamespace>Plugin.Feature1</RootNamespace>
 		<PackageId>Plugin.Feature1</PackageId>
 
