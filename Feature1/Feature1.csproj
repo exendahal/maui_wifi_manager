@@ -1,0 +1,171 @@
+<Project Sdk="MSBuild.Sdk.Extras/3.0.44">
+
+	<PropertyGroup>
+
+		<TargetFrameworks>netstandard2.0;MonoAndroid10.0;Xamarin.iOS10;net6.0-android;net6.0-ios;net6.0-maccatalyst;</TargetFrameworks>
+		<TargetFrameworks Condition=" '$(OS)' == 'Windows_NT' ">$(TargetFrameworks);uap10.0.19041;net6.0-windows10.0.19041;</TargetFrameworks>
+		<!--Feel free to add as many targets as you need below
+    netstandard1.0;netstandard2.0;MonoAndroid90;Xamarin.iOS10;uap10.0.16299;Xamarin.TVOS10;Xamarin.WatchOS10;Xamarin.Mac20;Tizen40;net6.0-tvos;net6.0-macos
+	
+    For UWP update the version number with a version number you have installed.
+    -->
+		<AssemblyName>Plugin.Feature1</AssemblyName>
+		<RootNamespace>Plugin.Feature1</RootNamespace>
+		<PackageId>Plugin.Feature1</PackageId>
+
+		<Product>$(AssemblyName) ($(TargetFramework))</Product>
+		<AssemblyVersion>1.0.0.0</AssemblyVersion>
+		<AssemblyFileVersion>1.0.0.0</AssemblyFileVersion>
+		<Version>1.0.0.0</Version>
+		<PackageVersion>1.0.0.0</PackageVersion>
+		<PackOnBuild>true</PackOnBuild>
+		<NeutralLanguage>en</NeutralLanguage>
+		<DefineConstants>$(DefineConstants);</DefineConstants>
+
+		<UseFullSemVerForNuGet>false</UseFullSemVerForNuGet>
+		<EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+		<LangVersion>8.0</LangVersion>
+		<Nullable>enable</Nullable>
+		<DebugType>portable</DebugType>
+
+		<!--TODO: Fill these in-->
+		<!--See the following for a list of valid license expressions: https://spdx.org/licenses/ -->
+		<PackageLicenseExpression>MIT</PackageLicenseExpression>
+		<PackageProjectUrl>LINK TO PROJECT</PackageProjectUrl>
+		<RepositoryUrl>LINK TO PROJECT</RepositoryUrl>
+		<PackageReleaseNotes>RELEASE NOTES</PackageReleaseNotes>
+		<PackageIconUrl>ICON URL</PackageIconUrl>
+		<PackageTags>xamarin, windows, ios, android, xamarin.forms, plugin, Feature1</PackageTags>
+
+		<Title>Feature1 Plugin for Xamarin and Windows</Title>
+		<Summary>Summary of nuget</Summary>
+		<Description>Plugin Description</Description>
+
+
+		<Owners>YOU</Owners>
+		<Authors>YOU</Authors>
+		<Copyright>Copyright 2019</Copyright>
+
+		<NeutralLanguage>en</NeutralLanguage>
+		<EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+
+	</PropertyGroup>
+
+
+	<!-- platform version number information -->
+	<PropertyGroup>
+		<SupportedOSPlatformVersion Condition="$(TargetFramework.Contains('-ios'))">10.0</SupportedOSPlatformVersion>
+		<SupportedOSPlatformVersion Condition="$(TargetFramework.Contains('-tvos'))">10.0</SupportedOSPlatformVersion>
+		<SupportedOSPlatformVersion Condition="$(TargetFramework.Contains('-maccatalyst'))">13.1</SupportedOSPlatformVersion>
+		<SupportedOSPlatformVersion Condition="$(TargetFramework.Contains('-macos'))">10.14</SupportedOSPlatformVersion>
+		<SupportedOSPlatformVersion Condition="$(TargetFramework.Contains('-android'))">21.0</SupportedOSPlatformVersion>
+		<SupportedOSPlatformVersion Condition="$(TargetFramework.Contains('-windows10'))">10.0.17763.0</SupportedOSPlatformVersion>
+		<TargetPlatformMinVersion Condition="$(TargetFramework.Contains('-windows10'))">10.0.17763.0</TargetPlatformMinVersion>
+	</PropertyGroup>
+
+	<PropertyGroup Condition=" $(TargetFramework.StartsWith('uap10.0')) ">
+		<TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
+	</PropertyGroup>
+
+	<PropertyGroup Condition=" '$(Configuration)'=='Release' And '$(OS)' == 'Windows_NT' ">
+		<!-- sourcelink: Declare that the Repository URL can be published to NuSpec -->
+		<PublishRepositoryUrl>true</PublishRepositoryUrl>
+		<!-- sourcelink: Embed source files that are not tracked by the source control manager to the PDB -->
+		<EmbedUntrackedSources>true</EmbedUntrackedSources>
+		<!-- sourcelink: Include PDB in the built .nupkg -->
+		<AllowedOutputExtensionsInPackageBuildOutputFolder>$(AllowedOutputExtensionsInPackageBuildOutputFolder);.pdb</AllowedOutputExtensionsInPackageBuildOutputFolder>
+	</PropertyGroup>
+	
+		
+	<ItemGroup Condition=" '$(Configuration)'=='Release' And '$(OS)' == 'Windows_NT' ">
+		<PackageReference Include="Microsoft.SourceLink.GitHub" Version="1.1.1" PrivateAssets="All" />
+	</ItemGroup>
+
+	<PropertyGroup Condition=" '$(Configuration)'=='Debug' ">
+		<DebugSymbols>true</DebugSymbols>
+		<GenerateDocumentationFile>false</GenerateDocumentationFile>
+	</PropertyGroup>
+	<PropertyGroup Condition=" '$(Configuration)'=='Release' ">
+		<GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+		<GenerateDocumentationFile>true</GenerateDocumentationFile>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<Compile Include="**\*.shared.cs" />
+	</ItemGroup>
+
+	<ItemGroup Condition=" $(TargetFramework.StartsWith('netstandard')) ">
+	</ItemGroup>
+
+	<ItemGroup Condition=" $(TargetFramework.StartsWith('uap10.0')) ">
+		<Compile Include="**\*.uwp.cs" />
+		<!--
+    If you need to add sdk references:
+     <SDKReference Include="WindowsMobile, Version=10.0.16299.0">
+      <Name>Windows Mobile Extensions for the UWP</Name>
+    </SDKReference>
+    -->
+	</ItemGroup>
+
+	<ItemGroup Condition=" $(TargetFramework.StartsWith('MonoAndroid')) ">
+		<Compile Include="**\*.android.cs" />
+	</ItemGroup>
+
+	<ItemGroup Condition=" $(TargetFramework.StartsWith('Xamarin.iOS')) ">
+		<Compile Include="**\*.apple.cs" />
+	</ItemGroup>
+
+	<ItemGroup Condition=" $(TargetFramework.Contains('-windows')) ">
+		<Compile Include="**\*.uwp.cs" />
+	</ItemGroup>
+
+
+	<ItemGroup Condition=" $(TargetFramework.Contains('-android')) ">
+		<Compile Include="**\*.android.cs" />
+	</ItemGroup>
+
+	<ItemGroup Condition=" $(TargetFramework.Contains('-ios')) ">
+		<Compile Include="**\*.apple.cs" />
+	</ItemGroup>
+
+	<ItemGroup Condition=" $(TargetFramework.Contains('-mac')) ">
+		<Compile Include="**\*.apple.cs" />
+	</ItemGroup>
+
+	<!--Additional item groups-->
+	<!--
+
+  
+  <ItemGroup Condition=" $(TargetFramework.Contains('-tvos')) ">
+    <Compile Include="**\*.apple.cs" />
+  </ItemGroup>
+
+  <ItemGroup Condition=" $(TargetFramework.StartsWith('Xamarin.TVOS')) ">
+    <Compile Include="**\*.tvos.cs" />
+  </ItemGroup>
+
+
+  <ItemGroup Condition=" $(TargetFramework.StartsWith('Xamarin.WatchOS')) ">
+    <Compile Include="**\*.watchos.cs" />
+  </ItemGroup>
+
+
+  <ItemGroup Condition=" $(TargetFramework.StartsWith('Xamarin.Mac')) ">
+    <Compile Include="**\*.mac.cs" />
+  </ItemGroup>
+
+  
+   <ItemGroup Condition=" $(TargetFramework.StartsWith('netcoreapp')) ">
+    <Compile Include="**\*.netcore.cs" />
+  </ItemGroup>
+  
+  <ItemGroup Condition=" $(TargetFramework.StartsWith('Tizen')) ">
+    <Compile Include="**\*.tizen.cs" />
+    <PackageReference Include="Tizen.NET" Version="4.0.0" />
+  </ItemGroup>
+
+  <ItemGroup Condition=" $(TargetFramework.StartsWith('net45')) ">
+    <Compile Include="**\*.dotnet.cs" />
+  </ItemGroup>
+  -->
+</Project>
