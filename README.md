@@ -1,5 +1,13 @@
-# plugin-template
+# Wifi Manager for Xamarin Forms
 
-Plugin for .NET Template
+## Platforms
+* Android
+* iOS
+* UWP
 
-Clone this template and rename a few files and you are set to start building your plugin!
+## Features
+* Scan Wi-Fi networks
+* Connect Wi-Fi with SSID and Password
+* Add new Wi-Fi Network
+* Get current Network Info
+
