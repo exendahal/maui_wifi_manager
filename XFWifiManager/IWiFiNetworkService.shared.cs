@@ -1,8 +1,8 @@
 ﻿using System.Threading.Tasks;
 
-namespace Plugin.XFWifiManager.Abstractions
+namespace Plugin.MauiWifiManager.Abstractions
 {
-    public interface IWiFiNetworkService
+    public interface IWifiNetworkService
     {
         Task<NetworkDataModel> ConnectWifi(string ssid, string password);
         Task<NetworkDataModel> GetNetworkInfo();

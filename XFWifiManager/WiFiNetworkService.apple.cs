@@ -1,13 +1,13 @@
-﻿using Plugin.XFWifiManager.Abstractions;
+﻿using Plugin.MauiWifiManager.Abstractions;
 using System;
 using System.Threading.Tasks;
 
-namespace Plugin.XFWifiManager
+namespace Plugin.MauiWifiManager
 {
     /// <summary>
-    /// Interface for Feature1
+    /// Interface for WiFiNetworkService
     /// </summary>
-    public class WiFiNetworkService : IWiFiNetworkService
+    public class WiFiNetworkService : IWifiNetworkService
     {
         public Task<NetworkDataModel> ConnectWifi(string ssid, string password)
         {

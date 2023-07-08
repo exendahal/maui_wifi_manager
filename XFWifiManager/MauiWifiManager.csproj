@@ -9,8 +9,8 @@
 	
     For UWP update the version number with a version number you have installed.
     -->
-		<AssemblyName>Plugin.XFWifiManager</AssemblyName>
-		<RootNamespace>Plugin.XFWifiManager</RootNamespace>
+		<AssemblyName>Plugin.MauiWifiManager</AssemblyName>
+		<RootNamespace>Plugin.MauiWifiManager</RootNamespace>
 		<PackageId>Plugin.Feature1</PackageId>
 
 		<Product>$(AssemblyName) ($(TargetFramework))</Product>
@@ -37,7 +37,7 @@
 		<PackageIconUrl>ICON URL</PackageIconUrl>
 		<PackageTags>xamarin, windows, ios, android, xamarin.forms, plugin, Wifi.Manager</PackageTags>
 
-		<Title>Wi-Fi Manager Plugin for Xamarin and Windows</Title>
+		<Title>Wi-Fi Manager Plugin for MAUI</Title>
 		<Summary>Wi-Fi Manager Plugin for Xamarin and Windows</Summary>
 		<Description>Wi-Fi Manager Plugin for Xamarin and Windows</Description>
 
