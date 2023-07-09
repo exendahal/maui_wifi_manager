@@ -49,6 +49,7 @@
 	</ItemGroup>
 
 	<ItemGroup>
+	  <ProjectReference Include="..\MAUIWifiManager\MauiWifiManager.csproj" />
 	  <ProjectReference Include="..\XFWifiManager\MauiWifiManager.csproj" />
 	</ItemGroup>
 
