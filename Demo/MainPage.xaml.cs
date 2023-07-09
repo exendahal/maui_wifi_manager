@@ -30,9 +30,9 @@ namespace Demo
             CrossWifiManager.Current.DisconnectWifi(WifiSsid.Text);
         }
 
-        private void OpenWifiSettingClicked(object sender, EventArgs e)
+        private async void OpenWifiSettingClicked(object sender, EventArgs e)
         {
-            CrossWifiManager.Current.OpenWifiSetting();
+            var response = await CrossWifiManager.Current.OpenWifiSetting();
         }
     }
 }
