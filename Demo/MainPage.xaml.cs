@@ -1,5 +1,4 @@
 ﻿using Plugin.MauiWifiManager;
-using Plugin.MauiWifiManager.Abstractions;
 
 namespace Demo
 {
@@ -18,17 +17,22 @@ namespace Demo
                 return;
             }
 
-            var response = CrossWifiManager.Current.ConnectWifi(WifiSsid.Text, WifiPassword.Text);
+            var response = await CrossWifiManager.Current.ConnectWifi(WifiSsid.Text, WifiPassword.Text);
         }
 
-        private void InfoBtnClicked(object sender, EventArgs e)
+        private async void InfoBtnClicked(object sender, EventArgs e)
         {
-
+            var response = await CrossWifiManager.Current.GetNetworkInfo();
         }
 
         private void DisconnectBtnClicked(object sender, EventArgs e)
         {
+            CrossWifiManager.Current.DisconnectWifi(WifiSsid.Text);
+        }
 
+        private void OpenWifiSettingClicked(object sender, EventArgs e)
+        {
+            CrossWifiManager.Current.OpenWifiSetting();
         }
     }
 }

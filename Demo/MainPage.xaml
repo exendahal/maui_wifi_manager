@@ -34,8 +34,9 @@
                     TextColor="Black" />
             </Border>
 
-            <Grid Margin="0,12">
+            <Grid Margin="12">
                 <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
                 <Grid.ColumnDefinitions>
@@ -66,6 +67,15 @@
                     Clicked="DisconnectBtnClicked"
                     FontSize="12"
                     Text="DISCONNECT" />
+
+                <Button
+                    x:Name="OpenSetting"
+                    Grid.Row="1"
+                    Grid.Column="0"
+                    Margin="0,16"
+                    Clicked="OpenWifiSettingClicked"
+                    FontSize="12"
+                    Text="OPEN SETTING" />
             </Grid>
 
         </VerticalStackLayout>
