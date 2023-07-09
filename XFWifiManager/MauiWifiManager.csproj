@@ -38,8 +38,8 @@
 		<PackageTags>xamarin, windows, ios, android, xamarin.forms, plugin, Wifi.Manager</PackageTags>
 
 		<Title>Wi-Fi Manager Plugin for MAUI</Title>
-		<Summary>Wi-Fi Manager Plugin for Xamarin and Windows</Summary>
-		<Description>Wi-Fi Manager Plugin for Xamarin and Windows</Description>
+		<Summary>Wi-Fi Manager Plugin for MAUI</Summary>
+		<Description>Wi-Fi Manager Plugin for MAUI</Description>
 
 
 		<Owners>Santsh Dahal</Owners>
@@ -130,6 +130,14 @@
 
 	<ItemGroup Condition=" $(TargetFramework.Contains('-ios')) ">
 		<Compile Include="**\*.apple.cs" />
+	</ItemGroup>
+
+	<ItemGroup Condition=" $(TargetFramework.Contains('-maccatalyst')) ">
+		<Compile Include="**\*.apple.cs" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<Compile Include="NetworkData.cs" />
 	</ItemGroup>
 	
 </Project>

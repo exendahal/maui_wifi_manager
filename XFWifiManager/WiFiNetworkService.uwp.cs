@@ -7,8 +7,11 @@ namespace Plugin.MauiWifiManager
     /// <summary>
     /// Interface for WiFiNetworkService
     /// </summary>
-    public class WiFiNetworkService : IWifiNetworkService
+    public class WifiNetworkService : IWifiNetworkService
     {
+        public WifiNetworkService()
+        {
+        }
         public Task<NetworkDataModel> ConnectWifi(string ssid, string password)
         {
             throw new NotImplementedException();
@@ -27,6 +30,14 @@ namespace Plugin.MauiWifiManager
         public Task<bool> OpenWifiSetting()
         {
             throw new NotImplementedException();
+        }
+
+        /// <summary>
+        /// Dispose
+        /// </summary>
+        public void Dispose()
+        {
+
         }
     }
 }
