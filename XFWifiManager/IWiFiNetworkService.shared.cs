@@ -6,8 +6,8 @@ namespace Plugin.MauiWifiManager
 {
     public interface IWifiNetworkService : IDisposable
     {
-        Task<NetworkDataModel> ConnectWifi(string ssid, string password);
-        Task<NetworkDataModel> GetNetworkInfo();
+        Task<NetworkData> ConnectWifi(string ssid, string password);
+        Task<NetworkData> GetNetworkInfo();
         void DisconnectWifi(string ssid);
         Task<bool> OpenWifiSetting();
     }    

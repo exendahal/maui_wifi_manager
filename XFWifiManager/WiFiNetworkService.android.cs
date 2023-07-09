@@ -13,7 +13,7 @@ namespace Plugin.MauiWifiManager
         { 
         }
             
-        public Task<NetworkDataModel> ConnectWifi(string ssid, string password)
+        public Task<NetworkData> ConnectWifi(string ssid, string password)
         {
             throw new NotImplementedException();
         }
@@ -23,7 +23,7 @@ namespace Plugin.MauiWifiManager
             throw new NotImplementedException();
         }       
 
-        public Task<NetworkDataModel> GetNetworkInfo()
+        public Task<NetworkData> GetNetworkInfo()
         {
             throw new NotImplementedException();
         }
