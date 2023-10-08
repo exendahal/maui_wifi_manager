@@ -1,5 +1,5 @@
 # Wifi Manager for MAUI & Xamarin Forms
-The MAUI Wi-Fi Manager library is a comprehensive solution designed specifically for MAUI & Xamarin.Forms applications, enabling easy management of Wi-Fi networks. With its intuitive APIs, developers can seamlessly integrate Wi-Fi functionality into their cross-platform applications, allowing users connect to, add, and retrieve information about Wi-Fi networks effortlessly.
+Welcome to the documentation for the MAUI Wi-Fi Manager library, a comprehensive solution designed specifically for MAUI & Xamarin.Forms applications. This library empowers developers to effortlessly manage Wi-Fi networks within their cross-platform applications. With its intuitive APIs, you can seamlessly integrate Wi-Fi functionality, allowing users to connect to, add, and retrieve information about Wi-Fi networks with ease.
 
 ## Platform Support
 
@@ -13,40 +13,59 @@ The MAUI Wi-Fi Manager library is a comprehensive solution designed specifically
 
 
 ## Features
-* Connect Wi-Fi with SSID and Password
-* Add new Wi-Fi Network
-* Get current Network Info
-* Disconnect Wi-Fi
-* Open Wi-Fi Setting
+**Connect Wi-Fi with SSID and Password:** Enable users to connect to Wi-Fi networks by providing the SSID and password.
+**Add a New Wi-Fi Network:** Seamlessly add new Wi-Fi networks to the device.
+**Get Current Network Info:** Retrieve information about the currently connected Wi-Fi network.
+**Disconnect Wi-Fi:** Allow users to disconnect from a Wi-Fi network.
+**Open Wi-Fi Setting:** Provide a quick way for users to access their device's Wi-Fi settings.
 
 ## Getting started
 
 ### Initialization
+Before using the MAUI Wi-Fi Manager plugin in your application, it's essential to initialize it. Here's how to do it on different platforms:
+
 #### Android
-The plugin requires to be initialized. To use a MAUI Wi-Fi Manager inside an application, Android application must initialize the plugin. 
+To use the MAUI Wi-Fi Manager on Android, you must initialize the plugin. Add the following code to your Android application: 
 ```csharp
  WifiNetworkService.Init(this);
 ```
 
-#### Connect Wi-Fi
+#### Connect to Wi-Fi
+To connect to a Wi-Fi network programmatically, use the ConnectWifi method. This method takes the SSID and password as parameters. Here's an example:
 ```csharp
  var response = await CrossWifiManager.Current.ConnectWifi(ssid, password);
 ```
 
+The NetworkData class is defined as follows:
+```csharp
+ public class NetworkData
+{
+    public int StausId { get; set; }
+    public string? Ssid { get; set; }
+    public string? IpAddress { get; set; }
+    public string? GatewayAddress { get; set; }
+}
+```
+
 #### Get Wi-Fi info
+You can retrieve information about the currently connected Wi-Fi network using the GetNetworkInfo method:
 ```csharp
  var response = await CrossWifiManager.Current.GetNetworkInfo();
 ```
 
 #### Disconnect Wi-Fi
+To disconnect from a Wi-Fi network, simply call the DisconnectWifi method with the SSID as a parameter:
 ```csharp
 CrossWifiManager.Current.DisconnectWifi(ssid);
 ```
 
 #### Open Wi-Fi Setting
+If you want to provide users with a convenient way to access their device's Wi-Fi settings, use the OpenWifiSetting method:
 ```csharp
  var response = await CrossWifiManager.Current.OpenWifiSetting();
 ```
+
+I value your feedback! If you encounter any issues, have suggestions for improvement, or wish to report bugs, please open an issue on GitHub or GitLab repository
 
 ## Created by: Santosh Dahal
 - [Twitter](https://www.twitter.com/exendahal)
