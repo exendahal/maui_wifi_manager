@@ -9,5 +9,7 @@ namespace Plugin.MauiWifiManager.Abstractions
         public string? GatewayAddress { get; set; }
         public object? NativeObject { get; set; }
         public object? Bssid { get; set; }
+        public object? SignalStrength { get; set; }
+        public object? SecurityType { get; set; }
     }
 }

@@ -291,7 +291,7 @@ namespace Plugin.MauiWifiManager
                 var scanResults = wifiManager.ScanResults;
                 foreach (var result in scanResults)
                 {
-                    wifiNetworks.Add(new NetworkData() { Bssid = result.Bssid,Ssid = result.Ssid });
+                    wifiNetworks.Add(new NetworkData() { Bssid = result.Bssid,Ssid = result.Ssid,NativeObject = result });
                 }
             }
             else
@@ -335,6 +335,7 @@ namespace Plugin.MauiWifiManager
                     _networkData.Ssid = wifiInfo.SSID.Trim(new char[] { '"', '\"' });
                     _networkData.IpAddress = wifiInfo.IpAddress;
                     _networkData.NativeObject = wifiInfo;
+                    _networkData.SignalStrength = wifiInfo.Rssi;                  
                 }
             }
         }
@@ -368,12 +369,6 @@ namespace Plugin.MauiWifiManager
 
             public override void OnReceive(Context context, Intent intent)
             {
-                // Get the scan results
-                wifiScanner.wifiManager_2 = (WifiManager)context.GetSystemService(Context.WifiService);
-                var scanResults = wifiScanner.wifiManager_2.ScanResults;
-
-                // Populate the ScanResults list
-                ScanResults.AddRange(scanResults);
             }
         }
     }
