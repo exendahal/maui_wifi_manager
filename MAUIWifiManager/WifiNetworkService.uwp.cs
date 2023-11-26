@@ -1,5 +1,6 @@
 ﻿using Plugin.MauiWifiManager.Abstractions;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Windows.Devices.WiFi;
@@ -117,6 +118,32 @@ namespace Plugin.MauiWifiManager
         public void Dispose()
         {
 
+        }
+
+        public async Task<List<NetworkData>> ScanWifiNetworks()
+        {
+            List<NetworkData> wifiNetworks = new List<NetworkData>();
+
+            var accessStatus = await WiFiAdapter.RequestAccessAsync();
+            if (accessStatus == WiFiAccessStatus.Allowed)
+            {
+                var result = await WiFiAdapter.FindAllAdaptersAsync();
+                if (result.Count > 0)
+                {
+                    var wifiAdapter = result[0];
+                    var availableNetworks = wifiAdapter.NetworkReport.AvailableNetworks;
+
+                    foreach (var network in availableNetworks)
+                    {
+                        wifiNetworks.Add(new NetworkData
+                        {
+                            Ssid = network.Ssid,
+                            Bssid = network.Bssid
+                        });
+                    }
+                }
+            }
+            return wifiNetworks;
         }
     }
 }

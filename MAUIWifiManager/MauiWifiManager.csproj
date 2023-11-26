@@ -2,8 +2,8 @@
 
 	<PropertyGroup>
 
-		<TargetFrameworks>netstandard2.0;MonoAndroid10.0;Xamarin.iOS10;net6.0-android;net6.0-ios;net6.0-maccatalyst;</TargetFrameworks>
-		<TargetFrameworks Condition=" '$(OS)' == 'Windows_NT' ">$(TargetFrameworks);uap10.0.19041;net6.0-windows10.0.19041;</TargetFrameworks>
+		<TargetFrameworks>netstandard2.0;MonoAndroid10.0;Xamarin.iOS10;net8.0-android;net8.0-ios;net8.0-maccatalyst;</TargetFrameworks>
+		<TargetFrameworks Condition=" '$(OS)' == 'Windows_NT' ">$(TargetFrameworks);uap10.0.19041;net8.0-windows10.0.19041;</TargetFrameworks>
 		<!--Feel free to add as many targets as you need below
     netstandard1.0;netstandard2.0;MonoAndroid90;Xamarin.iOS10;uap10.0.16299;Xamarin.TVOS10;Xamarin.WatchOS10;Xamarin.Mac20;Tizen40;net6.0-tvos;net6.0-macos
 	

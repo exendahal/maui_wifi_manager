@@ -5,7 +5,9 @@ namespace Plugin.MauiWifiManager.Abstractions
     {
         public int StausId { get; set; }
         public string? Ssid { get; set; }
-        public string? IpAddress { get; set; }
+        public int IpAddress { get; set; }
         public string? GatewayAddress { get; set; }
+        public object? NativeObject { get; set; }
+        public object? Bssid { get; set; }
     }
 }

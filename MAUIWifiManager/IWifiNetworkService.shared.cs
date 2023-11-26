@@ -1,5 +1,6 @@
 ﻿using Plugin.MauiWifiManager.Abstractions;
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 
 namespace Plugin.MauiWifiManager
@@ -10,5 +11,6 @@ namespace Plugin.MauiWifiManager
         Task<NetworkData> GetNetworkInfo();
         void DisconnectWifi(string ssid);
         Task<bool> OpenWifiSetting();
+        Task<List<NetworkData>> ScanWifiNetworks();
     }    
 }
