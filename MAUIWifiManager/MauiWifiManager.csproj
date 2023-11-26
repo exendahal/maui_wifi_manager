@@ -31,8 +31,8 @@
 		<!--TODO: Fill these in-->
 		<!--See the following for a list of valid license expressions: https://spdx.org/licenses/ -->
 		<PackageLicenseExpression>MIT</PackageLicenseExpression>
-		<PackageProjectUrl>LINK TO PROJECT</PackageProjectUrl>
-		<RepositoryUrl>LINK TO PROJECT</RepositoryUrl>
+		<PackageProjectUrl>https://github.com/exendahal/WifiManagerMAUI</PackageProjectUrl>
+		<RepositoryUrl>https://github.com/exendahal/WifiManagerMAUI</RepositoryUrl>
 		<PackageReleaseNotes>RELEASE NOTES</PackageReleaseNotes>
 		<PackageIconUrl>ICON URL</PackageIconUrl>
 		<PackageTags>xamarin, windows, ios, android, xamarin.forms, plugin, Wifi.Manager</PackageTags>
