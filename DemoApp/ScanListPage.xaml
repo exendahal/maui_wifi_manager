@@ -4,22 +4,45 @@
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
     Title="Wi-Fi List">
-    <NavigationPage.TitleView>
-        <StackLayout HorizontalOptions="EndAndExpand" Orientation="Horizontal">
-            <Button Clicked="Button_Clicked" Text="Refresh" />
-        </StackLayout>
-    </NavigationPage.TitleView>
-    <StackLayout>
-        <CollectionView x:Name="myCollectionView" SelectionMode="Single">
-            <CollectionView.ItemsLayout>
-                <LinearItemsLayout Orientation="Vertical" />
-            </CollectionView.ItemsLayout>
+    <Shell.TitleView>
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <Label
+                Grid.Column="0"
+                FontSize="20"
+                HorizontalTextAlignment="Center"
+                Text="Wi-Fi List"
+                VerticalTextAlignment="Center" />
+            <Button
+                x:Name="scan"
+                Grid.Column="1"
+                BackgroundColor="Transparent"
+                Clicked="ScanClicked"
+                HorizontalOptions="End"
+                Text="Refresh"
+                TextColor="{AppThemeBinding Light=Black,
+                                            Dark=White}" />
+        </Grid>
+
+    </Shell.TitleView>
+    <StackLayout Padding="20,0">
+        <CollectionView
+            x:Name="scanCollectionView"
+            SelectionChanged="ScanCollectionViewSelectionChanged"
+            SelectionMode="Single">
             <CollectionView.ItemTemplate>
                 <DataTemplate>
-                    <!--  Your DataTemplate for each item in the collection  -->
-                    <StackLayout>
-                        <Label Text="{Binding Name}" />
-                        <!--  Add other controls as needed for your data  -->
+                    <StackLayout Margin="0,12">
+                        <Label FontSize="18" Text="{Binding SsidName}" />
+                        <Label FontSize="14" Text="{Binding Bssid}" />
+                        <BoxView
+                            Margin="0,8"
+                            BackgroundColor="{AppThemeBinding Light=Black,
+                                                              Dark=White}"
+                            HeightRequest="0.1" />
                     </StackLayout>
                 </DataTemplate>
             </CollectionView.ItemTemplate>

@@ -73,6 +73,9 @@
 	</ItemGroup>
 
 	<ItemGroup>
+	  <MauiXaml Update="ConnectWifi.xaml">
+	    <Generator>MSBuild:Compile</Generator>
+	  </MauiXaml>
 	  <MauiXaml Update="ScanListPage.xaml">
 	    <Generator>MSBuild:Compile</Generator>
 	  </MauiXaml>
