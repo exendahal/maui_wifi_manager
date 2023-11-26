@@ -11,7 +11,7 @@
     -->
 		<AssemblyName>Plugin.MauiWifiManager</AssemblyName>
 		<RootNamespace>Plugin.MauiWifiManager</RootNamespace>
-		<PackageId>Plugin.Feature1</PackageId>
+		<PackageId>Plugin.MauiWifiManager</PackageId>
 
 		<Product>$(AssemblyName) ($(TargetFramework))</Product>
 		<AssemblyVersion>1.0.0.0</AssemblyVersion>
