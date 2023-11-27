@@ -17,7 +17,7 @@ public partial class ScanListPage : ContentPage
     private async void ScanClicked(object sender, EventArgs e)
     {
         PermissionStatus status = await Permissions.RequestAsync<Permissions.LocationWhenInUse>();
-        if (status == PermissionStatus.Granted)
+        if (status == PermissionStatus.Granted || DeviceInfo.Current.Platform == DevicePlatform.WinUI)
         {
             var response = await CrossWifiManager.Current.ScanWifiNetworks();
             foreach (var item in response)

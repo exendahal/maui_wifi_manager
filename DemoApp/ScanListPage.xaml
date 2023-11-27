@@ -22,7 +22,7 @@
                 BackgroundColor="Transparent"
                 Clicked="ScanClicked"
                 HorizontalOptions="End"
-                Text="Refresh"
+                Text="Scan"
                 TextColor="{AppThemeBinding Light=Black,
                                             Dark=White}" />
         </Grid>
@@ -33,6 +33,9 @@
             x:Name="scanCollectionView"
             SelectionChanged="ScanCollectionViewSelectionChanged"
             SelectionMode="Single">
+            <CollectionView.ItemsLayout>
+                <LinearItemsLayout Orientation="Vertical" />
+            </CollectionView.ItemsLayout>
             <CollectionView.ItemTemplate>
                 <DataTemplate>
                     <StackLayout Margin="0,12">
