@@ -132,13 +132,14 @@ namespace Plugin.MauiWifiManager
                 {
                     var wifiAdapter = result[0];
                     var availableNetworks = wifiAdapter.NetworkReport.AvailableNetworks;
-
                     foreach (var network in availableNetworks)
                     {
                         wifiNetworks.Add(new NetworkData
                         {
                             Ssid = network.Ssid,
-                            Bssid = network.Bssid
+                            Bssid = network.Bssid,
+                            SignalStrength = network.SignalBars,
+                            SecurityType = network.PhyKind
                         });
                     }
                 }
