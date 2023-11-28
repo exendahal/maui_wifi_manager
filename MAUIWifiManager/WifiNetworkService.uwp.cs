@@ -120,6 +120,9 @@ namespace Plugin.MauiWifiManager
 
         }
 
+        /// <summary>
+        /// Scan Wi-Fi Networks
+        /// </summary>
         public async Task<List<NetworkData>> ScanWifiNetworks()
         {
             List<NetworkData> wifiNetworks = new List<NetworkData>();
