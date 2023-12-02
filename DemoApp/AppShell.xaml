@@ -5,13 +5,5 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
     xmlns:local="clr-namespace:DemoApp"
     Title="MAUI Wi-FI Manager">
-    <FlyoutItem Title="Scan Wi-Fi">
-        <ShellContent ContentTemplate="{DataTemplate local:ScanListPage}" />
-    </FlyoutItem>
-    <FlyoutItem Title="Connect Wi-Fi">
-        <ShellContent ContentTemplate="{DataTemplate local:ConnectWifi}" />
-    </FlyoutItem>
-    <FlyoutItem Title="Open Setting">
-        <ShellContent ContentTemplate="{DataTemplate local:MainPage}" />
-    </FlyoutItem>
+    <ShellContent ContentTemplate="{DataTemplate local:MainPage}" />
 </Shell>

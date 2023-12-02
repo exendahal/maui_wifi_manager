@@ -1,5 +1,4 @@
 ﻿using Plugin.MauiWifiManager;
-using System.Net;
 namespace DemoApp
 {
     public partial class MainPage : ContentPage
@@ -7,51 +6,40 @@ namespace DemoApp
         public MainPage()
         {
             InitializeComponent();
-        }
+        }        
 
-        private async void ConnectBtnClicked(object sender, EventArgs e)
-        {
-            if (string.IsNullOrWhiteSpace(WifiSsid.Text) || string.IsNullOrWhiteSpace(WifiPassword.Text))
-            {
-                await DisplayAlert("Empty SSID or Password", "SSID and Password cannot be empty", "OK");
-                return;
-            }
-
-            var response = await CrossWifiManager.Current.ConnectWifi(WifiSsid.Text, WifiPassword.Text);
-        }
-
-        private async void InfoBtnClicked(object sender, EventArgs e)
-        {
-            PermissionStatus status = await Permissions.RequestAsync<Permissions.LocationWhenInUse>();
-            if (status == PermissionStatus.Granted)
-            {
-                var response = await CrossWifiManager.Current.GetNetworkInfo();
-                Console.WriteLine(response.NativeObject);
-                IPAddress ipAddress = new IPAddress(BitConverter.GetBytes(response.IpAddress));
-                await DisplayAlert(response.Ssid,"IP Address: " + ipAddress, "OK");
-            }                
-            else
-                await DisplayAlert("No location permisson","Please provide location permission","OK");
-        }
-
-        private void DisconnectBtnClicked(object sender, EventArgs e)
-        {
-            CrossWifiManager.Current.DisconnectWifi(WifiSsid.Text);
-        }
-
-        private async void OpenWifiSettingClicked(object sender, EventArgs e)
-        {
-            var response = await CrossWifiManager.Current.OpenWifiSetting();
-        }
-
-        private async void StartScanClicked(object sender, EventArgs e)
-        {
-            var response = await CrossWifiManager.Current.ScanWifiNetworks();
-        }
-
-        private async void ScanListClicked(object sender, EventArgs e)
+        private async void ScanTapped(object sender, TappedEventArgs e)
         {
             await Navigation.PushAsync(new ScanListPage());
+        }
+
+        private async void ConnectWiFiTapped(object sender, TappedEventArgs e)
+        {
+            await Navigation.PushAsync(new ConnectWifi());
+        }
+
+        private async void NetworkInfoTapped(object sender, TappedEventArgs e)
+        {
+            await Navigation.PushAsync(new NetworkInfo());
+        }
+
+        private async void DisconnectSettingTapped(object sender, TappedEventArgs e)
+        {
+            await Navigation.PushAsync(new DisconnectWifi());
+        }
+
+        private async void OpenSettingTapped(object sender, TappedEventArgs e)
+        {
+            var result = await DisplayAlert("Open setting", "Do you want to open Wi-Fi setting?", "YES", "NO");
+            if (result)
+            {
+                await CrossWifiManager.Current.OpenWifiSetting();
+            }
+        }
+
+        private async void InfoTapped(object sender, TappedEventArgs e)
+        {
+             await DisplayAlert("MAUI Wi-Fi Manager", "Target Framework: .NET 8\nDeveloped by: Santosh Dahal", "OK");
         }
     }
 

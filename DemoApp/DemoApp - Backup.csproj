@@ -57,11 +57,6 @@
 	</ItemGroup>
 
 	<ItemGroup>
-	  <None Include="DemoApp.csproj" />
-	  <None Include="DemoApp.csproj.user" />
-	</ItemGroup>
-
-	<ItemGroup>
 		<PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)" />
 		<PackageReference Include="Microsoft.Maui.Controls.Compatibility" Version="$(MauiVersion)" />
 		<PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="8.0.0" />
@@ -73,6 +68,9 @@
 	</ItemGroup>
 
 	<ItemGroup>
+	  <Compile Update="DisconnectWifi.xaml.cs">
+	    <DependentUpon>DisconnectWifi.xaml</DependentUpon>
+	  </Compile>
 	  <Compile Update="ScanListPage.xaml.cs">
 	    <DependentUpon>ScanListPage.xaml</DependentUpon>
 	  </Compile>
@@ -82,10 +80,10 @@
 	  <MauiXaml Update="ConnectWifi.xaml">
 	    <Generator>MSBuild:Compile</Generator>
 	  </MauiXaml>
-	  <MauiXaml Update="DisconnectWifi.xaml">
+	  <MauiXaml Update="NetworkInfo.xaml">
 	    <Generator>MSBuild:Compile</Generator>
 	  </MauiXaml>
-	  <MauiXaml Update="NetworkInfo.xaml">
+	  <MauiXaml Update="DisconnectWifi.xaml">
 	    <Generator>MSBuild:Compile</Generator>
 	  </MauiXaml>
 	  <MauiXaml Update="ScanListPage.xaml">

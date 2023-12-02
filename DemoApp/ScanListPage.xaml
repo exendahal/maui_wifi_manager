@@ -3,7 +3,7 @@
     x:Class="DemoApp.ScanListPage"
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
-    Title="Wi-Fi List">
+    x:Name="scanPage">
     <Shell.TitleView>
         <Grid>
             <Grid.ColumnDefinitions>
@@ -12,43 +12,80 @@
             </Grid.ColumnDefinitions>
             <Label
                 Grid.Column="0"
-                FontSize="20"
+                FontSize="Title"
                 HorizontalTextAlignment="Center"
                 Text="Wi-Fi List"
+                TextColor="{StaticResource SecondaryDarkText}"
+                TextTransform="Uppercase"
                 VerticalTextAlignment="Center" />
             <Button
                 x:Name="scan"
                 Grid.Column="1"
                 BackgroundColor="Transparent"
                 Clicked="ScanClicked"
+                FontSize="Medium"
                 HorizontalOptions="End"
                 Text="Scan"
-                TextColor="{AppThemeBinding Light=Black,
-                                            Dark=White}" />
+                TextColor="{StaticResource SecondaryDarkText}"
+                TextTransform="Uppercase" />
         </Grid>
-
     </Shell.TitleView>
-    <StackLayout Padding="20,0">
-        <CollectionView
-            x:Name="scanCollectionView"
-            SelectionChanged="ScanCollectionViewSelectionChanged"
-            SelectionMode="Single">
-            <CollectionView.ItemsLayout>
-                <LinearItemsLayout Orientation="Vertical" />
-            </CollectionView.ItemsLayout>
-            <CollectionView.ItemTemplate>
-                <DataTemplate>
-                    <StackLayout Margin="0,12">
-                        <Label FontSize="18" Text="{Binding SsidName}" />
-                        <Label FontSize="14" Text="{Binding Bssid}" />
-                        <BoxView
-                            Margin="0,8"
-                            BackgroundColor="{AppThemeBinding Light=Black,
-                                                              Dark=White}"
-                            HeightRequest="0.1" />
-                    </StackLayout>
-                </DataTemplate>
-            </CollectionView.ItemTemplate>
-        </CollectionView>
-    </StackLayout>
+    <Grid>
+        <ActivityIndicator
+            x:Name="loading"
+            HeightRequest="46"
+            IsRunning="True"
+            WidthRequest="46"
+            Color="{StaticResource SecondaryDarkText}" />
+        <ScrollView Padding="20,0">
+            <CollectionView x:Name="scanCollectionView" SelectionMode="None">
+                <CollectionView.ItemsLayout>
+                    <LinearItemsLayout Orientation="Vertical" />
+                </CollectionView.ItemsLayout>
+                <CollectionView.ItemTemplate>
+                    <DataTemplate>
+                        <StackLayout Padding="12,6">
+                            <Grid ColumnSpacing="12">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackLayout Grid.Column="0" VerticalOptions="CenterAndExpand">
+                                    <Label FontSize="18" Text="{Binding SsidName}" />
+                                    <Label FontSize="14" Text="{Binding Bssid}" />
+                                </StackLayout>
+                                <Button
+                                    Grid.Column="1"
+                                    Padding="18,0"
+                                    Command="{Binding Source={x:Reference Name=scanPage}, Path=BindingContext.InfoCommand}"
+                                    CommandParameter="{Binding .}"
+                                    CornerRadius="2"
+                                    HeightRequest="44"
+                                    Text="Info"
+                                    TextTransform="Uppercase"
+                                    VerticalOptions="CenterAndExpand" />
+                                <Button
+                                    Grid.Column="2"
+                                    Padding="8,0"
+                                    Command="{Binding Source={x:Reference Name=scanPage}, Path=BindingContext.ConnectCommand}"
+                                    CommandParameter="{Binding .}"
+                                    CornerRadius="2"
+                                    HeightRequest="44"
+                                    Text="Connect"
+                                    TextTransform="Uppercase"
+                                    VerticalOptions="CenterAndExpand" />
+                            </Grid>
+                            <BoxView
+                                Margin="0,8"
+                                BackgroundColor="{AppThemeBinding Light=Black,
+                                                                  Dark=White}"
+                                HeightRequest="0.1" />
+                        </StackLayout>
+                    </DataTemplate>
+                </CollectionView.ItemTemplate>
+            </CollectionView>
+        </ScrollView>
+    </Grid>
+
 </ContentPage>
