@@ -1,4 +1,5 @@
 ﻿using Plugin.MauiWifiManager;
+using System.Runtime.CompilerServices;
 namespace DemoApp
 {
     public partial class MainPage : ContentPage
@@ -10,22 +11,39 @@ namespace DemoApp
 
         private async void ScanTapped(object sender, TappedEventArgs e)
         {
-            await Navigation.PushAsync(new ScanListPage());
+            PermissionStatus status = await Permissions.RequestAsync<Permissions.LocationWhenInUse>();
+            if (status == PermissionStatus.Granted || DeviceInfo.Current.Platform == DevicePlatform.WinUI)
+                await Navigation.PushAsync(new ScanListPage());
+            else
+                await DisplayAlert("No location permisson", "Please provide location permission", "OK");
+           
         }
 
         private async void ConnectWiFiTapped(object sender, TappedEventArgs e)
         {
-            await Navigation.PushAsync(new ConnectWifi());
+            PermissionStatus status = await Permissions.RequestAsync<Permissions.LocationWhenInUse>();
+            if (status == PermissionStatus.Granted || DeviceInfo.Current.Platform == DevicePlatform.WinUI)
+                await Navigation.PushAsync(new ConnectWifi());
+            else
+                await DisplayAlert("No location permisson", "Please provide location permission", "OK");           
         }
 
         private async void NetworkInfoTapped(object sender, TappedEventArgs e)
         {
-            await Navigation.PushAsync(new NetworkInfo());
+            PermissionStatus status = await Permissions.RequestAsync<Permissions.LocationWhenInUse>();
+            if (status == PermissionStatus.Granted || DeviceInfo.Current.Platform == DevicePlatform.WinUI)
+                await Navigation.PushAsync(new NetworkInfo());
+            else
+                await DisplayAlert("No location permisson", "Please provide location permission", "OK");           
         }
 
         private async void DisconnectSettingTapped(object sender, TappedEventArgs e)
         {
-            await Navigation.PushAsync(new DisconnectWifi());
+            PermissionStatus status = await Permissions.RequestAsync<Permissions.LocationWhenInUse>();
+            if (status == PermissionStatus.Granted || DeviceInfo.Current.Platform == DevicePlatform.WinUI)
+                await Navigation.PushAsync(new DisconnectWifi());
+            else
+                await DisplayAlert("No location permisson", "Please provide location permission", "OK");           
         }
 
         private async void OpenSettingTapped(object sender, TappedEventArgs e)
