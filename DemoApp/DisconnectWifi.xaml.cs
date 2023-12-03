@@ -13,7 +13,7 @@ public partial class DisconnectWifi : ContentPage
     {
         base.OnAppearing();
         PermissionStatus status = await Permissions.RequestAsync<Permissions.LocationWhenInUse>();
-        if (status == PermissionStatus.Granted)
+        if (status == PermissionStatus.Granted || DeviceInfo.Current.Platform == DevicePlatform.WinUI)
         {
             var response = await CrossWifiManager.Current.GetNetworkInfo();
             ssid = response.Ssid;

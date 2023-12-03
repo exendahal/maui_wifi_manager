@@ -60,7 +60,7 @@ public partial class ScanListPage : ContentPage
                 networkDataModel.Add(new NetworkDataModel() 
                 {
                     StausId = item.StausId,
-                    IpAddress = item.IpAddress, 
+                    IpAddress = (int)item.IpAddress, 
                     Bssid = item.Bssid, 
                     Ssid = item.Ssid, 
                     GatewayAddress = item.GatewayAddress, 
