@@ -2,8 +2,10 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using System.Threading.Tasks;
 using Windows.Devices.WiFi;
+using Windows.Networking;
 using Windows.Networking.Connectivity;
 using Windows.Security.Credentials;
 using Windows.System;
@@ -102,11 +104,13 @@ namespace Plugin.MauiWifiManager
             {
                 data.Ssid = profile.WlanConnectionProfileDetails.GetConnectedSsid();
             }
+            var hostNames = NetworkInformation.GetHostNames();
+            var ipAddressString = hostNames.FirstOrDefault(h => h.Type == HostNameType.Ipv4)?.DisplayName;
+            IPAddress ipAddress = IPAddress.Parse(ipAddressString);
+            data.IpAddress = BitConverter.ToInt32(ipAddress.GetAddressBytes(), 0);
+            data.Bssid = profile.NetworkAdapter.NetworkAdapterId;
             data.NativeObject = profile;
-            if (profile.IsWlanConnectionProfile)
-            {
-                var details = profile.WlanConnectionProfileDetails;
-            }
+            data.SignalStrength = profile.GetSignalBars();           
             return Task.FromResult(data);
         }
 
