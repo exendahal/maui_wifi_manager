@@ -95,13 +95,19 @@ namespace Plugin.MauiWifiManager
         /// </summary>
         public Task<NetworkData> GetNetworkInfo()
         {
-            NetworkData networkData = new NetworkData();
-            ConnectionProfile InternetConnectionProfile = NetworkInformation.GetInternetConnectionProfile();
-            if (InternetConnectionProfile?.ProfileName != null)
+            NetworkData data = new NetworkData();
+            ConnectionProfile profile = NetworkInformation.GetInternetConnectionProfile();
+            data.StausId = (int)profile.GetNetworkConnectivityLevel();
+            if (profile.IsWlanConnectionProfile)
             {
-                networkData.Ssid = InternetConnectionProfile?.ProfileName;
+                data.Ssid = profile.WlanConnectionProfileDetails.GetConnectedSsid();
             }
-            return Task.FromResult(networkData);
+            data.NativeObject = profile;
+            if (profile.IsWlanConnectionProfile)
+            {
+                var details = profile.WlanConnectionProfileDetails;
+            }
+            return Task.FromResult(data);
         }
 
         /// <summary>
