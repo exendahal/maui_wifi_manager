@@ -1,11 +1,12 @@
-﻿using CoreLocation;
+﻿using CoreFoundation;
+using CoreLocation;
 using Foundation;
 using NetworkExtension;
-using ObjCRuntime;
 using Plugin.MauiWifiManager.Abstractions;
 using System;
 using System.Collections.Generic;
-using System.Runtime.InteropServices;
+using System.Linq;
+using System.Net;
 using System.Threading.Tasks;
 using SystemConfiguration;
 using UIKit;
@@ -17,8 +18,10 @@ namespace Plugin.MauiWifiManager
     /// </summary>
     public class WifiNetworkService : IWifiNetworkService
     {
+        public NEHotspotHelper hotspotHelper;
         public WifiNetworkService()
         {
+            hotspotHelper = new NEHotspotHelper();
         }
         public async Task<NetworkData> ConnectWifi(string ssid, string password)
         {
@@ -34,7 +37,7 @@ namespace Plugin.MauiWifiManager
             {
                 if (error?.LocalizedDescription == "already associated.")
                 {
-                    
+                    networkData = await GetNetworkInfo();
                 }
                 else
                 {
@@ -72,9 +75,15 @@ namespace Plugin.MauiWifiManager
                     {
                         if (CaptiveNetwork.TryCopyCurrentNetworkInfo(item, out NSDictionary? info) == StatusCode.OK)
                         {
-                            networkData.Ssid = info?[CaptiveNetwork.NetworkInfoKeySSID].ToString();                            
+                            networkData.Ssid = info?[CaptiveNetwork.NetworkInfoKeySSID].ToString();
+                            networkData.Bssid = info?[CaptiveNetwork.NetworkInfoKeyBSSID].ToString();
+                            networkData.NativeObject = info;
                         }
                     }
+                    IPAddress[] ipAddresses = Dns.GetHostAddresses(Dns.GetHostName());
+                    IPAddress ipAddress = ipAddresses.FirstOrDefault(ip => ip.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork);
+                    networkData.IpAddress = BitConverter.ToInt32(ipAddress.GetAddressBytes(), 0);
+
                 }
             }
             return Task.FromResult(networkData);
@@ -88,7 +97,7 @@ namespace Plugin.MauiWifiManager
         public Task<bool> OpenWifiSetting()
         {
             if (UIDevice.CurrentDevice.CheckSystemVersion(8, 0))
-            {                
+            {
                 NSUrl url = new NSUrl(UIApplication.OpenSettingsUrlString);
                 return Task.FromResult(UIApplication.SharedApplication.OpenUrl(url));
             }
@@ -104,90 +113,61 @@ namespace Plugin.MauiWifiManager
         }
 
         /// <summary>
-        /// Scan Wi-Fi Networks
+        /// Scan Wi-Fi Networks       
         /// </summary>
         public async Task<List<NetworkData>> ScanWifiNetworks()
         {
             List<NetworkData> wifiNetworks = new List<NetworkData>();
-            // Check if Wi-Fi is available on the device
-            if (Reachability.LocalWifiConnectionStatus() == NetworkStatus.NotReachable)
+
+            var queue = new DispatchQueue("com.BajraTech.MauiWifiManager");
+            var options = new NEHotspotHelperOptions { DisplayName = (NSString)"Maui Wifi Manager" };
+            var handler = new NEHotspotHelperHandler(async (cmd) =>
             {
-                Console.WriteLine("Wi-Fi is not reachable.");
-                return wifiNetworks;
+                if (cmd.CommandType == NEHotspotHelperCommandType.FilterScanList)
+                {
+                    foreach (var network in cmd.NetworkList)
+                    {
+                        wifiNetworks.Add(new NetworkData
+                        {
+                            Ssid = network.Ssid,
+                            Bssid = network.Bssid,
+                            SignalStrength = network.SignalStrength
+                        });
+                    }
+                    await Task.Delay(1000); // wait for the scan to complete
+                    var response = cmd.CreateResponse(NEHotspotHelperResult.Success);
+                    response.SetNetworkList(cmd.NetworkList);
+                    response.Deliver();
+                }
+                else if (cmd.CommandType == NEHotspotHelperCommandType.Evaluate)
+                {
+                    // Evaluate the network and set the confidence level
+                    var network = cmd.Network;
+                    network.SetConfidence(NEHotspotHelperConfidence.High);
+                    var response = cmd.CreateResponse(NEHotspotHelperResult.Success);
+                    response.SetNetwork(network);
+                    response.Deliver();
+                }
+                else if (cmd.CommandType == NEHotspotHelperCommandType.Authenticate)
+                {
+                    // Perform custom authentication and deliver the result
+                    var response = cmd.CreateResponse(NEHotspotHelperResult.Success);
+                    response.Deliver();
+                }
+            });
+
+            var success = NEHotspotHelper.Register(options, queue, handler);
+            if (success)
+            {
+                Console.WriteLine("Registered successfully");
+            }
+            else
+            {
+                Console.WriteLine("Registration failed");
             }
 
-            // Get the list of available networks
-            var interfaces = CNCopySupportedInterfaces();
-            if (interfaces != null)
-            {
-                var interfaceArray = NSArray.ArrayFromHandle<NSString>(interfaces);
-                foreach (var interfaceName in interfaceArray)
-                {
-                    NSDictionary info;
-                    var status = CaptiveNetwork.TryCopyCurrentNetworkInfo(interfaceName, out info);
-                    if (status != StatusCode.OK)
-                    {
-                        continue;
-                    }
-                    var ssid = info[CaptiveNetwork.NetworkInfoKeySSID].ToString();
-                    var bssid = info[CaptiveNetwork.NetworkInfoKeyBSSID].ToString();
-                    if (ssid != null && bssid != null)
-                    {
-                        wifiNetworks.Add(new NetworkData { Ssid = ssid.ToString(), Bssid = bssid.ToString() });
-                    }
-                }
-            }
             return wifiNetworks;
         }
-        // Import CoreFoundation
-        [DllImport(Constants.CoreFoundationLibrary)]
-        extern static IntPtr CNCopySupportedInterfaces();
 
-        [DllImport(Constants.SystemConfigurationLibrary)]
-        extern static IntPtr CNCopyCurrentNetworkInfo(IntPtr interfaceName);
-
-        // Reachability class to check Wi-Fi connection status
-        public class Reachability
-        {
-            public static NetworkStatus LocalWifiConnectionStatus()
-            {
-                NetworkReachabilityFlags flags;
-                bool defaultNetworkAvailable = IsNetworkAvailable(out flags);
-                if (defaultNetworkAvailable && ((flags & NetworkReachabilityFlags.IsDirect) != 0))
-                    return NetworkStatus.NotReachable;
-                else if ((flags & NetworkReachabilityFlags.IsWWAN) != 0)
-                    return NetworkStatus.ReachableViaCarrierDataNetwork;
-                else if (flags == 0)
-                    return NetworkStatus.NotReachable;
-                return NetworkStatus.ReachableViaWiFiNetwork;
-            }
-
-            static bool IsNetworkAvailable(out NetworkReachabilityFlags flags)
-            {
-                using (var h = new NetworkReachability("www.apple.com"))
-                {
-                    if (h == null)
-                    {
-                        flags = 0;
-                        return false;
-                    }
-
-                    return h.TryGetFlags(out flags) && IsReachableWithoutRequiringConnection(flags);
-                }
-            }
-
-            static bool IsReachableWithoutRequiringConnection(NetworkReachabilityFlags flags)
-            {
-                return (flags & NetworkReachabilityFlags.Reachable) != 0;
-            }
-        }
-
-        // Enum for network status
-        public enum NetworkStatus
-        {
-            NotReachable,
-            ReachableViaCarrierDataNetwork,
-            ReachableViaWiFiNetwork
-        }
     }
 }
