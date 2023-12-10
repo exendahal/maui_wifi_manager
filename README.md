@@ -1,6 +1,6 @@
-# Wifi Manager for MAUI & Xamarin Forms
+# Wifi Manager for MAUI
 
-Welcome to the documentation for the MAUI Wi-Fi Manager library, a comprehensive solution designed specifically for MAUI & Xamarin.Forms applications. This library empowers developers to effortlessly manage Wi-Fi networks within their cross-platform applications. With its intuitive APIs, you can seamlessly integrate Wi-Fi functionality, allowing users to connect to, add, and retrieve information about Wi-Fi networks with ease.
+Welcome to the documentation for the MAUI Wi-Fi Manager library, a comprehensive solution designed specifically for MAUI. This library empowers developers to effortlessly manage Wi-Fi networks within their cross-platform applications. With its intuitive APIs, you can seamlessly integrate Wi-Fi functionality, allowing users to connect to, add, and retrieve information about Wi-Fi networks with ease.
 
 ## Platform Support
 
@@ -51,6 +51,29 @@ Android Permissions
 
 Make sure you request location before scanning Wi-Fi
 
+#### iOS
+
+Add wifi-info and HotspotConfiguration in Entitlements.plist
+
+```xml
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+ <key>com.apple.developer.networking.wifi-info</key>
+ <true/>
+ <key>com.apple.developer.networking.HotspotConfiguration</key>
+ <true/>
+</dict>
+</plist>
+```
+
+Request location permisson on info.plist
+
+```xml
+<key>NSLocationWhenInUseUsageDescription</key>
+<string>App want to access location to get ssid</string>
+```
+
 Example
 
 ```csharp
@@ -86,7 +109,7 @@ The NetworkData class is defined as follows:
  }
 ```
 
-#### Scan available Wi-Fi
+#### Scan available Wi-Fi (Not available on iOS)
 
 You can available Wi-Fi networks using the ScanWifiNetworks method:
 
