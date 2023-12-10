@@ -28,5 +28,11 @@
 	</array>
 	<key>XSAppIconAssets</key>
 	<string>Assets.xcassets/appicon.appiconset</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Get current location</string>
+	<key>CFBundleDisplayName</key>
+	<string>Maui Wifi Manager</string>
+	<key>CFBundleIdentifier</key>
+	<string>com.BajraTech.MauiWifiManager</string>
 </dict>
 </plist>
