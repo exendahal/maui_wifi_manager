@@ -10,8 +10,8 @@
     For UWP update the version number with a version number you have installed.
     -->
 		<AssemblyName>Plugin.MauiWifiManager</AssemblyName>
-		<RootNamespace>Plugin.MauiWifiManager</RootNamespace>
-		<PackageId>Plugin.MauiWifiManager</PackageId>
+		<RootNamespace>Plugin.MauiWifiManage</RootNamespace>
+		<PackageId>WifiManager.Maui</PackageId>
 
 		<Product>$(AssemblyName) ($(TargetFramework))</Product>
 		<AssemblyVersion>1.0.0.0</AssemblyVersion>
@@ -33,8 +33,8 @@
 		<PackageLicenseExpression>MIT</PackageLicenseExpression>
 		<PackageProjectUrl>https://github.com/exendahal/WifiManagerMAUI</PackageProjectUrl>
 		<RepositoryUrl>https://github.com/exendahal/WifiManagerMAUI</RepositoryUrl>
-		<PackageReleaseNotes>RELEASE NOTES</PackageReleaseNotes>
-		<PackageIconUrl>ICON URL</PackageIconUrl>
+		<PackageIcon>icon.png</PackageIcon>
+		<PackageReadmeFile>README.md</PackageReadmeFile>
 		<PackageTags>xamarin, windows, ios, android, xamarin.forms, plugin, Wifi.Manager</PackageTags>
 
 		<Title>Wi-Fi Manager Plugin for MAUI</Title>
@@ -42,9 +42,9 @@
 		<Description>Wi-Fi Manager Plugin for MAUI</Description>
 
 
-		<Owners>Santsh Dahal</Owners>
-		<Authors>Santosh Dahal</Authors>
-		<Copyright>Copyright 2023</Copyright>
+		<Owners>exendahal</Owners>
+		<Authors>exendahal</Authors>
+		<Copyright>Santosh Dahal</Copyright>
 
 		<NeutralLanguage>en</NeutralLanguage>
 		<EnableDefaultCompileItems>false</EnableDefaultCompileItems>
@@ -76,6 +76,8 @@
 		
 	<ItemGroup Condition=" '$(Configuration)'=='Release' And '$(OS)' == 'Windows_NT' ">
 		<PackageReference Include="Microsoft.SourceLink.GitHub" Version="1.1.1" PrivateAssets="All" />
+		<None Include="docs\README.md" Pack="true" PackagePath="\" />
+		<None Include="images\icon.png" Pack="true" PackagePath="\" />
 	</ItemGroup>
 
 	<PropertyGroup Condition=" '$(Configuration)'=='Debug' ">
