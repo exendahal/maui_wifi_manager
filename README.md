@@ -2,7 +2,8 @@
 
 Welcome to the documentation for the MAUI Wi-Fi Manager library, a comprehensive solution designed specifically for MAUI. This library empowers developers to effortlessly manage Wi-Fi networks within their cross-platform applications. With its intuitive APIs, you can seamlessly integrate Wi-Fi functionality, allowing users to connect to, add, and retrieve information about Wi-Fi networks with ease.
 
-[![WifiManager.Maui](https://img.shields.io/nuget/v/WifiManager.Maui)](WifiManager.Maui)
+[![WifiManager.Maui](https://img.shields.io/nuget/v/WifiManager.Maui)](https://www.nuget.org/packages/WifiManager.Maui/)
+
 
 ## Platform Support
 
