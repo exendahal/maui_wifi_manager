@@ -14,10 +14,10 @@
 		<PackageId>WifiManager.Maui</PackageId>
 
 		<Product>$(AssemblyName) ($(TargetFramework))</Product>
-		<AssemblyVersion>1.0.0.0</AssemblyVersion>
-		<AssemblyFileVersion>1.0.0.0</AssemblyFileVersion>
-		<Version>1.0.0.0</Version>
-		<PackageVersion>1.0.0.0</PackageVersion>
+		<AssemblyVersion>1.0.1</AssemblyVersion>
+		<AssemblyFileVersion>1.0.1</AssemblyFileVersion>
+		<Version>1.0.1</Version>
+		<PackageVersion>1.0.1</PackageVersion>
 		<PackOnBuild>true</PackOnBuild>
 		<NeutralLanguage>en</NeutralLanguage>
 		<DefineConstants>$(DefineConstants);</DefineConstants>
@@ -37,9 +37,8 @@
 		<PackageReadmeFile>README.md</PackageReadmeFile>
 		<PackageTags>xamarin, windows, ios, android, xamarin.forms, plugin, Wifi.Manager</PackageTags>
 
-		<Title>Wi-Fi Manager Plugin for MAUI</Title>
-		<Summary>Wi-Fi Manager Plugin for MAUI</Summary>
-		<Description>Wi-Fi Manager Plugin for MAUI</Description>
+		<Title>Wi-Fi Manager Plugin for MAUI</Title>		
+		<Description>MAUI Wi-Fi Manager is solution for Wi-Fi management features. With these APIs, effortlessly connect, add, and retrieve Wi-Fi network information in cross-platform MAUI applications.</Description>
 
 
 		<Owners>exendahal</Owners>

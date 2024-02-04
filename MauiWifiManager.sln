@@ -5,7 +5,7 @@ VisualStudioVersion = 17.5.33424.131
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DemoApp", "DemoApp\DemoApp.csproj", "{44458D82-6C21-4B4A-B29F-B8F85257CE43}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MauiWifiManager", "MAUIWifiManager\MauiWifiManager.csproj", "{8A687AF0-600B-4107-B540-050E6099CAD1}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MauiWifiManager", "MAUIWifiManager\MauiWifiManager.csproj", "{722B9A3D-2FD5-4DAA-AAEF-3A21EAABBD60}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -19,10 +19,10 @@ Global
 		{44458D82-6C21-4B4A-B29F-B8F85257CE43}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{44458D82-6C21-4B4A-B29F-B8F85257CE43}.Release|Any CPU.Build.0 = Release|Any CPU
 		{44458D82-6C21-4B4A-B29F-B8F85257CE43}.Release|Any CPU.Deploy.0 = Release|Any CPU
-		{8A687AF0-600B-4107-B540-050E6099CAD1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{8A687AF0-600B-4107-B540-050E6099CAD1}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{8A687AF0-600B-4107-B540-050E6099CAD1}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{8A687AF0-600B-4107-B540-050E6099CAD1}.Release|Any CPU.Build.0 = Release|Any CPU
+		{722B9A3D-2FD5-4DAA-AAEF-3A21EAABBD60}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{722B9A3D-2FD5-4DAA-AAEF-3A21EAABBD60}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{722B9A3D-2FD5-4DAA-AAEF-3A21EAABBD60}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{722B9A3D-2FD5-4DAA-AAEF-3A21EAABBD60}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
