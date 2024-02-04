@@ -14,11 +14,11 @@ Welcome to the documentation for the MAUI Wi-Fi Manager library, a comprehensive
 
 ## Features
 
-- Connect Wi-Fi with SSID and Password:** Enable users to connect to Wi-Fi networks by providing the SSID and password.
-- Add a New Wi-Fi Network:** Seamlessly add new Wi-Fi networks to the device.
-- Get Current Network Info:** Retrieve information about the currently connected Wi-Fi network.
-- Disconnect Wi-Fi:** Allow users to disconnect from a Wi-Fi network.
-- Open Wi-Fi Setting:** Provide a quick way for users to access their device's Wi-Fi settings.
+- Connect Wi-Fi with SSID and Password: Enable users to connect to Wi-Fi networks by providing the SSID and password.
+- Add a New Wi-Fi Network: Seamlessly add new Wi-Fi networks to the device.
+- Get Current Network Info: Retrieve information about the currently connected Wi-Fi network.
+- Disconnect Wi-Fi: Allow users to disconnect from a Wi-Fi network.
+- Open Wi-Fi Setting: Provide a quick way for users to access their device's Wi-Fi settings.
 
 ## Getting started
 
