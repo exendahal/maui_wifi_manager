@@ -66,7 +66,7 @@ Add wifi-info and HotspotConfiguration in Entitlements.plist
 </plist>
 ```
 
-Request location permisson on info.plist
+Request location permission on info.plist
 
 ```xml
 <key>NSLocationWhenInUseUsageDescription</key>
@@ -82,7 +82,7 @@ if (status == PermissionStatus.Granted)
     var response = await CrossWifiManager.Current.ScanWifiNetworks();    
 }
 else
-    await DisplayAlert("No location permisson", "Please provide location permission", "OK");
+    await DisplayAlert("No location permission", "Please provide location permission", "OK");
 ```
 
 #### Connect to Wi-Fi
@@ -99,18 +99,18 @@ The NetworkData class is defined as follows:
  public class NetworkData
  {
     public int StausId { get; set; }
-    public string? Ssid { get; set; }
+    public string Ssid { get; set; }
     public int IpAddress { get; set; }
-    public string? GatewayAddress { get; set; }
-    public object? NativeObject { get; set; }
-    public object? Bssid { get; set; }
-    public object? SignalStrength { get; set; }
+    public string GatewayAddress { get; set; }
+    public object NativeObject { get; set; }
+    public object Bssid { get; set; }
+    public object SignalStrength { get; set; }
  }
 ```
 
 #### Scan available Wi-Fi (Not available on iOS)
 
-You can available Wi-Fi networks using the ScanWifiNetworks method:
+You can available Wi-Fi networks using the ScanWifiNetworks method (Available on Android & Windows):
 
 ```csharp
    var response = await CrossWifiManager.Current.ScanWifiNetworks();
@@ -141,11 +141,6 @@ If you want to provide users with a convenient way to access their device's Wi-F
 ```
 
 I value your feedback! If you encounter any issues, have suggestions for improvement, or wish to report bugs, please open an issue on GitHub or GitLab repository
-
-## Created by: Santosh Dahal
-
-- [Twitter](https://www.twitter.com/exendahal)
-- [Linkedin](https://www.linkedin.com/in/exendahal/)
 
 ## License
 
