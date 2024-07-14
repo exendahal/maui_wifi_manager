@@ -29,7 +29,6 @@ namespace Plugin.MauiWifiManager
         {
             
         }
-
         public static void Init(Context context)
         {
             CheckInit(context);
@@ -50,6 +49,8 @@ namespace Plugin.MauiWifiManager
             };
 
         }
+
+
         /// <summary>
         /// Connect Wi-Fi
         /// </summary>
@@ -85,7 +86,9 @@ namespace Plugin.MauiWifiManager
                 RequestNetwork(ssid, password);
             }
             else
-                await AddWifi(ssid, password);
+            {
+                await AddWifiSuggestion(ssid, password);
+            }               
             return _networkData;
         }
 
@@ -193,21 +196,38 @@ namespace Plugin.MauiWifiManager
         }
 
         /// <summary>
-        /// Dispose
+        /// Scan Wi-Fi Networks
         /// </summary>
-        public void Dispose()
+        public async Task<List<NetworkData>> ScanWifiNetworks()
         {
-
+            _wifiManager = (WifiManager)(_context.GetSystemService(Context.WifiService));
+            List<NetworkData> wifiNetworks = new List<NetworkData>();
+            if (_wifiManager.IsWifiEnabled)
+            {
+                _wifiManager?.StartScan();
+                var scanResults = _wifiManager?.ScanResults;
+                foreach (var result in scanResults)
+                {
+                    wifiNetworks.Add(new NetworkData()
+                    {
+                        Bssid = result.Bssid,
+                        Ssid = result.Ssid,
+                        NativeObject = result
+                    });
+                }
+            }
+            else
+            {
+                Console.WriteLine("WI-Fi turned off");
+            }
+            return wifiNetworks;
         }
 
-        public static void CheckInit(Context context)
-        {
-            if (context == null)
-                throw new ArgumentNullException(nameof(_context), "Please call WifiNetworkService.Init(this) inside the MainActivity's OnCreate function.");
-        }
 
-        private async Task AddWifi(string ssid, string psk)
+        private async Task<NetworkData> AddWifiSuggestion(string ssid, string psk)
         {
+            TaskCompletionSource<NetworkData> tcs = new TaskCompletionSource<NetworkData>();
+
             var suggestions = new List<IParcelable>
                         {
                            new WifiNetworkSuggestion.Builder()
@@ -227,8 +247,43 @@ namespace Plugin.MauiWifiManager
                 bundle.PutParcelableArrayList("android.provider.extra.WIFI_NETWORK_LIST", suggestions);
                 var intent = new Intent("android.settings.WIFI_ADD_NETWORKS");
                 intent.PutExtras(bundle);
-                _context.StartActivity(intent);
+                _context?.StartActivity(intent);
+
+                var connectivityManager = (ConnectivityManager)_context.GetSystemService(Context.ConnectivityService);
+                var networkRequest = new NetworkRequest.Builder()
+                    .AddTransportType(TransportType.Wifi)
+                    .Build();
+                NetworkCallbackFlags flagIncludeLocationInfo = NetworkCallbackFlags.IncludeLocationInfo;
+                var networkCallback = new NetworkCallback(((int)flagIncludeLocationInfo))
+                {
+                    OnNetworkCapabilitiesChanged = (network, networkCapabilities) =>
+                    {
+                        WifiInfo wifiInfo = (WifiInfo)networkCapabilities.TransportInfo;
+
+                        if (wifiInfo != null && wifiInfo.SupplicantState == SupplicantState.Completed)
+                        {
+                            _networkData.StausId = 1;
+                            _networkData.Ssid = wifiInfo?.SSID?.Trim(new char[] { '"', '\"' });
+                            _networkData.Bssid = wifiInfo?.BSSID;
+                            _networkData.IpAddress = wifiInfo.IpAddress;
+                            _networkData.NativeObject = wifiInfo;
+                            _networkData.SignalStrength = wifiInfo.Rssi;
+                            tcs.TrySetResult(_networkData);
+                        }
+                        else if (wifiInfo != null && wifiInfo.SupplicantState == SupplicantState.Invalid)
+                        {
+                            tcs.TrySetResult(null);
+                        }
+                    },
+                    NetworkUnavailable = () =>
+                    {
+                        tcs.TrySetResult(null);
+                    }
+                };
+                connectivityManager.RegisterNetworkCallback(networkRequest, networkCallback);
+                return await tcs.Task;
             }
+            return null;
         }      
 
         public void RequestNetwork(string ssid, string password) 
@@ -276,32 +331,18 @@ namespace Plugin.MauiWifiManager
             }
         }
 
-        /// <summary>
-        /// Scan Wi-Fi Networks
-        /// </summary>
-        public async Task<List<NetworkData>> ScanWifiNetworks()
+        public static void CheckInit(Context context)
         {
-            _wifiManager = (WifiManager)(_context.GetSystemService(Context.WifiService));
-            List<NetworkData> wifiNetworks = new List<NetworkData>();   
-            if (_wifiManager.IsWifiEnabled)
-            {
-                _wifiManager?.StartScan();
-                var scanResults = _wifiManager?.ScanResults;
-                foreach (var result in scanResults)
-                {
-                    wifiNetworks.Add(new NetworkData() 
-                    { 
-                        Bssid = result.Bssid,
-                        Ssid = result.Ssid,
-                        NativeObject = result 
-                    });
-                }
-            }
-            else
-            {
-                Console.WriteLine("WI-Fi turned off");
-            }
-            return wifiNetworks;
+            if (context == null)
+                throw new ArgumentNullException(nameof(_context), "Please call WifiNetworkService.Init(this) inside the MainActivity's OnCreate function.");
+        }
+
+        /// <summary>
+        /// Dispose
+        /// </summary>
+        public void Dispose()
+        {
+
         }
 
         private class NetworkCallback : ConnectivityManager.NetworkCallback
