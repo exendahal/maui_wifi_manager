@@ -259,27 +259,39 @@ namespace Plugin.MauiWifiManager
                     OnNetworkCapabilitiesChanged = (network, networkCapabilities) =>
                     {
                         WifiInfo wifiInfo = (WifiInfo)networkCapabilities.TransportInfo;
-
-                        if (wifiInfo != null && wifiInfo.SupplicantState == SupplicantState.Completed)
+                        if (wifiInfo != null)
                         {
-                            _networkData.StausId = 1;
-                            _networkData.Ssid = wifiInfo?.SSID?.Trim(new char[] { '"', '\"' });
-                            _networkData.Bssid = wifiInfo?.BSSID;
-                            _networkData.IpAddress = wifiInfo.IpAddress;
-                            _networkData.NativeObject = wifiInfo;
-                            _networkData.SignalStrength = wifiInfo.Rssi;
-                            tcs.TrySetResult(_networkData);
+                            if (wifiInfo.SupplicantState == SupplicantState.Completed)
+                            {
+                                _networkData.StausId = 1;
+                                _networkData.Ssid = wifiInfo?.SSID?.Trim(new char[] { '"', '\"' });
+                                _networkData.Bssid = wifiInfo?.BSSID;
+                                _networkData.IpAddress = wifiInfo.IpAddress;
+                                _networkData.NativeObject = wifiInfo;
+                                _networkData.SignalStrength = wifiInfo.Rssi;
+                                tcs.TrySetResult(_networkData);
+                            }
+                            else if (wifiInfo.SupplicantState == SupplicantState.Invalid)
+                            {
+                                tcs.TrySetResult(null);
+                            }
                         }
-                        else if (wifiInfo != null && wifiInfo.SupplicantState == SupplicantState.Invalid)
-                        {
-                            tcs.TrySetResult(null);
-                        }
+                       
                     },
                     NetworkUnavailable = () =>
                     {
                         tcs.TrySetResult(null);
                     }
                 };
+                // Set a timeout of 15 seconds
+                var timeoutTask = Task.Delay(TimeSpan.FromSeconds(15));
+                await Task.WhenAny(tcs.Task, timeoutTask);
+
+                if (!tcs.Task.IsCompleted)
+                {
+                    tcs.TrySetResult(null);
+                }
+
                 connectivityManager.RegisterNetworkCallback(networkRequest, networkCallback);
                 return await tcs.Task;
             }
