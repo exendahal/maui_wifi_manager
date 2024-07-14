@@ -19,8 +19,8 @@ namespace Plugin.MauiWifiManager
     public class WifiNetworkService : IWifiNetworkService
     {
         private static NetworkData? _networkData;
-        private static Context _context;
-        private static NetworkCallback _callback;
+        private static Context? _context;
+        private static NetworkCallback? _callback;
         private static ConnectivityManager? _connectivityManager;
         private static bool _requested;
         private static NetworkRequest? _request;
@@ -133,20 +133,45 @@ namespace Plugin.MauiWifiManager
             }
             else
             {
+                TaskCompletionSource<NetworkData> tcs = new TaskCompletionSource<NetworkData>();
                 ConnectivityManager connectivityManager = _context.GetSystemService(Context.ConnectivityService) as ConnectivityManager;
                 NetworkInfo activeNetworkInfo = connectivityManager.ActiveNetworkInfo;
                 if (activeNetworkInfo != null)
                 {
                     NetworkCallbackFlags flagIncludeLocationInfo = NetworkCallbackFlags.IncludeLocationInfo;
-                    NetworkCallback networkCallback = new NetworkCallback((int)flagIncludeLocationInfo);
+                    NetworkCallback networkCallback = new NetworkCallback((int)flagIncludeLocationInfo)
+                    {
+                        OnNetworkCapabilitiesChanged = (network, networkCapabilities) =>
+                        {
+                            WifiInfo wifiInfo = (WifiInfo)networkCapabilities.TransportInfo;
+
+                            if (wifiInfo != null && wifiInfo.SupplicantState == SupplicantState.Completed)
+                            {
+                                _networkData.StausId = 1;
+                                _networkData.Ssid = wifiInfo?.SSID?.Trim(new char[] { '"', '\"' });
+                                _networkData.Bssid = wifiInfo?.BSSID;
+                                _networkData.IpAddress = wifiInfo.IpAddress;
+                                _networkData.NativeObject = wifiInfo;
+                                _networkData.SignalStrength = wifiInfo.Rssi;
+                                tcs.TrySetResult(_networkData);
+                            }
+                        },                       
+                        NetworkUnavailable = () =>
+                        {
+                            tcs.TrySetResult(null);
+                        }
+                    };
+
                     connectivityManager.RequestNetwork(_request, networkCallback);
+                    connectivityManager.RegisterNetworkCallback(_request, networkCallback);
+                    return await tcs.Task;
                 }
                 else
                 {
                     Console.WriteLine("Failed to get data");
-                }
-            }
-            await Task.Delay(1000);
+                    return null;
+                }              
+            }           
             return _networkData;
         }
 
@@ -183,29 +208,28 @@ namespace Plugin.MauiWifiManager
 
         private async Task AddWifi(string ssid, string psk)
         {
-            await Task.Run(async () =>
-            {
-                var suggestions = new List<IParcelable>
+            var suggestions = new List<IParcelable>
                         {
                            new WifiNetworkSuggestion.Builder()
                             .SetSsid(ssid)
-                            .SetWpa2Passphrase(psk)                          
+                            .SetWpa2Passphrase(psk)
                             .SetIsAppInteractionRequired(true)
-                            .SetIsUserInteractionRequired(true)                                                
+                            .SetIsUserInteractionRequired(true)
                             .SetIsEnhancedOpen(false)
                             .SetIsHiddenSsid(false)
                             .Build()
                     };
 
-                await OpenWifiSetting();
+            var response = await OpenWifiSetting();
+            if (response)
+            {
                 var bundle = new Bundle();
                 bundle.PutParcelableArrayList("android.provider.extra.WIFI_NETWORK_LIST", suggestions);
                 var intent = new Intent("android.settings.WIFI_ADD_NETWORKS");
                 intent.PutExtras(bundle);
                 _context.StartActivity(intent);
-
-            });
-         }      
+            }
+        }      
 
         public void RequestNetwork(string ssid, string password) 
         {
@@ -284,8 +308,8 @@ namespace Plugin.MauiWifiManager
         {
             public Action<Network> NetworkAvailable { get; set; }
             public Action NetworkUnavailable { get; set; }
-
-            public NetworkCallback(int flags)
+            public Action<Network, NetworkCapabilities> OnNetworkCapabilitiesChanged { get; set; }
+            public NetworkCallback(int flags) : base(flags)
             {
             }
             public NetworkCallback()
@@ -305,20 +329,7 @@ namespace Plugin.MauiWifiManager
             public override void OnCapabilitiesChanged(Network network, NetworkCapabilities networkCapabilities)
             {
                 base.OnCapabilitiesChanged(network, networkCapabilities);
-                WifiInfo wifiInfo = (WifiInfo)networkCapabilities.TransportInfo;
-
-                if (wifiInfo != null)
-                {
-                    if (wifiInfo.SupplicantState == SupplicantState.Completed)
-                    {
-                        _networkData.StausId = 1;
-                        _networkData.Ssid = wifiInfo?.SSID?.Trim(new char[] { '"', '\"' });
-                        _networkData.Bssid = wifiInfo?.BSSID;
-                        _networkData.IpAddress = wifiInfo.IpAddress;
-                        _networkData.NativeObject = wifiInfo;
-                        _networkData.SignalStrength = wifiInfo.Rssi;
-                    }                                 
-                }
+                OnNetworkCapabilitiesChanged?.Invoke(network, networkCapabilities);
             }
         }
 
