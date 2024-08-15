@@ -110,7 +110,7 @@ The NetworkData class is defined as follows:
 
 #### Scan available Wi-Fi (Not available on iOS)
 
-You can available Wi-Fi networks using the ScanWifiNetworks method (Available on Android & Windows):
+You can access available Wi-Fi networks using the ScanWifiNetworks method (Available on Android & Windows):
 
 ```csharp
    var response = await CrossWifiManager.Current.ScanWifiNetworks();
