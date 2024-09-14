@@ -25,28 +25,46 @@ namespace Plugin.MauiWifiManager
         private static bool _requested;
         private static NetworkRequest? _request;
         private static WifiManager? _wifiManager;
+        private static TaskCompletionSource<NetworkData> tcsAndroidTen = new TaskCompletionSource<NetworkData>();
         public WifiNetworkService() 
         {
             
         }
         public static void Init(Context context)
         {
-            CheckInit(context);
-            _context = context;
-            _networkData = new NetworkData();
-            _wifiManager = (WifiManager)(_context.GetSystemService(Context.WifiService));
-            _request = new NetworkRequest.Builder().AddTransportType(transportType: TransportType.Wifi).Build();
-            _callback = new NetworkCallback
+            if (context != null)
             {
-                NetworkAvailable = network =>
+                CheckInit(context);
+                _context = context;
+                _networkData = new NetworkData();
+                _wifiManager = (WifiManager)(_context.GetSystemService(Context.WifiService));
+                _request = new NetworkRequest.Builder().AddTransportType(transportType: TransportType.Wifi).Build();
+                _callback = new NetworkCallback
                 {
-
-                },
-                NetworkUnavailable = () =>
-                {
-
-                }
-            };
+                    NetworkAvailable = async network =>
+                    {
+                        _wifiManager = (WifiManager)(_context.GetSystemService(Context.WifiService));
+                        if (_wifiManager != null && _wifiManager.IsWifiEnabled)
+                        {
+                            _networkData.Ssid = _wifiManager.ConnectionInfo.SSID.Trim(new char[] { '"', '\"' });
+                            _networkData.Bssid = _wifiManager.ConnectionInfo.BSSID;
+                            _networkData.SignalStrength = _wifiManager.ConnectionInfo.Rssi;
+                            _networkData.IpAddress = _wifiManager.DhcpInfo.IpAddress;
+                            _networkData.GatewayAddress = _wifiManager.DhcpInfo.Gateway.ToString();
+                            _networkData.NativeObject = _wifiManager.ConnectionInfo;
+                            tcsAndroidTen.TrySetResult(_networkData);
+                        }
+                    },
+                    NetworkUnavailable = () =>
+                    {
+                        tcsAndroidTen.TrySetResult(new NetworkData());
+                    }
+                };
+            }
+            else
+            {
+                throw new NullReferenceException("Context is null. Initialization cannot proceed.");
+            }           
 
         }
 
@@ -57,39 +75,48 @@ namespace Plugin.MauiWifiManager
         public async Task<NetworkData> ConnectWifi(string ssid, string password)
         {
             _wifiManager = (WifiManager)(_context.GetSystemService(Context.WifiService));
-            if (Build.VERSION.SdkInt <= BuildVersionCodes.P)
-            {               
-                if (!_wifiManager.IsWifiEnabled)
+            if (_wifiManager != null)
+            {
+                if (Build.VERSION.SdkInt <= BuildVersionCodes.P)
                 {
-                    _wifiManager.SetWifiEnabled(true);
-                }
-                string wifiSsid = _wifiManager.ConnectionInfo.SSID.ToString();
-                if (wifiSsid != string.Format("\"{0}\"", ssid))
-                {
-                    WifiConfiguration wifiConfig = new WifiConfiguration();
-                    wifiConfig.Ssid = string.Format("\"{0}\"", ssid);
-                    wifiConfig.PreSharedKey = string.Format("\"{0}\"", password);
-                    int netId = _wifiManager.AddNetwork(wifiConfig);
-                    _wifiManager.Disconnect();
-                    _wifiManager.EnableNetwork(netId, true);
-                    _wifiManager.Reconnect();
-                    _networkData.Ssid = wifiConfig.Ssid;
+                    if (!_wifiManager.IsWifiEnabled)
+                    {
+                        _wifiManager.SetWifiEnabled(true);
+                    }
+                    string wifiSsid = _wifiManager.ConnectionInfo.SSID.ToString();
+                    if (wifiSsid != string.Format("\"{0}\"", ssid))
+                    {
+                        WifiConfiguration wifiConfig = new WifiConfiguration();
+                        wifiConfig.Ssid = string.Format("\"{0}\"", ssid);
+                        wifiConfig.PreSharedKey = string.Format("\"{0}\"", password);
+                        int netId = _wifiManager.AddNetwork(wifiConfig);
+                        _wifiManager.Disconnect();
+                        _wifiManager.EnableNetwork(netId, true);
+                        _wifiManager.Reconnect();
+                        _networkData.Ssid = wifiConfig.Ssid;
 
+                    }
+                    else
+                    {
+                        Console.WriteLine("Cannot find valid SSID");
+                    }
+                }
+                else if (Build.VERSION.SdkInt == BuildVersionCodes.Q)
+                {
+                    RequestNetwork(ssid, password);
+                    return await tcsAndroidTen.Task;
                 }
                 else
                 {
-                    Console.WriteLine("Cannot find valid SSID");
+                    await AddWifiSuggestion(ssid, password);
                 }
-            }
-            else if (Build.VERSION.SdkInt == BuildVersionCodes.Q)
-            {
-                RequestNetwork(ssid, password);
+                return _networkData;
             }
             else
             {
-                await AddWifiSuggestion(ssid, password);
-            }               
-            return _networkData;
+                throw new InvalidOperationException("Wi-Fi Manager is unavailable. Please ensure the device has Wi-Fi capability.");
+            }
+            
         }
 
         /// <summary>
@@ -99,18 +126,34 @@ namespace Plugin.MauiWifiManager
         /// </summary>
         public void DisconnectWifi(string? ssid)
         {
-            CheckInit(_context);
-            if (Build.VERSION.SdkInt >= BuildVersionCodes.Q)
+            if (_context != null)
             {
-                Intent panelIntent = new Intent(Panel.ActionWifi);
-                _context.StartActivity(panelIntent);
-            }               
+                CheckInit(_context);
+                if (Build.VERSION.SdkInt >= BuildVersionCodes.Q)
+                {
+                    Intent panelIntent = new Intent(Panel.ActionWifi);
+                    _context.StartActivity(panelIntent);
+                }
+                else
+                {
+                    _wifiManager = (WifiManager)(_context.GetSystemService(Context.WifiService));
+                    if (_wifiManager != null)
+                    {
+                        _wifiManager.SetWifiEnabled(false); // Disable wifi
+                        _wifiManager.SetWifiEnabled(true); // Enable wifi
+                    }
+                    else
+                    {
+                        throw new NullReferenceException("_wifiManager is null.");
+                    }
+                  
+                }
+            }
             else
             {
-                _wifiManager = (WifiManager)(_context.GetSystemService(Context.WifiService));
-                _wifiManager.SetWifiEnabled(false); // Disable wifi
-                _wifiManager.SetWifiEnabled(true); // Enable wifi
+                throw new NullReferenceException("Context is null. Disconnect Wi-Fi cannot proceed.");
             }
+            
         }
 
         /// <summary>
@@ -122,16 +165,25 @@ namespace Plugin.MauiWifiManager
             if (apiLevel < 31)
             {
                 _wifiManager = (WifiManager)(_context.GetSystemService(Context.WifiService));
-                if (_wifiManager.IsWifiEnabled)
+                if (_wifiManager != null && _wifiManager.IsWifiEnabled)
                 {
                     _networkData.Ssid = _wifiManager.ConnectionInfo.SSID.Trim(new char[] { '"', '\"' });
+                    _networkData.Bssid = _wifiManager.ConnectionInfo.BSSID;
+                    _networkData.SignalStrength = _wifiManager.ConnectionInfo.Rssi;
                     _networkData.IpAddress = _wifiManager.DhcpInfo.IpAddress;
                     _networkData.GatewayAddress = _wifiManager.DhcpInfo.Gateway.ToString();
-                    _networkData.NativeObject = _wifiManager;
+                    _networkData.NativeObject = _wifiManager.ConnectionInfo;
                 }
                 else
                 {
-                    Console.WriteLine("WI-Fi turned off");
+                    if (_wifiManager == null)
+                    {
+                        throw new InvalidOperationException("Wi-Fi Manager is unavailable. Please ensure the device has Wi-Fi capability.");
+                    }
+                    else if (!_wifiManager.IsWifiEnabled)
+                    {
+                        throw new InvalidOperationException("Wi-Fi is turned off. Please enable Wi-Fi to proceed.");
+                    }
                 }
             }
             else
@@ -161,7 +213,7 @@ namespace Plugin.MauiWifiManager
                         },                       
                         NetworkUnavailable = () =>
                         {
-                            tcs.TrySetResult(null);
+                            tcs.TrySetResult(new NetworkData());
                         }
                     };
 
@@ -172,7 +224,7 @@ namespace Plugin.MauiWifiManager
                 else
                 {
                     Console.WriteLine("Failed to get data");
-                    return null;
+                    return new NetworkData();
                 }              
             }           
             return _networkData;
@@ -218,7 +270,7 @@ namespace Plugin.MauiWifiManager
             }
             else
             {
-                Console.WriteLine("WI-Fi turned off");
+                throw new InvalidOperationException("Wi-Fi is turned off. Please enable Wi-Fi to proceed.");
             }
             return wifiNetworks;
         }
@@ -303,7 +355,7 @@ namespace Plugin.MauiWifiManager
             _wifiManager = (WifiManager)(_context.GetSystemService(Context.WifiService));
             if (!_wifiManager.IsWifiEnabled) 
             {
-                Console.WriteLine("Wi-Fi is turned off");
+                throw new InvalidOperationException("Wi-Fi is turned off. Please enable Wi-Fi to proceed.");
             }
 
             var specifier = new WifiNetworkSpecifier.Builder()
