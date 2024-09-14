@@ -257,13 +257,10 @@ namespace Plugin.MauiWifiManager
                         {
                            new WifiNetworkSuggestion.Builder()
                             .SetSsid(ssid)
-                            .SetWpa2Passphrase(psk)
-                            .SetIsAppInteractionRequired(true)
-                            .SetIsUserInteractionRequired(true)
-                            .SetIsEnhancedOpen(false)
-                            .SetIsHiddenSsid(false)
+                            .SetWpa2Passphrase(psk)                           
+                            .SetIsUserInteractionRequired(true)                            
                             .Build()
-                    };
+                        };
 
             var response = await OpenWifiSetting();
             if (response)
@@ -306,15 +303,21 @@ namespace Plugin.MauiWifiManager
                         tcs.TrySetResult(new NetworkData());
                     }
                 };
-                // Set a timeout of 15 seconds
-                var timeoutTask = Task.Delay(TimeSpan.FromSeconds(15));
-                await Task.WhenAny(tcs.Task, timeoutTask);
+                connectivityManager.RegisterNetworkCallback(networkRequest, networkCallback);
 
-                if (!tcs.Task.IsCompleted)
+                // Set a timeout to prevent hanging
+                var timeoutTask = Task.Delay(TimeSpan.FromSeconds(15));
+                var completedTask = await Task.WhenAny(tcs.Task, timeoutTask);
+
+                if (completedTask == timeoutTask)
                 {
+                    // Timed out, return default result
                     tcs.TrySetResult(new NetworkData());
                 }
-                connectivityManager.RegisterNetworkCallback(networkRequest, networkCallback);
+
+                // Ensure to unregister the callback when done
+                connectivityManager.UnregisterNetworkCallback(networkCallback);
+
                 return await tcs.Task;
             }
             return new NetworkData();
