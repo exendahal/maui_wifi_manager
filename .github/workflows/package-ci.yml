@@ -2,7 +2,7 @@ name: Build Package for CI
 
 on:
   push:
-   branches: 
+    branches: 
       - "main"
       - "develop"
     paths-ignore:
@@ -12,12 +12,28 @@ on:
       - "main"
       - "develop"
 
+env:
+  BUILD_CONFIGURATION: Release
+  DOTNET_VERSION: 8.0.x
+  CSPROJ_TO_BUILD: MAUIWifiManager.csproj
 jobs:
-  build-plugin-ci:
+  build-sample-ci:
 
     runs-on: windows-latest
 
     steps:
-    - uses: actions/checkout@v4
-    - name: Build
-      run: dotnet build src\MAUIWifiManager\MAUIWifiManager.csproj -c Release
+    - uses: actions/checkout@v3
+
+    - name: Setup .NET ${{ env.DOTNET_VERSION }}
+      uses: actions/setup-dotnet@v2
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+
+    - name: Install .NET MAUI Workload
+      run: dotnet workload install maui
+
+    - name: Restore dependencies
+      run: dotnet restore src\MAUIWifiManager\${{ env.CSPROJ_TO_BUILD }}
+
+    - name: Build Package ${{ env.CSPROJ_TO_BUILD }}
+      run: dotnet build src\MAUIWifiManager\${{ env.CSPROJ_TO_BUILD }} -c ${{ env.BUILD_CONFIGURATION }}
