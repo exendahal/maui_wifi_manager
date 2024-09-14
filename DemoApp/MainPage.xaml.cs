@@ -1,4 +1,5 @@
-﻿using Plugin.MauiWifiManager;
+﻿using DemoApp.Services.Interfaces;
+using Plugin.MauiWifiManager;
 using System.Runtime.CompilerServices;
 namespace DemoApp
 {
@@ -11,39 +12,74 @@ namespace DemoApp
 
         private async void ScanTapped(object sender, TappedEventArgs e)
         {
-            PermissionStatus status = await Permissions.RequestAsync<Permissions.LocationWhenInUse>();
-            if (status == PermissionStatus.Granted || DeviceInfo.Current.Platform == DevicePlatform.WinUI)
-                await Navigation.PushAsync(new ScanListPage());
+            var gpsStatus = await IPlatformApplication.Current.Services.GetService<IGpsService>().GpsStatus();
+            if (gpsStatus)
+            {
+                PermissionStatus status = await Permissions.RequestAsync<Permissions.LocationWhenInUse>();
+                if (status == PermissionStatus.Granted || DeviceInfo.Current.Platform == DevicePlatform.WinUI)
+                    await Navigation.PushAsync(new ScanListPage());
+                else
+                    await DisplayAlert("No location permisson", "Please provide location permission", "OK");
+            }
             else
-                await DisplayAlert("No location permisson", "Please provide location permission", "OK");
+            {
+                await DisplayAlert("No location", "Please turn on location service", "OK");
+            }
+            
            
         }
 
         private async void ConnectWiFiTapped(object sender, TappedEventArgs e)
         {
-            PermissionStatus status = await Permissions.RequestAsync<Permissions.LocationWhenInUse>();
-            if (status == PermissionStatus.Granted || DeviceInfo.Current.Platform == DevicePlatform.WinUI)
-                await Navigation.PushAsync(new ConnectWifi());
+            var gpsStatus = await IPlatformApplication.Current.Services.GetService<IGpsService>().GpsStatus();
+            if (gpsStatus)
+            {
+                PermissionStatus status = await Permissions.RequestAsync<Permissions.LocationWhenInUse>();
+                if (status == PermissionStatus.Granted || DeviceInfo.Current.Platform == DevicePlatform.WinUI)
+                    await Navigation.PushAsync(new ConnectWifi());
+                else
+                    await DisplayAlert("No location permisson", "Please provide location permission", "OK");
+            }
             else
-                await DisplayAlert("No location permisson", "Please provide location permission", "OK");           
+            {
+                await DisplayAlert("No location", "Please turn on location service", "OK");
+            }
+
         }
 
         private async void NetworkInfoTapped(object sender, TappedEventArgs e)
         {
-            PermissionStatus status = await Permissions.RequestAsync<Permissions.LocationWhenInUse>();
-            if (status == PermissionStatus.Granted || DeviceInfo.Current.Platform == DevicePlatform.WinUI)
-                await Navigation.PushAsync(new NetworkInfo());
+            var gpsStatus = await IPlatformApplication.Current.Services.GetService<IGpsService>().GpsStatus();
+            if (gpsStatus)
+            {
+                PermissionStatus status = await Permissions.RequestAsync<Permissions.LocationWhenInUse>();
+                if (status == PermissionStatus.Granted || DeviceInfo.Current.Platform == DevicePlatform.WinUI)
+                    await Navigation.PushAsync(new NetworkInfo());
+                else
+                    await DisplayAlert("No location permisson", "Please provide location permission", "OK");
+            }
             else
-                await DisplayAlert("No location permisson", "Please provide location permission", "OK");           
+            {
+                await DisplayAlert("No location", "Please turn on location service", "OK");
+            }
+                        
         }
 
         private async void DisconnectSettingTapped(object sender, TappedEventArgs e)
         {
-            PermissionStatus status = await Permissions.RequestAsync<Permissions.LocationWhenInUse>();
-            if (status == PermissionStatus.Granted || DeviceInfo.Current.Platform == DevicePlatform.WinUI)
-                await Navigation.PushAsync(new DisconnectWifi());
-            else
-                await DisplayAlert("No location permisson", "Please provide location permission", "OK");           
+            var gpsStatus = await IPlatformApplication.Current.Services.GetService<IGpsService>().GpsStatus();
+            if (gpsStatus)
+            {
+                PermissionStatus status = await Permissions.RequestAsync<Permissions.LocationWhenInUse>();
+                if (status == PermissionStatus.Granted || DeviceInfo.Current.Platform == DevicePlatform.WinUI)
+                    await Navigation.PushAsync(new DisconnectWifi());
+                else
+                    await DisplayAlert("No location permisson", "Please provide location permission", "OK");
+            } else
+            {
+                await DisplayAlert("No location", "Please turn on location service", "OK");
+            }
+
         }
 
         private async void OpenSettingTapped(object sender, TappedEventArgs e)
