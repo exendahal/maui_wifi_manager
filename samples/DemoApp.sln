@@ -1,0 +1,33 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.10.35122.118
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DemoApp", "DemoApp.csproj", "{8F2F33EC-3233-42FF-852C-14D7285F29FC}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MauiWifiManager", "..\src\MAUIWifiManager\MauiWifiManager.csproj", "{FF62D77B-5094-472E-878B-385723BFB4B4}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{8F2F33EC-3233-42FF-852C-14D7285F29FC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8F2F33EC-3233-42FF-852C-14D7285F29FC}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8F2F33EC-3233-42FF-852C-14D7285F29FC}.Debug|Any CPU.Deploy.0 = Debug|Any CPU
+		{8F2F33EC-3233-42FF-852C-14D7285F29FC}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8F2F33EC-3233-42FF-852C-14D7285F29FC}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8F2F33EC-3233-42FF-852C-14D7285F29FC}.Release|Any CPU.Deploy.0 = Release|Any CPU
+		{FF62D77B-5094-472E-878B-385723BFB4B4}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{FF62D77B-5094-472E-878B-385723BFB4B4}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{FF62D77B-5094-472E-878B-385723BFB4B4}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{FF62D77B-5094-472E-878B-385723BFB4B4}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {96135521-CFD4-443F-BC70-4E27005355CE}
+	EndGlobalSection
+EndGlobal
