@@ -273,36 +273,72 @@ namespace Plugin.MauiWifiManager
 
                 var connectivityManager = (ConnectivityManager)_context.GetSystemService(Context.ConnectivityService);
                 var networkRequest = new NetworkRequest.Builder().AddTransportType(TransportType.Wifi).Build();
-                NetworkCallbackFlags flagIncludeLocationInfo = NetworkCallbackFlags.IncludeLocationInfo;
-                var networkCallback = new NetworkCallback(((int)flagIncludeLocationInfo))
+
+                ConnectivityManager.NetworkCallback networkCallback;
+                if (Build.VERSION.SdkInt >= BuildVersionCodes.S)
                 {
-                    OnNetworkCapabilitiesChanged = (network, networkCapabilities) =>
+                    NetworkCallbackFlags flagIncludeLocationInfo = NetworkCallbackFlags.IncludeLocationInfo;
+                    networkCallback = new NetworkCallback(((int)flagIncludeLocationInfo))
                     {
-                        WifiInfo wifiInfo = (WifiInfo)networkCapabilities.TransportInfo;
-                        if (wifiInfo != null)
+                        OnNetworkCapabilitiesChanged = (network, networkCapabilities) =>
                         {
-                            if (wifiInfo.SupplicantState == SupplicantState.Completed)
+                            WifiInfo wifiInfo = (WifiInfo)networkCapabilities.TransportInfo;
+                            if (wifiInfo != null)
+                            {
+                                if (wifiInfo.SupplicantState == SupplicantState.Completed)
+                                {
+                                    _networkData.StausId = 1;
+                                    _networkData.Ssid = wifiInfo?.SSID?.Trim(new char[] { '"', '\"' });
+                                    _networkData.Bssid = wifiInfo?.BSSID;
+                                    _networkData.IpAddress = wifiInfo.IpAddress;
+                                    _networkData.NativeObject = wifiInfo;
+                                    _networkData.SignalStrength = wifiInfo.Rssi;
+                                    tcs.TrySetResult(_networkData);
+                                }
+                                else if (wifiInfo.SupplicantState == SupplicantState.Invalid)
+                                {
+                                    tcs.TrySetResult(new NetworkData());
+                                }
+                            }
+
+                        },
+                        NetworkUnavailable = () =>
+                        {
+                            tcs.TrySetResult(new NetworkData());
+                        }
+                    };
+                }
+                else
+                {
+                    var wifiManager = (WifiManager)(_context.GetSystemService(Context.WifiService));
+
+                    networkCallback = new NetworkCallback
+                    {
+                        NetworkAvailable = network =>
+                        {
+
+                        },
+                        OnNetworkCapabilitiesChanged = (network, networkCapabilities) =>
+                        {
+                            if (networkCapabilities.HasCapability(NetCapability.Validated))
                             {
                                 _networkData.StausId = 1;
-                                _networkData.Ssid = wifiInfo?.SSID?.Trim(new char[] { '"', '\"' });
-                                _networkData.Bssid = wifiInfo?.BSSID;
-                                _networkData.IpAddress = wifiInfo.IpAddress;
-                                _networkData.NativeObject = wifiInfo;
-                                _networkData.SignalStrength = wifiInfo.Rssi;
+                                _networkData.Ssid = wifiManager.ConnectionInfo.SSID.Trim(new char[] { '"', '\"' });
+                                _networkData.Bssid = wifiManager.ConnectionInfo.BSSID;
+                                _networkData.SignalStrength = wifiManager.ConnectionInfo.Rssi;
+                                _networkData.IpAddress = wifiManager.DhcpInfo.IpAddress;
+                                _networkData.GatewayAddress = wifiManager.DhcpInfo.Gateway.ToString();
+                                _networkData.NativeObject = wifiManager.ConnectionInfo;
                                 tcs.TrySetResult(_networkData);
                             }
-                            else if (wifiInfo.SupplicantState == SupplicantState.Invalid)
-                            {
-                                tcs.TrySetResult(new NetworkData());
-                            }
+                        },
+                        NetworkUnavailable = () =>
+                        {                            
+                            tcs.TrySetResult(new NetworkData());
                         }
-                       
-                    },
-                    NetworkUnavailable = () =>
-                    {
-                        tcs.TrySetResult(new NetworkData());
-                    }
-                };
+                    };
+                }
+                    
                 connectivityManager.RegisterNetworkCallback(networkRequest, networkCallback);
 
                 // Set a timeout to prevent hanging
