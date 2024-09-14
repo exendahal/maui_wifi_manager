@@ -1,0 +1,23 @@
+name: Build Package for CI
+
+on:
+  push:
+   branches: 
+      - "main"
+      - "develop"
+    paths-ignore:
+      - "**.md"
+  pull_request:
+    branches: 
+      - "main"
+      - "develop"
+
+jobs:
+  build-plugin-ci:
+
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Build
+      run: dotnet build src\MAUIWifiManager\MAUIWifiManager.csproj -c Release
