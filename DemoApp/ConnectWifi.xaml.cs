@@ -17,6 +17,7 @@ public partial class ConnectWifi : ContentPage
         }
 
         var response = await CrossWifiManager.Current.ConnectWifi(WifiSsid.Text, WifiPassword.Text);
-        //await DisplayAlert("Wi-Fi Info", response?.NativeObject?.ToString(),"OK");
+        if (response?.NativeObject != null)
+            await DisplayAlert("Wi-Fi Info", response?.NativeObject?.ToString(),"OK");
     }
 }

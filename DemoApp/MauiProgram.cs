@@ -1,4 +1,6 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using DemoApp.Platforms;
+using DemoApp.Services.Interfaces;
+using Microsoft.Extensions.Logging;
 
 namespace DemoApp
 {
@@ -18,7 +20,7 @@ namespace DemoApp
 #if DEBUG
     		builder.Logging.AddDebug();
 #endif
-
+            builder.Services.AddTransient<IGpsService, GpsService>();
             return builder.Build();
         }
     }
