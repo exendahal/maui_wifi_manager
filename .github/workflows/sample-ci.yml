@@ -12,6 +12,10 @@ on:
       - "main"
       - "develop"
 
+env:
+  BUILD_CONFIGURATION: Release
+  DOTNET_VERSION: 8.0.x
+  CSPROJ_TO_BUILD: DemoApp.csproj
 jobs:
   build-sample-ci:
 
@@ -19,5 +23,17 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
-    - name: Build
-      run: dotnet build samples\DemoApp.sln -c Release
+
+    - name: Setup .NET ${{ env.DOTNET_VERSION }}
+      uses: actions/setup-dotnet@v2
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+
+    - name: Install .NET MAUI Workload
+      run: dotnet workload install maui
+
+    - name: Restore dependencies
+      run: dotnet restore samples\${{ env.CSPROJ_TO_BUILD }}
+
+    - name: Build Demo App ${{ env.CSPROJ_TO_BUILD }}
+      run: dotnet build samples\${{ env.CSPROJ_TO_BUILD }} -c ${{ env.BUILD_CONFIGURATION }} -f:net8.0-android
