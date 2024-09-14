@@ -7,6 +7,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
+using System.Net.Sockets;
 using System.Threading.Tasks;
 using SystemConfiguration;
 using UIKit;
@@ -60,32 +61,56 @@ namespace Plugin.MauiWifiManager
         /// </summary>
         public Task<NetworkData> GetNetworkInfo()
         {
-            NetworkData networkData = new NetworkData();
-            var manager = new CLLocationManager();
-            if (UIDevice.CurrentDevice.CheckSystemVersion(8, 0))
-                manager.RequestWhenInUseAuthorization();
+            var networkData = new NetworkData();
 
-            if (CLLocationManager.Status is CLAuthorizationStatus.Authorized ||
-                    CLLocationManager.Status is CLAuthorizationStatus.AuthorizedAlways ||
-                    CLLocationManager.Status is CLAuthorizationStatus.AuthorizedWhenInUse)
+            if (UIDevice.CurrentDevice.CheckSystemVersion(14, 0))
             {
+                // Request current Wi-Fi networks using NEHotspotNetwork
+                var hotspotHelperOptions = new NEHotspotHelperOptions();
+                var configuration = new NSDictionary();
+
+                NEHotspotHelper.Register(hotspotHelperOptions, DispatchQueue.MainQueue, (cmd) =>
+                {
+                    var networks = cmd.NetworkList;
+                    if (networks != null)
+                    {
+                        foreach (var network in networks)
+                        {
+                            networkData.StausId = 1;
+                            networkData.Ssid = network.Ssid;
+                            networkData.Bssid = network.Bssid;
+                            networkData.SignalStrength = network.SignalStrength;
+                            networkData.NativeObject = network;  // Store the native object for further use.
+                        }
+                    }
+                });
+            }
+            else
+            {
+                // Fallback for older iOS versions
                 if (CaptiveNetwork.TryGetSupportedInterfaces(out string[] supportedInterfaces) == StatusCode.OK)
                 {
                     foreach (var item in supportedInterfaces)
                     {
                         if (CaptiveNetwork.TryCopyCurrentNetworkInfo(item, out NSDictionary? info) == StatusCode.OK)
                         {
+                            networkData.StausId = 1;
                             networkData.Ssid = info?[CaptiveNetwork.NetworkInfoKeySSID].ToString();
                             networkData.Bssid = info?[CaptiveNetwork.NetworkInfoKeyBSSID].ToString();
                             networkData.NativeObject = info;
                         }
                     }
-                    IPAddress[] ipAddresses = Dns.GetHostAddresses(Dns.GetHostName());
-                    IPAddress ipAddress = ipAddresses.FirstOrDefault(ip => ip.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork);
-                    networkData.IpAddress = BitConverter.ToInt32(ipAddress.GetAddressBytes(), 0);
-
                 }
             }
+
+            // Get device's IP address
+            IPAddress[] ipAddresses = Dns.GetHostAddresses(Dns.GetHostName());
+            IPAddress ipAddress = ipAddresses.FirstOrDefault(ip => ip.AddressFamily == AddressFamily.InterNetwork);
+            if (ipAddress != null)
+            {
+                networkData.IpAddress = BitConverter.ToInt32(ipAddress.GetAddressBytes(), 0);
+            }
+
             return Task.FromResult(networkData);
         }
 
@@ -118,54 +143,6 @@ namespace Plugin.MauiWifiManager
         public async Task<List<NetworkData>> ScanWifiNetworks()
         {
             List<NetworkData> wifiNetworks = new List<NetworkData>();
-
-            var queue = new DispatchQueue("com.BajraTech.MauiWifiManager");
-            var options = new NEHotspotHelperOptions { DisplayName = (NSString)"Maui Wifi Manager" };
-            var handler = new NEHotspotHelperHandler(async (cmd) =>
-            {
-                if (cmd.CommandType == NEHotspotHelperCommandType.FilterScanList)
-                {
-                    foreach (var network in cmd.NetworkList)
-                    {
-                        wifiNetworks.Add(new NetworkData
-                        {
-                            Ssid = network.Ssid,
-                            Bssid = network.Bssid,
-                            SignalStrength = network.SignalStrength
-                        });
-                    }
-                    await Task.Delay(1000); // wait for the scan to complete
-                    var response = cmd.CreateResponse(NEHotspotHelperResult.Success);
-                    response.SetNetworkList(cmd.NetworkList);
-                    response.Deliver();
-                }
-                else if (cmd.CommandType == NEHotspotHelperCommandType.Evaluate)
-                {
-                    // Evaluate the network and set the confidence level
-                    var network = cmd.Network;
-                    network.SetConfidence(NEHotspotHelperConfidence.High);
-                    var response = cmd.CreateResponse(NEHotspotHelperResult.Success);
-                    response.SetNetwork(network);
-                    response.Deliver();
-                }
-                else if (cmd.CommandType == NEHotspotHelperCommandType.Authenticate)
-                {
-                    // Perform custom authentication and deliver the result
-                    var response = cmd.CreateResponse(NEHotspotHelperResult.Success);
-                    response.Deliver();
-                }
-            });
-
-            var success = NEHotspotHelper.Register(options, queue, handler);
-            if (success)
-            {
-                Console.WriteLine("Registered successfully");
-            }
-            else
-            {
-                Console.WriteLine("Registration failed");
-            }
-
             return wifiNetworks;
         }
 
