@@ -1,12 +1,9 @@
-﻿using CoreFoundation;
-using CoreLocation;
+﻿using CoreLocation;
 using Foundation;
 using NetworkExtension;
 using Plugin.MauiWifiManager.Abstractions;
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Net;
 using System.Threading.Tasks;
 using SystemConfiguration;
 using UIKit;
@@ -75,15 +72,15 @@ namespace Plugin.MauiWifiManager
                     {
                         if (CaptiveNetwork.TryCopyCurrentNetworkInfo(item, out NSDictionary? info) == StatusCode.OK)
                         {
+                            networkData.StausId = 1;
                             networkData.Ssid = info?[CaptiveNetwork.NetworkInfoKeySSID].ToString();
                             networkData.Bssid = info?[CaptiveNetwork.NetworkInfoKeyBSSID].ToString();
                             networkData.NativeObject = info;
                         }
                     }
-                    IPAddress[] ipAddresses = Dns.GetHostAddresses(Dns.GetHostName());
-                    IPAddress ipAddress = ipAddresses.FirstOrDefault(ip => ip.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork);
-                    networkData.IpAddress = BitConverter.ToInt32(ipAddress.GetAddressBytes(), 0);
-
+                    //IPAddress[] ipAddresses = Dns.GetHostAddresses(Dns.GetHostName());
+                    //IPAddress ipAddress = ipAddresses.FirstOrDefault(ip => ip.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork);
+                    //networkData.IpAddress = BitConverter.ToInt32(ipAddress.GetAddressBytes(), 0);
                 }
             }
             return Task.FromResult(networkData);
@@ -118,56 +115,10 @@ namespace Plugin.MauiWifiManager
         public async Task<List<NetworkData>> ScanWifiNetworks()
         {
             List<NetworkData> wifiNetworks = new List<NetworkData>();
-
-            var queue = new DispatchQueue("com.BajraTech.MauiWifiManager");
-            var options = new NEHotspotHelperOptions { DisplayName = (NSString)"Maui Wifi Manager" };
-            var handler = new NEHotspotHelperHandler(async (cmd) =>
-            {
-                if (cmd.CommandType == NEHotspotHelperCommandType.FilterScanList)
-                {
-                    foreach (var network in cmd.NetworkList)
-                    {
-                        wifiNetworks.Add(new NetworkData
-                        {
-                            Ssid = network.Ssid,
-                            Bssid = network.Bssid,
-                            SignalStrength = network.SignalStrength
-                        });
-                    }
-                    await Task.Delay(1000); // wait for the scan to complete
-                    var response = cmd.CreateResponse(NEHotspotHelperResult.Success);
-                    response.SetNetworkList(cmd.NetworkList);
-                    response.Deliver();
-                }
-                else if (cmd.CommandType == NEHotspotHelperCommandType.Evaluate)
-                {
-                    // Evaluate the network and set the confidence level
-                    var network = cmd.Network;
-                    network.SetConfidence(NEHotspotHelperConfidence.High);
-                    var response = cmd.CreateResponse(NEHotspotHelperResult.Success);
-                    response.SetNetwork(network);
-                    response.Deliver();
-                }
-                else if (cmd.CommandType == NEHotspotHelperCommandType.Authenticate)
-                {
-                    // Perform custom authentication and deliver the result
-                    var response = cmd.CreateResponse(NEHotspotHelperResult.Success);
-                    response.Deliver();
-                }
-            });
-
-            var success = NEHotspotHelper.Register(options, queue, handler);
-            if (success)
-            {
-                Console.WriteLine("Registered successfully");
-            }
-            else
-            {
-                Console.WriteLine("Registration failed");
-            }
-
-            return wifiNetworks;
+            // ScanWifiNetworks is not supported on iOS
+            return await Task.FromResult(wifiNetworks);
         }
+
 
     }
 }

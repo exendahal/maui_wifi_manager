@@ -33,6 +33,6 @@
 	<key>CFBundleDisplayName</key>
 	<string>Maui Wifi Manager</string>
 	<key>CFBundleIdentifier</key>
-	<string>com.BajraTech.MauiWifiManager</string>
+	<string>com.company.MauiWifiManager</string>
 </dict>
 </plist>
