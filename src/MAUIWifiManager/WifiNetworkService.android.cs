@@ -50,7 +50,7 @@ namespace Plugin.MauiWifiManager
             var wifiManager = (WifiManager)(_context.GetSystemService(Context.WifiService));
             if (wifiManager != null)
             {
-                if (Build.VERSION.SdkInt <= BuildVersionCodes.P)
+                if (!OperatingSystem.IsAndroidVersionAtLeast(29))
                 {
                     if (!wifiManager.IsWifiEnabled)
                     {
@@ -74,7 +74,7 @@ namespace Plugin.MauiWifiManager
                         Console.WriteLine("Cannot find valid SSID");
                     }
                 }
-                else if (Build.VERSION.SdkInt == BuildVersionCodes.Q)
+                else if (OperatingSystem.IsAndroidVersionAtLeast(29) && !OperatingSystem.IsAndroidVersionAtLeast(30))
                 {
                     _networkData = await RequestNetwork(ssid, password);
                 }
@@ -101,7 +101,7 @@ namespace Plugin.MauiWifiManager
             if (_context != null)
             {
                 CheckInit(_context);
-                if (Build.VERSION.SdkInt >= BuildVersionCodes.Q)
+                if (OperatingSystem.IsAndroidVersionAtLeast(29))
                 {
                     Intent panelIntent = new Intent(Panel.ActionWifi);
                     _context.StartActivity(panelIntent);
@@ -132,9 +132,8 @@ namespace Plugin.MauiWifiManager
         /// Get Wi-Fi Network Info
         /// </summary>
         public async Task<NetworkData> GetNetworkInfo()
-        {           
-            int apiLevel = (int)Build.VERSION.SdkInt;
-            if (apiLevel < 31)
+        {
+            if (!OperatingSystem.IsAndroidVersionAtLeast(31))
             {
                 var wifiManager = (WifiManager)(_context.GetSystemService(Context.WifiService));
                 if (wifiManager != null && wifiManager.IsWifiEnabled)
@@ -275,7 +274,7 @@ namespace Plugin.MauiWifiManager
                 var networkRequest = new NetworkRequest.Builder().AddTransportType(TransportType.Wifi).Build();
 
                 ConnectivityManager.NetworkCallback networkCallback;
-                if (Build.VERSION.SdkInt >= BuildVersionCodes.S)
+                if (OperatingSystem.IsAndroidVersionAtLeast(31))
                 {
                     NetworkCallbackFlags flagIncludeLocationInfo = NetworkCallbackFlags.IncludeLocationInfo;
                     networkCallback = new NetworkCallback(((int)flagIncludeLocationInfo))
