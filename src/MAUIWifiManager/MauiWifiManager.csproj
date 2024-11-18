@@ -14,10 +14,10 @@
 		<PackageId>WifiManager.Maui</PackageId>
 
 		<Product>$(AssemblyName) ($(TargetFramework))</Product>
-		<AssemblyVersion>1.0.5</AssemblyVersion>
-		<AssemblyFileVersion>1.0.5</AssemblyFileVersion>
-		<Version>1.0.5</Version>
-		<PackageVersion>1.0.5</PackageVersion>
+		<AssemblyVersion>1.0.7</AssemblyVersion>
+		<AssemblyFileVersion>1.0.7</AssemblyFileVersion>
+		<Version>1.0.7</Version>
+		<PackageVersion>1.0.7</PackageVersion>
 		<PackOnBuild>true</PackOnBuild>
 		<NeutralLanguage>en</NeutralLanguage>
 		<DefineConstants>$(DefineConstants);</DefineConstants>
