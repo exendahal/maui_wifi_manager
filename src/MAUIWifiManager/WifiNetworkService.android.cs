@@ -499,5 +499,19 @@ namespace Plugin.MauiWifiManager
             {
             }
         }
+
+
+        /// <summary>
+        /// Open Wireless Setting
+        /// </summary>
+        public Task<bool> OpenWirelessSetting()
+        {
+            CheckInit(_context);
+            var taskCompletionSource = new TaskCompletionSource<bool>();
+            var panelIntent = new Intent(ActionWirelessSettings);
+            _context.StartActivity(panelIntent);
+            taskCompletionSource.TrySetResult(true);
+            return taskCompletionSource.Task;
+        }
     }
 }

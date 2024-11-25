@@ -159,5 +159,14 @@ namespace Plugin.MauiWifiManager
             }
             return wifiNetworks;
         }
+
+
+        /// <summary>
+        /// Open Network and Internet Setting
+        /// </summary>
+        public async Task<bool> OpenWirelessSetting()
+        {
+            return await Launcher.LaunchUriAsync(new Uri("ms-settings:network"));
+        }
     }
 }
