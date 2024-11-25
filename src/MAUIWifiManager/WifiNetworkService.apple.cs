@@ -119,6 +119,15 @@ namespace Plugin.MauiWifiManager
             return await Task.FromResult(wifiNetworks);
         }
 
+        public Task<bool> OpenWirelessSetting()
+        {
+            if (UIDevice.CurrentDevice.CheckSystemVersion(8, 0))
+            {
+                NSUrl url = new NSUrl(UIApplication.OpenSettingsUrlString);
+                return Task.FromResult(UIApplication.SharedApplication.OpenUrl(url));
+            }
+            return Task.FromResult(false);
+        }
 
     }
 }

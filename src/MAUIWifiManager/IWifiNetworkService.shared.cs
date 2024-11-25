@@ -12,5 +12,6 @@ namespace Plugin.MauiWifiManager
         void DisconnectWifi(string ssid);
         Task<bool> OpenWifiSetting();
         Task<List<NetworkData>> ScanWifiNetworks();
+        Task<bool> OpenWirelessSetting();
     }    
 }

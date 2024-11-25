@@ -95,6 +95,11 @@ namespace DemoApp
         {
              await DisplayAlert("MAUI Wi-Fi Manager", "Target Framework: .NET 8\nDeveloped by: Santosh Dahal", "OK");
         }
+
+        private async void HotspotOpen(object sender, TappedEventArgs e)
+        {
+            await CrossWifiManager.Current.OpenWirelessSetting();
+        }
     }
 
 }
