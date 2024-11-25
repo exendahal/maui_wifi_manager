@@ -34,7 +34,7 @@
                 <Grid.RowDefinitions>
                     <RowDefinition Height="*" />
                     <RowDefinition Height="*" />
-
+                    <RowDefinition Height="*" />
                     <RowDefinition Height="*" />
                 </Grid.RowDefinitions>
                 <Grid.ColumnDefinitions>
@@ -148,12 +148,35 @@
                             Source="dotnet_bot.png" />
                         <Label
                             HorizontalOptions="CenterAndExpand"
-                            Text="Open Setting"
+                            Text="Open Wi-Fi Setting"
                             TextTransform="Uppercase"
                             VerticalOptions="CenterAndExpand" />
                     </StackLayout>
                     <Frame.GestureRecognizers>
                         <TapGestureRecognizer Tapped="OpenSettingTapped" />
+                    </Frame.GestureRecognizers>
+                </Frame>
+                <Frame
+                    Grid.Row="3"
+                    Grid.Column="0"
+                    Margin="10"
+                    Padding="10"
+                    BackgroundColor="Purple"
+                    CornerRadius="10"
+                    HasShadow="True">
+                    <StackLayout>
+                        <Image
+                            Aspect="AspectFit"
+                            HeightRequest="100"
+                            Source="dotnet_bot.png" />
+                        <Label
+                            HorizontalOptions="CenterAndExpand"
+                            Text="About"
+                            TextTransform="Uppercase"
+                            VerticalOptions="CenterAndExpand" />
+                    </StackLayout>
+                    <Frame.GestureRecognizers>
+                        <TapGestureRecognizer Tapped="InfoTapped" />
                     </Frame.GestureRecognizers>
                 </Frame>
                 <Frame
@@ -171,12 +194,12 @@
                             Source="dotnet_bot.png" />
                         <Label
                             HorizontalOptions="CenterAndExpand"
-                            Text="Info"
+                            Text="Open Network Setting"
                             TextTransform="Uppercase"
                             VerticalOptions="CenterAndExpand" />
                     </StackLayout>
                     <Frame.GestureRecognizers>
-                        <TapGestureRecognizer Tapped="InfoTapped" />
+                        <TapGestureRecognizer Tapped="HotspotOpen" />
                     </Frame.GestureRecognizers>
                 </Frame>
             </Grid>
