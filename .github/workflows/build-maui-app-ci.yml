@@ -1,16 +1,14 @@
-name: Build Sample for CI
+name: Build MAUI APP
 
 on:
   push:
     branches: 
-      - "main"
-      - "develop"
+      - "main"      
     paths-ignore:
       - "**.md"
   pull_request:
     branches: 
-      - "main"
-      - "develop"
+      - "main"      
 
 env:
   BUILD_CONFIGURATION: Release
