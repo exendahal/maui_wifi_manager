@@ -34,5 +34,7 @@
 	<string>Maui Wifi Manager</string>
 	<key>CFBundleIdentifier</key>
 	<string>com.company.MauiWifiManager</string>
+	<key>NSCameraUsageDescription</key>
+	<string>This app uses barcode scanning to connect Wi-Fi</string>
 </dict>
 </plist>
