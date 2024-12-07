@@ -1,6 +1,5 @@
 ﻿using DemoApp.Services.Interfaces;
 using Plugin.MauiWifiManager;
-using System.Runtime.CompilerServices;
 namespace DemoApp
 {
     public partial class MainPage : ContentPage
@@ -19,7 +18,7 @@ namespace DemoApp
                 if (status == PermissionStatus.Granted || DeviceInfo.Current.Platform == DevicePlatform.WinUI)
                     await Navigation.PushAsync(new ScanListPage());
                 else
-                    await DisplayAlert("No location permisson", "Please provide location permission", "OK");
+                    await DisplayAlert("No location permission", "Please provide location permission", "OK");
             }
             else
             {
@@ -38,7 +37,7 @@ namespace DemoApp
                 if (status == PermissionStatus.Granted || DeviceInfo.Current.Platform == DevicePlatform.WinUI)
                     await Navigation.PushAsync(new ConnectWifi());
                 else
-                    await DisplayAlert("No location permisson", "Please provide location permission", "OK");
+                    await DisplayAlert("No location permission", "Please provide location permission", "OK");
             }
             else
             {
@@ -56,7 +55,7 @@ namespace DemoApp
                 if (status == PermissionStatus.Granted || DeviceInfo.Current.Platform == DevicePlatform.WinUI)
                     await Navigation.PushAsync(new NetworkInfo());
                 else
-                    await DisplayAlert("No location permisson", "Please provide location permission", "OK");
+                    await DisplayAlert("No location permission", "Please provide location permission", "OK");
             }
             else
             {
@@ -74,7 +73,7 @@ namespace DemoApp
                 if (status == PermissionStatus.Granted || DeviceInfo.Current.Platform == DevicePlatform.WinUI)
                     await Navigation.PushAsync(new DisconnectWifi());
                 else
-                    await DisplayAlert("No location permisson", "Please provide location permission", "OK");
+                    await DisplayAlert("No location permission", "Please provide location permission", "OK");
             } else
             {
                 await DisplayAlert("No location", "Please turn on location service", "OK");
@@ -91,15 +90,15 @@ namespace DemoApp
             }
         }
 
+        private async void NetworkSettingOpen(object sender, TappedEventArgs e)
+        {
+            await CrossWifiManager.Current.OpenWirelessSetting();
+        }
         private async void InfoTapped(object sender, TappedEventArgs e)
         {
              await DisplayAlert("MAUI Wi-Fi Manager", "Target Framework: .NET 8\nDeveloped by: Santosh Dahal", "OK");
         }
-
-        private async void HotspotOpen(object sender, TappedEventArgs e)
-        {
-            await CrossWifiManager.Current.OpenWirelessSetting();
-        }
+        
     }
 
 }
