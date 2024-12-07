@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage
+    x:Class="DemoApp.ScanAndConnect"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:zxing="clr-namespace:ZXing.Net.Maui.Controls;assembly=ZXing.Net.MAUI.Controls"
+    Title="ScanAndConnect">
+    <ScrollView>
+        <StackLayout>
+            <Image HeightRequest="160" Source="dotnet_bot.png" />
+            <Label
+                FontSize="Title"
+                HorizontalOptions="CenterAndExpand"
+                Text="Scan &#38; Connect Wi-Fi"
+                TextColor="{StaticResource SecondaryDarkText}"
+                TextTransform="Uppercase" />
+
+            <StackLayout Padding="40,20">
+                <Button
+                    x:Name="ConnectBtn"
+                    Grid.Column="0"
+                    Margin="0,32"
+                    BackgroundColor="{StaticResource SecondaryDarkText}"
+                    Clicked="ConnectBtnClicked"
+                    FontSize="12"
+                    Text="Scan &#38; Connect"
+                    TextColor="White"
+                    TextTransform="Uppercase" />
+            </StackLayout>
+        </StackLayout>
+    </ScrollView>
+</ContentPage>

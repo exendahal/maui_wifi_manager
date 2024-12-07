@@ -1,6 +1,8 @@
-﻿using DemoApp.Platforms;
+﻿using CommunityToolkit.Maui;
+using DemoApp.Platforms;
 using DemoApp.Services.Interfaces;
 using Microsoft.Extensions.Logging;
+using ZXing.Net.Maui.Controls;
 
 namespace DemoApp
 {
@@ -11,6 +13,8 @@ namespace DemoApp
             var builder = MauiApp.CreateBuilder();
             builder
                 .UseMauiApp<App>()
+                .UseBarcodeReader()
+                .UseMauiCommunityToolkit()
                 .ConfigureFonts(fonts =>
                 {
                     fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");
