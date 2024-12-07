@@ -156,7 +156,7 @@ await CrossWifiManager.Current.OpenWifiSetting();
 
 ## Feedback & Issues
 
-If you encounter any issues or have suggestions, please open an issue on the project's GitHub or GitLab repository.
+If you encounter any issues or have suggestions, please open an issue on the project's GitHub repository.
 
 ---
 
