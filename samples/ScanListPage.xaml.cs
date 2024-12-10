@@ -33,7 +33,7 @@ public partial class ScanListPage : ContentPage
 
     private async void ExecuteInfoCommand(NetworkDataModel model)
     {
-        var info = $"StatusId: {model.StausId}, " +
+        var info = $"StatusId: {model.StatusId}, " +
                $"Ssid: {model.SsidName}, " +
                $"IpAddress: {model.IpAddress}, " +
                $"GatewayAddress: {model.GatewayAddress ?? "N/A"}, " +
@@ -59,7 +59,7 @@ public partial class ScanListPage : ContentPage
             {
                 networkDataModel.Add(new NetworkDataModel() 
                 {
-                    StausId = item.StausId,
+                    StatusId = item.StatusId,
                     IpAddress = (int)item.IpAddress, 
                     Bssid = item.Bssid, 
                     Ssid = item.Ssid, 
