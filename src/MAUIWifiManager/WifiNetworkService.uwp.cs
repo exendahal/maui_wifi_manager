@@ -99,7 +99,7 @@ namespace Plugin.MauiWifiManager
         {
             NetworkData data = new NetworkData();
             ConnectionProfile profile = NetworkInformation.GetInternetConnectionProfile();
-            data.StausId = (int)profile.GetNetworkConnectivityLevel();
+            data.StatusId = (int)profile.GetNetworkConnectivityLevel();
             if (profile.IsWlanConnectionProfile)
             {
                 data.Ssid = profile.WlanConnectionProfileDetails.GetConnectedSsid();

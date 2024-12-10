@@ -127,7 +127,7 @@ namespace Plugin.MauiWifiManager
                 var wifiManager = _context.GetSystemService(Context.WifiService) as WifiManager;
                 if (wifiManager != null && wifiManager.IsWifiEnabled)
                 {
-                    _networkData.StausId = 1;
+                    _networkData.StatusId = 1;
                     _networkData.Ssid = wifiManager.ConnectionInfo?.SSID?.Trim(new char[] { '"', '\"' });
                     _networkData.Bssid = wifiManager.ConnectionInfo?.BSSID;
                     _networkData.SignalStrength = wifiManager.ConnectionInfo?.Rssi;
@@ -165,7 +165,7 @@ namespace Plugin.MauiWifiManager
 
                                 if (wifiInfo != null && wifiInfo.SupplicantState == SupplicantState.Completed)
                                 {
-                                    _networkData.StausId = 1;
+                                    _networkData.StatusId = 1;
                                     _networkData.Ssid = wifiInfo?.SSID?.Trim(new char[] { '"', '\"' });
                                     _networkData.Bssid = wifiInfo?.BSSID;
                                     _networkData.IpAddress = wifiInfo?.IpAddress ?? 0;
@@ -285,7 +285,7 @@ namespace Plugin.MauiWifiManager
                                 {
                                     if (wifiInfo.SupplicantState == SupplicantState.Completed)
                                     {
-                                        _networkData.StausId = 1;
+                                        _networkData.StatusId = 1;
                                         _networkData.Ssid = wifiInfo?.SSID?.Trim(new char[] { '"', '\"' });
                                         _networkData.Bssid = wifiInfo?.BSSID;
                                         _networkData.IpAddress = wifiInfo?.IpAddress ?? 0;
@@ -321,7 +321,7 @@ namespace Plugin.MauiWifiManager
                                     {
                                         if (OperatingSystem.IsAndroidVersionAtLeast(30) && !OperatingSystem.IsAndroidVersionAtLeast(31))
                                         {
-                                            _networkData.StausId = 1;
+                                            _networkData.StatusId = 1;
                                             _networkData.Ssid = wifiManager.ConnectionInfo?.SSID?.Trim(new char[] { '"', '\"' });
                                             _networkData.Bssid = wifiManager.ConnectionInfo?.BSSID;
                                             _networkData.SignalStrength = wifiManager.ConnectionInfo?.Rssi;
@@ -389,7 +389,7 @@ namespace Plugin.MauiWifiManager
                         {
                             if (networkCapabilities.HasCapability(NetCapability.Validated))
                             {
-                                _networkData.StausId = 1;
+                                _networkData.StatusId = 1;
                                 _networkData.Ssid = wifiManager.ConnectionInfo?.SSID?.Trim(new char[] { '"', '\"' });
                                 _networkData.Bssid = wifiManager.ConnectionInfo?.BSSID;
                                 _networkData.SignalStrength = wifiManager.ConnectionInfo?.Rssi;
