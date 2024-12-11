@@ -2,7 +2,7 @@
 {
     public class NetworkDataModel
     {
-        public int StausId { get; set; }
+        public int StatusId { get; set; }
         public string? Ssid { get; set; }
         public string? SsidName { get { return string.IsNullOrWhiteSpace(Ssid) ? "Unknown" : Ssid; } }
         public int IpAddress { get; set; }

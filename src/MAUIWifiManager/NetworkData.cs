@@ -3,7 +3,7 @@ namespace Plugin.MauiWifiManager.Abstractions
 {
     public class NetworkData
     {
-        public int StausId { get; set; }
+        public int StatusId { get; set; }
         public string? Ssid { get; set; }
         public int IpAddress { get; set; }
         public string? GatewayAddress { get; set; }

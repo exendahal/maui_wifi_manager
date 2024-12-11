@@ -72,7 +72,7 @@ namespace Plugin.MauiWifiManager
                     {
                         if (CaptiveNetwork.TryCopyCurrentNetworkInfo(item, out NSDictionary? info) == StatusCode.OK)
                         {
-                            networkData.StausId = 1;
+                            networkData.StatusId = 1;
                             networkData.Ssid = info?[CaptiveNetwork.NetworkInfoKeySSID].ToString();
                             networkData.Bssid = info?[CaptiveNetwork.NetworkInfoKeyBSSID].ToString();
                             networkData.NativeObject = info;
