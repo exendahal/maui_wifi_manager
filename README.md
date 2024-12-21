@@ -160,6 +160,21 @@ If you encounter any issues or have suggestions, please open an issue on the pro
 
 ---
 
+## Contributing Guidelines
+
+ contributions to this project are always welcomed. To ensure a smooth collaboration, please follow these guidelines:
+
+### **Branching Strategy**
+
+- **`develop`**: This is the **development branch** where all new features and bug fixes should be merged. Always branch out from `develop` for your work.
+- **`main`**: This is the **release branch** containing production-ready code. Only merge into `main` after thorough testing and reviews.
+
+### **Using Issue Templates**
+
+Create a new issue using one of the provided **issue templates**. These templates ensure we have all the necessary information to understand and address the issue effectively.
+
+---
+
 ## License
 
 This project is licensed under the MIT License. See the [LICENSE](LICENSE.md) file for details.
