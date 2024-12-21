@@ -59,29 +59,60 @@ namespace Plugin.MauiWifiManager
         {
             NetworkData networkData = new NetworkData();
             var manager = new CLLocationManager();
-            if (UIDevice.CurrentDevice.CheckSystemVersion(8, 0))
+
+            // Request location permissions if iOS version is 8.0+
+            if (OperatingSystem.IsIOSVersionAtLeast(8))
                 manager.RequestWhenInUseAuthorization();
 
-            if (CLLocationManager.Status is CLAuthorizationStatus.Authorized ||
-                    CLLocationManager.Status is CLAuthorizationStatus.AuthorizedAlways ||
-                    CLLocationManager.Status is CLAuthorizationStatus.AuthorizedWhenInUse)
+            if (OperatingSystem.IsIOSVersionAtLeast(14))
             {
-                if (CaptiveNetwork.TryGetSupportedInterfaces(out string[] supportedInterfaces) == StatusCode.OK)
+                if (manager.AuthorizationStatus == CLAuthorizationStatus.Authorized ||
+                    manager.AuthorizationStatus == CLAuthorizationStatus.AuthorizedAlways ||
+                    manager.AuthorizationStatus == CLAuthorizationStatus.AuthorizedWhenInUse)
                 {
-                    foreach (var item in supportedInterfaces)
+                    // Use NEHotspotNetwork for iOS 14.0+                  
+                    NEHotspotNetwork.FetchCurrent(hotspotNetwork =>
                     {
-                        if (CaptiveNetwork.TryCopyCurrentNetworkInfo(item, out NSDictionary? info) == StatusCode.OK)
+                        if (hotspotNetwork != null && !string.IsNullOrEmpty(hotspotNetwork.Ssid))
                         {
                             networkData.StatusId = 1;
-                            networkData.Ssid = info?[CaptiveNetwork.NetworkInfoKeySSID].ToString();
-                            networkData.Bssid = info?[CaptiveNetwork.NetworkInfoKeyBSSID].ToString();
-                            networkData.NativeObject = info;
+                            networkData.Ssid = hotspotNetwork.Ssid;
+                            networkData.Bssid = hotspotNetwork.Bssid;
+                            networkData.SignalStrength = hotspotNetwork.SignalStrength;
+                            if (UIDevice.CurrentDevice.CheckSystemVersion(15, 0))
+                            {
+                                networkData.SecurityType = hotspotNetwork.SecurityType;
+                            }
+                            networkData.NativeObject = hotspotNetwork;
+                        }
+                    });
+                }
+
+            }
+            else
+            {
+                if (CLLocationManager.Status is CLAuthorizationStatus.AuthorizedAlways ||
+                CLLocationManager.Status is CLAuthorizationStatus.AuthorizedWhenInUse)
+                {
+                    if (CaptiveNetwork.TryGetSupportedInterfaces(out string[] supportedInterfaces) == StatusCode.OK)
+                    {
+                        if (supportedInterfaces != null)
+                        {
+                            foreach (var item in supportedInterfaces)
+                            {
+                                if (CaptiveNetwork.TryCopyCurrentNetworkInfo(item, out NSDictionary? info) == StatusCode.OK)
+                                {
+                                    networkData.StatusId = 1;
+                                    networkData.Ssid = info?[CaptiveNetwork.NetworkInfoKeySSID]?.ToString();
+                                    networkData.Bssid = info?[CaptiveNetwork.NetworkInfoKeyBSSID]?.ToString();
+                                    networkData.NativeObject = info;
+                                    break; // Get the first available network
+                                }
+                            }
                         }
                     }
-                    //IPAddress[] ipAddresses = Dns.GetHostAddresses(Dns.GetHostName());
-                    //IPAddress ipAddress = ipAddresses.FirstOrDefault(ip => ip.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork);
-                    //networkData.IpAddress = BitConverter.ToInt32(ipAddress.GetAddressBytes(), 0);
                 }
+
             }
             return Task.FromResult(networkData);
         }
