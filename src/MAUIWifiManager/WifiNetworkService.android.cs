@@ -52,6 +52,8 @@ namespace Plugin.MauiWifiManager
             var wifiManager = _context.GetSystemService(Context.WifiService) as WifiManager;
             if (wifiManager != null)
             {
+
+                //Android version is less than 29(Android 10)
                 if (!OperatingSystem.IsAndroidVersionAtLeast(29))
                 {
                     if (!wifiManager.IsWifiEnabled)
@@ -74,8 +76,10 @@ namespace Plugin.MauiWifiManager
                     else
                         Console.WriteLine("Cannot find valid SSID");
                 }
+                //Android version is 29(Android 10)
                 else if (OperatingSystem.IsAndroidVersionAtLeast(29) && !OperatingSystem.IsAndroidVersionAtLeast(30))
                     _networkData = await RequestNetwork(ssid, password);
+                //Android version is greater than 29(Android 10)
                 else
                     await AddWifiSuggestion(ssid, password);
                 return _networkData;
@@ -372,7 +376,11 @@ namespace Plugin.MauiWifiManager
             if (OperatingSystem.IsAndroidVersionAtLeast(29) && !OperatingSystem.IsAndroidVersionAtLeast(30))
             {
                 var specifier = new WifiNetworkSpecifier.Builder().SetSsid(ssid).SetWpa2Passphrase(password).Build();
-                var request = new NetworkRequest.Builder()?.AddTransportType(TransportType.Wifi)?.SetNetworkSpecifier(specifier)?.Build();
+                var request = new NetworkRequest.Builder()?
+                    .AddTransportType(TransportType.Wifi)?
+                    .SetNetworkSpecifier(specifier)?
+                    .AddCapability(NetCapability.Internet)?
+                    .Build();
                 var networkCallback = new NetworkCallback
                 {
                     NetworkAvailable = network =>
