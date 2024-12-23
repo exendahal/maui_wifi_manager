@@ -26,6 +26,7 @@ public partial class ScanQr : Popup
                 var ssid = first.Value.Split(new[] { "S:" }, StringSplitOptions.None)[1].Split(';')[0];
                 var password = first.Value.Split(new[] { "P:" }, StringSplitOptions.None)[1].Split(';')[0];
                 string result = ssid + ":" +password;
+                barcodeReader.IsDetecting = false;
                 Close(result);
             }
         }
