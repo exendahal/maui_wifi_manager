@@ -20,29 +20,66 @@ namespace Plugin.MauiWifiManager
         {
             hotspotHelper = new NEHotspotHelper();
         }
+        
+        /// <summary>
+        /// Connect to Wifi
+        /// </summary>
+        /// <param name="ssid"></param>
+        /// <param name="password"></param>
+        /// <returns></returns>
         public async Task<NetworkData> ConnectWifi(string ssid, string password)
         {
-            NetworkData networkData = new NetworkData();
-            NEHotspotConfigurationManager.SharedManager.RemoveConfiguration(ssid);
-            var config = new NEHotspotConfiguration(ssid, password, isWep: false);
-            config.JoinOnce = false;
-            var tcs = new TaskCompletionSource<NSError>();
-            NEHotspotConfigurationManager.SharedManager.ApplyConfiguration(config, err => tcs.TrySetResult(err));
-            var error = await tcs.Task;
+            var networkData = new NetworkData();
 
-            if (error != null)
+            try
             {
-                if (error?.LocalizedDescription == "already associated.")
+                // Remove any existing configuration for the SSID
+                NEHotspotConfigurationManager.SharedManager.RemoveConfiguration(ssid);
+
+                // Create a new configuration for the SSID and password
+                var config = new NEHotspotConfiguration(ssid, password, isWep: false)
                 {
+                    JoinOnce = false
+                };
+
+                var tcs = new TaskCompletionSource<NSError>();
+
+                // Apply the configuration
+                NEHotspotConfigurationManager.SharedManager.ApplyConfiguration(config, err =>
+                {
+                    tcs.TrySetResult(err);
+                });
+
+                // Await the result of the configuration task
+                var error = await tcs.Task;
+
+                // Handle connection status
+                if (error == null)
+                {
+                    // Successfully connected
+                    Console.WriteLine("Successfully connected to the network.");
+                    networkData = await GetNetworkInfo();
+                }
+                else if (error.LocalizedDescription == "already associated.")
+                {
+                    // Already connected
+                    Console.WriteLine("Already associated with the network.");
                     networkData = await GetNetworkInfo();
                 }
                 else
                 {
-                    Console.WriteLine("Not Connected");
+                    // Connection failed
+                    Console.WriteLine($"Connection failed: {error.LocalizedDescription}");
                 }
             }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error connecting to WiFi: {ex.Message}");
+            }
+
             return networkData;
         }
+
 
         /// <summary>
         /// Disconnect Wi-Fi
