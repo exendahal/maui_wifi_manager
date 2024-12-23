@@ -375,11 +375,11 @@ namespace Plugin.MauiWifiManager
             TaskCompletionSource<NetworkData> tcs = new TaskCompletionSource<NetworkData>();
             if (OperatingSystem.IsAndroidVersionAtLeast(29) && !OperatingSystem.IsAndroidVersionAtLeast(30))
             {
+                // Creating a connection using this API does not provide an internet connection to the app or to the device.
                 var specifier = new WifiNetworkSpecifier.Builder().SetSsid(ssid).SetWpa2Passphrase(password).Build();
                 var request = new NetworkRequest.Builder()?
                     .AddTransportType(TransportType.Wifi)?
-                    .SetNetworkSpecifier(specifier)?
-                    .AddCapability(NetCapability.Internet)?
+                    .SetNetworkSpecifier(specifier)?                                    
                     .Build();
                 var networkCallback = new NetworkCallback
                 {
@@ -412,6 +412,7 @@ namespace Plugin.MauiWifiManager
 
                 };
                 UnregisterNetworkCallback(networkCallback);
+
                 _connectivityManager = _context.GetSystemService(Context.ConnectivityService) as ConnectivityManager;
                 if (_requested)
                     _connectivityManager?.UnregisterNetworkCallback(networkCallback);
