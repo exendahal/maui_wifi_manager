@@ -5,8 +5,10 @@ using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
 using Windows.Devices.WiFi;
+using Windows.Devices.WiFiDirect;
 using Windows.Networking;
 using Windows.Networking.Connectivity;
+using Windows.Networking.NetworkOperators;
 using Windows.Security.Credentials;
 using Windows.System;
 
@@ -17,6 +19,7 @@ namespace Plugin.MauiWifiManager
     /// </summary>
     public class WifiNetworkService : IWifiNetworkService
     {
+        private NetworkOperatorTetheringManager _networkOperatorTetheringManager;
         public WifiNetworkService()
         {
         }
@@ -167,6 +170,138 @@ namespace Plugin.MauiWifiManager
         public async Task<bool> OpenWirelessSetting()
         {
             return await Launcher.LaunchUriAsync(new Uri("ms-settings:network"));
+        }
+
+        public async Task<NetworkData> StartLocalHotspot()
+        {
+            var networkData = new NetworkData();
+            try
+            {
+                _networkOperatorTetheringManager = TryGetCurrentNetworkOperatorTetheringManager();
+
+                if (_networkOperatorTetheringManager != null)
+                {
+                    bool isTethered = _networkOperatorTetheringManager.TetheringOperationalState == TetheringOperationalState.On;
+                    if (isTethered)
+                    {
+                        NetworkOperatorTetheringAccessPointConfiguration configuration = _networkOperatorTetheringManager.GetCurrentAccessPointConfiguration();
+                        networkData.Ssid = configuration.Ssid;
+                        networkData.Password = configuration.Passphrase;
+                    }
+                    else
+                    {
+                        var result = await _networkOperatorTetheringManager.StartTetheringAsync();
+                        if (result.Status == TetheringOperationStatus.Success)
+                        {
+                            NetworkOperatorTetheringAccessPointConfiguration configuration = _networkOperatorTetheringManager.GetCurrentAccessPointConfiguration();
+                            networkData.Ssid = configuration.Ssid;
+                            networkData.Password = configuration.Passphrase;
+                        }
+                        else
+                        {
+                            switch (result.Status)
+                            {
+                                case TetheringOperationStatus.WiFiDeviceOff:
+                                    Console.WriteLine("Wi-Fi adapter is either turned off or missing.");
+                                    break;
+                                default:
+                                    Console.WriteLine($"Failed to start tethering: {result.Status}");
+                                    break;
+                            }
+                        }
+                    }
+                }
+                else
+                {
+                    Console.WriteLine($"Failed to start tethering");
+                }
+            }
+            catch(Exception ex)
+            {
+                Console.WriteLine($"Failed to start tethering: {ex.Message}");
+            }
+            return networkData;
+        }
+
+        public async Task<bool> StopLocalHotspot()
+        {
+            try
+            {
+                bool isTethered = _networkOperatorTetheringManager.TetheringOperationalState == TetheringOperationalState.On;
+                if (isTethered)
+                {
+                    var result = await _networkOperatorTetheringManager.StopTetheringAsync();
+                    if (result.Status == TetheringOperationStatus.Success)
+                    {
+                        return true;
+                    }
+                    else
+                    {
+                        return false;
+                    }
+                }
+                else
+                {
+                    Console.WriteLine($"No active hostpot.");
+                    return false;
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error stopping hotspot: {ex.Message}");                
+            }
+            return false;
+        }
+        NetworkOperatorTetheringManager TryGetCurrentNetworkOperatorTetheringManager()
+        {
+            ConnectionProfile currentConnectionProfile = NetworkInformation.GetInternetConnectionProfile();
+            if (currentConnectionProfile == null)
+            {
+                Console.WriteLine("System is not connected to the Internet.");
+            }
+            TetheringCapability tetheringCapability =
+              NetworkOperatorTetheringManager.GetTetheringCapabilityFromConnectionProfile(currentConnectionProfile);
+            if (tetheringCapability != TetheringCapability.Enabled)
+            {
+                string message;
+                switch (tetheringCapability)
+                {
+                    case TetheringCapability.DisabledByGroupPolicy:
+                        message = "Tethering is disabled due to group policy.";
+                        break;
+                    case TetheringCapability.DisabledByHardwareLimitation:
+                        message = "Tethering is not available due to hardware limitations.";
+                        break;
+                    case TetheringCapability.DisabledByOperator:
+                        message = "Tethering operations are disabled for this account by the network operator.";
+                        break;
+                    case TetheringCapability.DisabledByRequiredAppNotInstalled:
+                        message = "An application required for tethering operations is not available.";
+                        break;
+                    case TetheringCapability.DisabledBySku:
+                        message = "Tethering is not supported by the current account services.";
+                        break;
+                    case TetheringCapability.DisabledBySystemCapability:
+                        // This will occur if the "wiFiControl" capability is missing from the App.
+                        message = "This app is not configured to access Wi-Fi devices on this machine.";
+                        break;
+                    default:
+                        message = $"Tethering is disabled on this machine. (Code {(int)tetheringCapability}).";
+                        break;
+                }
+                Console.WriteLine(message);
+            }
+            const int E_NOT_FOUND = unchecked((int)0x80070490);
+
+            try
+            {
+                return NetworkOperatorTetheringManager.CreateFromConnectionProfile(currentConnectionProfile);
+            }
+            catch (Exception ex) when (ex.HResult == E_NOT_FOUND)
+            {
+                Console.WriteLine("System has no Wi-Fi adapters.");
+                return null;
+            }
         }
     }
 }

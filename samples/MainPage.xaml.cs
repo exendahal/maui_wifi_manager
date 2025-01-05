@@ -5,9 +5,11 @@ namespace DemoApp
 {
     public partial class MainPage : ContentPage
     {
-        public MainPage()
+        private readonly INearbyDevicesPermissionService _NearbyDevicesPermissionService;
+        public MainPage(INearbyDevicesPermissionService nearbyDevicesPermissionService)
         {
             InitializeComponent();
+            _NearbyDevicesPermissionService = nearbyDevicesPermissionService;
         }        
 
         private async void ScanTapped(object sender, TappedEventArgs e)
@@ -93,7 +95,21 @@ namespace DemoApp
         private async void InfoTapped(object sender, TappedEventArgs e)
         {
              await DisplayAlert("MAUI Wi-Fi Manager", "Target Framework: .NET 8\nDeveloped by: Santosh Dahal", "OK");
-        }        
+        }
+
+        private async void HostspotTapped(object sender, TappedEventArgs e)
+        {
+            var status = await _NearbyDevicesPermissionService.CheckBlePermission();
+            if (status ==  PermissionStatus.Granted)
+            {
+                await Navigation.PushAsync(new HotspotPage());               
+            }
+            else
+            {
+
+               await DisplayAlert("No Nearby Wi-Fi permission", "Please provide Nearby Wi-Fi permission", "OK");
+            }
+        }
     }
 
 }

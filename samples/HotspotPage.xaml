@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage
+    x:Class="DemoApp.HotspotPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:zxing="clr-namespace:ZXing.Net.Maui.Controls;assembly=ZXing.Net.MAUI.Controls"
+    Title="Local Hotspot">
+    <VerticalStackLayout Padding="24">
+        <Button
+            x:Name="StartBtn"
+            Grid.Column="0"
+            Margin="0,32"
+            BackgroundColor="{StaticResource SecondaryDarkText}"
+            Clicked="StartBtnClicked"
+            FontSize="12"
+            Text="Start Hotspot"
+            TextColor="White"
+            TextTransform="Uppercase" />
+        <StackLayout x:Name="HotSpotStack" IsVisible="False">
+            <Label x:Name="HotSpotSsid" Text="SSID:" />
+            <Label x:Name="HotSpotPassword" Text="Password:" />
+            <zxing:BarcodeGeneratorView
+                x:Name="WiFiQR"
+                Margin="0,32"
+                ForegroundColor="DarkBlue"
+                Format="QrCode"
+                HeightRequest="250"
+                WidthRequest="250" />
+        </StackLayout>
+
+    </VerticalStackLayout>
+</ContentPage>

@@ -182,9 +182,8 @@ namespace Plugin.MauiWifiManager
         /// </summary>
         public async Task<List<NetworkData>> ScanWifiNetworks()
         {
-            List<NetworkData> wifiNetworks = new List<NetworkData>();
-            // ScanWifiNetworks is not supported on iOS
-            return await Task.FromResult(wifiNetworks);
+            Console.WriteLine($"ScanWifiNetworks is not supported on iOS");
+            return await Task.FromResult(new List<NetworkData>());
         }
 
         public Task<bool> OpenWirelessSetting()
@@ -197,5 +196,16 @@ namespace Plugin.MauiWifiManager
             return Task.FromResult(false);
         }
 
+        public async Task<NetworkData> StartLocalHotspot()
+        {
+            Console.WriteLine($"StartLocalHotspot is not supported on iOS");
+            return await Task.FromResult(new NetworkData());
+        }
+
+        public async Task<bool> StopLocalHotspot()
+        {
+            Console.WriteLine($"StopLocalHotspot is not supported on iOS");
+            return await Task.FromResult(false);
+        }
     }
 }

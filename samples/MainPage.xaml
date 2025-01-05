@@ -158,7 +158,7 @@
                 </Frame>
                 <Frame
                     Grid.Row="3"
-                    Grid.Column="0"
+                    Grid.Column="1"
                     Margin="10"
                     Padding="10"
                     BackgroundColor="Purple"
@@ -179,6 +179,7 @@
                         <TapGestureRecognizer Tapped="InfoTapped" />
                     </Frame.GestureRecognizers>
                 </Frame>
+
                 <Frame
                     Grid.Row="2"
                     Grid.Column="1"
@@ -200,6 +201,30 @@
                     </StackLayout>
                     <Frame.GestureRecognizers>
                         <TapGestureRecognizer Tapped="NetworkSettingOpen" />
+                    </Frame.GestureRecognizers>
+                </Frame>
+
+                <Frame
+                    Grid.Row="3"
+                    Grid.Column="0"
+                    Margin="10"
+                    Padding="10"
+                    BackgroundColor="Green"
+                    CornerRadius="10"
+                    HasShadow="True">
+                    <StackLayout>
+                        <Image
+                            Aspect="AspectFit"
+                            HeightRequest="100"
+                            Source="dotnet_bot.png" />
+                        <Label
+                            HorizontalOptions="CenterAndExpand"
+                            Text="Hotspot"
+                            TextTransform="Uppercase"
+                            VerticalOptions="CenterAndExpand" />
+                    </StackLayout>
+                    <Frame.GestureRecognizers>
+                        <TapGestureRecognizer Tapped="HostspotTapped" />
                     </Frame.GestureRecognizers>
                 </Frame>
             </Grid>

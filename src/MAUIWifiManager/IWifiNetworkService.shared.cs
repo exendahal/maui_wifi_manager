@@ -13,5 +13,7 @@ namespace Plugin.MauiWifiManager
         Task<bool> OpenWifiSetting();
         Task<List<NetworkData>> ScanWifiNetworks();
         Task<bool> OpenWirelessSetting();
+        Task<NetworkData> StartLocalHotspot();
+        Task<bool> StopLocalHotspot();
     }    
 }

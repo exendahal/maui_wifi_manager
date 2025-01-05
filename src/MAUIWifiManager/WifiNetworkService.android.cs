@@ -7,6 +7,7 @@ using Plugin.MauiWifiManager.Abstractions;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using static Android.Net.Wifi.WifiManager;
 using static Android.Provider.Settings;
 using Context = Android.Content.Context;
 
@@ -21,7 +22,8 @@ namespace Plugin.MauiWifiManager
         private static NetworkData _networkData = null!;
         private static Context _context = null!;
         private static ConnectivityManager? _connectivityManager;
-        private static bool _requested; 
+        private static bool _requested;
+        public static WifiManager.LocalOnlyHotspotReservation? _hotspotReservation;
         public WifiNetworkService() 
         {
             
@@ -125,7 +127,7 @@ namespace Plugin.MauiWifiManager
         /// Get Wi-Fi Network Info
         /// </summary>
         public async Task<NetworkData> GetNetworkInfo()
-        {         
+        {
             if (!OperatingSystem.IsAndroidVersionAtLeast(31))
             {
                 var wifiManager = _context.GetSystemService(Context.WifiService) as WifiManager;
@@ -192,7 +194,7 @@ namespace Plugin.MauiWifiManager
                         return new NetworkData();
                 }
                
-            }           
+            }
             return _networkData;
         }
 
@@ -385,7 +387,7 @@ namespace Plugin.MauiWifiManager
                 {
                     NetworkAvailable = network =>
                     {
-
+                       
                     },
                     NetworkUnavailable = () =>
                     {
@@ -397,6 +399,7 @@ namespace Plugin.MauiWifiManager
                         {
                             if (networkCapabilities.HasCapability(NetCapability.Validated))
                             {
+                                _connectivityManager?.BindProcessToNetwork(network);
                                 _networkData.StatusId = 1;
                                 _networkData.Ssid = wifiManager.ConnectionInfo?.SSID?.Trim(new char[] { '"', '\"' });
                                 _networkData.Bssid = wifiManager.ConnectionInfo?.BSSID;
@@ -449,6 +452,63 @@ namespace Plugin.MauiWifiManager
 
         }
 
+        public Task<NetworkData> StartLocalHotspot()
+        {
+            try
+            {
+                _networkData = new NetworkData();
+                var wifiManager = _context.GetSystemService(Context.WifiService) as WifiManager;
+                if (wifiManager != null && wifiManager.IsWifiEnabled)
+                {
+                    TaskCompletionSource<NetworkData> tcs = new TaskCompletionSource<NetworkData>();
+                    if (OperatingSystem.IsAndroidVersionAtLeast(26))
+                    {
+                        if (_hotspotReservation != null)
+                        {
+                            _networkData.Ssid = _hotspotReservation.WifiConfiguration.Ssid;
+                            _networkData.Password = _hotspotReservation.WifiConfiguration.PreSharedKey;
+                            _networkData.NativeObject = _hotspotReservation;
+                            tcs.TrySetResult(_networkData);
+                            Console.WriteLine($"Hotspot already active");
+                        }
+                        else
+                        {
+                            wifiManager.StartLocalOnlyHotspot(new LocalHotspotCallback()
+                            {
+                                OnHostspotStarted = (reservation) =>
+                                {
+                                    _hotspotReservation = reservation;
+                                    _networkData.Ssid = reservation.WifiConfiguration.Ssid;
+                                    _networkData.Password = reservation.WifiConfiguration.PreSharedKey;
+                                    _networkData.NativeObject = reservation;
+                                    tcs.TrySetResult(_networkData);
+                                }
+                            }, new Handler());
+                        }
+                        return tcs.Task;
+                    }
+                }
+            }
+            catch(Exception ex)
+            {
+                Console.WriteLine($"Start Hotspot error: {ex.Message}");
+            }            
+            return Task.FromResult(_networkData);
+        }
+
+        public Task<bool> StopLocalHotspot()
+        {
+            try
+            {
+                _hotspotReservation?.Close();
+                return Task.FromResult(true);
+            }
+            catch(Exception ex)
+            {
+                Console.WriteLine($"Stop Hotspot error: {ex.Message}");
+            }
+            return Task.FromResult(false);
+        }
     }
     public class NetworkCallback : ConnectivityManager.NetworkCallback
     {
@@ -503,6 +563,35 @@ namespace Plugin.MauiWifiManager
         }
         public override void OnReceive(Context context, Intent intent)
         {
+        }
+    }
+
+    public class LocalHotspotCallback : WifiManager.LocalOnlyHotspotCallback
+    {
+        public Action<LocalOnlyHotspotReservation> OnHostspotStarted { get; set; }
+        public Action OnHotspotStopped { get; set; }
+        public Action<LocalOnlyHotspotCallbackErrorCode> OnHotspotFailed { get; set; }
+
+        public override void OnStarted(WifiManager.LocalOnlyHotspotReservation? reservation)
+        {
+            if (OperatingSystem.IsAndroidVersionAtLeast(26))
+            {
+                base.OnStarted(reservation);
+                OnHostspotStarted.Invoke(reservation);
+            }                
+        }
+
+        public override void OnStopped()
+        {
+            base.OnStopped();
+            OnHotspotStopped.Invoke();
+        }
+
+        public override void OnFailed([GeneratedEnum] LocalOnlyHotspotCallbackErrorCode reason)
+        {
+            base.OnFailed(reason);
+            OnHotspotFailed.Invoke(reason);
+            Console.WriteLine($"Hotspot failes: {reason}");
         }
     }
 
