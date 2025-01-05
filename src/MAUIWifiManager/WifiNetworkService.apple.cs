@@ -106,64 +106,66 @@ namespace Plugin.MauiWifiManager
             if (OperatingSystem.IsIOSVersionAtLeast(14))
             {
                 var tcs = new TaskCompletionSource<NetworkData>();
-                NEHotspotNetwork.FetchCurrent(hotspotNetwork =>
+                if (locationManager.AuthorizationStatus == CLAuthorizationStatus.Authorized ||
+                    locationManager.AuthorizationStatus == CLAuthorizationStatus.AuthorizedAlways ||
+                    locationManager.AuthorizationStatus == CLAuthorizationStatus.AuthorizedWhenInUse)
                 {
-                    if (hotspotNetwork != null)
+                    NEHotspotNetwork.FetchCurrent(hotspotNetwork =>
                     {
-                        networkData.StatusId = 1;
-                        networkData.Ssid = hotspotNetwork.Ssid;
-                        networkData.Bssid = hotspotNetwork.Bssid;
-                        networkData.SignalStrength = hotspotNetwork.SignalStrength;
-                        if (UIDevice.CurrentDevice.CheckSystemVersion(15, 0))
+                        if (hotspotNetwork != null)
                         {
-                            networkData.SecurityType = hotspotNetwork.SecurityType;
+                            networkData.StatusId = 1;
+                            networkData.Ssid = hotspotNetwork.Ssid;
+                            networkData.Bssid = hotspotNetwork.Bssid;
+                            networkData.SignalStrength = hotspotNetwork.SignalStrength;
+                            if (UIDevice.CurrentDevice.CheckSystemVersion(15, 0))
+                            {
+                                networkData.SecurityType = hotspotNetwork.SecurityType;
+                            }
+                            networkData.NativeObject = hotspotNetwork;
                         }
-                        networkData.NativeObject = hotspotNetwork;
-                    }
-                    else
-                    {
-                        networkData.StatusId = -1; // No network available
-                    }
-                    tcs.SetResult(networkData);
-                });
+                        else
+                        {
+                            networkData.StatusId = -1; // No network available
+                        }
+                        tcs.SetResult(networkData);
+                    });
 
+                }
+                else
+                {
+
+                   networkData.StatusId = -2; // Location permissions not granted
+                    tcs.SetResult(networkData);
+                }
                 return await tcs.Task;
             }
             // Handle iOS versions less than 14 using CaptiveNetwork
             else
             {
-                if (locationManager.AuthorizationStatus == CLAuthorizationStatus.Authorized ||
-                    locationManager.AuthorizationStatus == CLAuthorizationStatus.AuthorizedAlways ||
-                    locationManager.AuthorizationStatus == CLAuthorizationStatus.AuthorizedWhenInUse)
+                if (CaptiveNetwork.TryGetSupportedInterfaces(out string[] supportedInterfaces) == StatusCode.OK)
                 {
-                    if (CaptiveNetwork.TryGetSupportedInterfaces(out string[] supportedInterfaces) == StatusCode.OK)
+                    if (supportedInterfaces != null)
                     {
-                        if (supportedInterfaces != null)
+                        foreach (var interfaceName in supportedInterfaces)
                         {
-                            foreach (var interfaceName in supportedInterfaces)
+                            if (CaptiveNetwork.TryCopyCurrentNetworkInfo(interfaceName, out NSDictionary? info) == StatusCode.OK)
                             {
-                                if (CaptiveNetwork.TryCopyCurrentNetworkInfo(interfaceName, out NSDictionary? info) == StatusCode.OK)
+                                networkData = new NetworkData
                                 {
-                                    networkData = new NetworkData
-                                    {
-                                        StatusId = 1,
-                                        Ssid = info?[CaptiveNetwork.NetworkInfoKeySSID]?.ToString(),
-                                        Bssid = info?[CaptiveNetwork.NetworkInfoKeyBSSID]?.ToString(),
-                                        NativeObject = info
-                                    };
-                                    break; // Use the first available network
-                                }
+                                    StatusId = 1,
+                                    Ssid = info?[CaptiveNetwork.NetworkInfoKeySSID]?.ToString(),
+                                    Bssid = info?[CaptiveNetwork.NetworkInfoKeyBSSID]?.ToString(),
+                                    NativeObject = info
+                                };
+                                break; // Use the first available network
                             }
                         }
-                    }
-                    else
-                    {
-                        networkData.StatusId = -1; // No network available
                     }
                 }
                 else
                 {
-                    networkData.StatusId = -2; // Location permissions not granted
+                    networkData.StatusId = -1; // No network available
                 }
             }
 
