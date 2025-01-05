@@ -5,7 +5,6 @@ using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
 using Windows.Devices.WiFi;
-using Windows.Devices.WiFiDirect;
 using Windows.Networking;
 using Windows.Networking.Connectivity;
 using Windows.Networking.NetworkOperators;
@@ -177,7 +176,7 @@ namespace Plugin.MauiWifiManager
             var networkData = new NetworkData();
             try
             {
-                _networkOperatorTetheringManager = TryGetCurrentNetworkOperatorTetheringManager();
+                _networkOperatorTetheringManager = TryGetTetheringManager();
 
                 if (_networkOperatorTetheringManager != null)
                 {
@@ -252,56 +251,89 @@ namespace Plugin.MauiWifiManager
             }
             return false;
         }
-        NetworkOperatorTetheringManager TryGetCurrentNetworkOperatorTetheringManager()
+        NetworkOperatorTetheringManager TryGetTetheringManager()
         {
-            ConnectionProfile currentConnectionProfile = NetworkInformation.GetInternetConnectionProfile();
-            if (currentConnectionProfile == null)
+            ConnectionProfile internetConnectionProfile = NetworkInformation.GetInternetConnectionProfile();
+            if (internetConnectionProfile != null)
             {
-                Console.WriteLine("System is not connected to the Internet.");
-            }
-            TetheringCapability tetheringCapability =
-              NetworkOperatorTetheringManager.GetTetheringCapabilityFromConnectionProfile(currentConnectionProfile);
-            if (tetheringCapability != TetheringCapability.Enabled)
-            {
-                string message;
-                switch (tetheringCapability)
-                {
-                    case TetheringCapability.DisabledByGroupPolicy:
-                        message = "Tethering is disabled due to group policy.";
-                        break;
-                    case TetheringCapability.DisabledByHardwareLimitation:
-                        message = "Tethering is not available due to hardware limitations.";
-                        break;
-                    case TetheringCapability.DisabledByOperator:
-                        message = "Tethering operations are disabled for this account by the network operator.";
-                        break;
-                    case TetheringCapability.DisabledByRequiredAppNotInstalled:
-                        message = "An application required for tethering operations is not available.";
-                        break;
-                    case TetheringCapability.DisabledBySku:
-                        message = "Tethering is not supported by the current account services.";
-                        break;
-                    case TetheringCapability.DisabledBySystemCapability:
-                        // This will occur if the "wiFiControl" capability is missing from the App.
-                        message = "This app is not configured to access Wi-Fi devices on this machine.";
-                        break;
-                    default:
-                        message = $"Tethering is disabled on this machine. (Code {(int)tetheringCapability}).";
-                        break;
-                }
-                Console.WriteLine(message);
-            }
-            const int E_NOT_FOUND = unchecked((int)0x80070490);
+                Console.WriteLine($"Internet connection profile found: {internetConnectionProfile.ProfileName}");
+                TetheringCapability tetheringCapability =
+                    NetworkOperatorTetheringManager.GetTetheringCapabilityFromConnectionProfile(internetConnectionProfile);
 
-            try
-            {
-                return NetworkOperatorTetheringManager.CreateFromConnectionProfile(currentConnectionProfile);
+                HandleTetheringCapability(tetheringCapability, internetConnectionProfile.ProfileName);
+
+                if (tetheringCapability == TetheringCapability.Enabled)
+                {
+                    try
+                    {
+                        return NetworkOperatorTetheringManager.CreateFromConnectionProfile(internetConnectionProfile);
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"Failed to create TetheringManager for internet profile: {ex.Message}");
+                    }
+                }
             }
-            catch (Exception ex) when (ex.HResult == E_NOT_FOUND)
+            else
             {
-                Console.WriteLine("System has no Wi-Fi adapters.");
-                return null;
+                Console.WriteLine("No internet connection profile found.");
             }
+            var connectionProfiles = NetworkInformation.GetConnectionProfiles();
+            foreach (var profile in connectionProfiles)
+            {
+                TetheringCapability tetheringCapability =
+                    NetworkOperatorTetheringManager.GetTetheringCapabilityFromConnectionProfile(profile);
+
+                HandleTetheringCapability(tetheringCapability, profile.ProfileName);
+
+                if (tetheringCapability == TetheringCapability.Enabled)
+                {
+                    try
+                    {
+                        return NetworkOperatorTetheringManager.CreateFromConnectionProfile(profile);
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"Failed to create TetheringManager for profile {profile.ProfileName}: {ex.Message}");
+                    }
+                }
+            }
+
+            Console.WriteLine("No tethering-enabled profiles found.");
+            return null;
         }
+        void HandleTetheringCapability(TetheringCapability tetheringCapability, string profileName)
+        {
+            string message;
+            switch (tetheringCapability)
+            {
+                case TetheringCapability.Enabled:
+                    message = $"Tethering is enabled for profile: {profileName}.";
+                    break;
+                case TetheringCapability.DisabledByGroupPolicy:
+                    message = $"Tethering is disabled for profile '{profileName}' due to group policy.";
+                    break;
+                case TetheringCapability.DisabledByHardwareLimitation:
+                    message = $"Tethering is not available for profile '{profileName}' due to hardware limitations.";
+                    break;
+                case TetheringCapability.DisabledByOperator:
+                    message = $"Tethering is disabled for profile '{profileName}' by the network operator.";
+                    break;
+                case TetheringCapability.DisabledByRequiredAppNotInstalled:
+                    message = $"Tethering is disabled for profile '{profileName}' because a required application is not installed.";
+                    break;
+                case TetheringCapability.DisabledBySku:
+                    message = $"Tethering is not supported by the account services for profile '{profileName}'.";
+                    break;
+                case TetheringCapability.DisabledBySystemCapability:
+                    message = $"Tethering is disabled for profile '{profileName}' due to missing system capabilities.";
+                    break;
+                default:
+                    message = $"Tethering is disabled for profile '{profileName}'. (Code: {(int)tetheringCapability})";
+                    break;
+            }
+            Console.WriteLine(message);
+        }
+
     }
 }
