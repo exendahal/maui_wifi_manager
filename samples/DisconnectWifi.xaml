@@ -15,45 +15,48 @@
                 VerticalTextAlignment="Center" />
         </Grid>
     </Shell.TitleView>
-    <VerticalStackLayout Padding="40,20">
-        <Image HeightRequest="160" Source="dotnet_bot.png" />
-        <Label
-            FontSize="Title"
-            HorizontalOptions="CenterAndExpand"
-            Text="Disconnect Wi-Fi"
-            TextColor="{StaticResource SecondaryDarkText}"
-            TextTransform="Uppercase" />
-        <Border
-            Margin="16"
-            Padding="18,12"
-            Background="#2B0B98"
-            HorizontalOptions="Center"
-            Stroke="#C49B33"
-            StrokeShape="RoundRectangle 4,4,4,4"
-            StrokeThickness="1">
-            <StackLayout Orientation="Horizontal">
-                <Label
-                    FontSize="Medium"
-                    HorizontalOptions="Center"
-                    Text="SSID: "
-                    TextColor="White"
-                    TextTransform="Uppercase" />
-                <Label
-                    x:Name="ssidTxt"
-                    FontSize="Medium"
-                    HorizontalOptions="Center"
-                    TextColor="White" />
-            </StackLayout>
-        </Border>
-        <Button
-            x:Name="DisConnectBtn"
-            Grid.Column="0"
-            Margin="0,32"
-            BackgroundColor="{StaticResource SecondaryDarkText}"
-            Clicked="DisConnectBtnClicked"
-            FontSize="12"
-            Text="Disconnect Wi-FI"
-            TextColor="White"
-            TextTransform="Uppercase" />
-    </VerticalStackLayout>
+    <ScrollView>
+        <VerticalStackLayout Padding="40,20">
+            <Image HeightRequest="160" Source="dotnet_bot.png" />
+            <Label
+                FontSize="Title"
+                HorizontalOptions="CenterAndExpand"
+                Text="Disconnect Wi-Fi"
+                TextColor="{StaticResource SecondaryDarkText}"
+                TextTransform="Uppercase" />
+            <Border
+                Margin="16"
+                Padding="18,12"
+                Background="#2B0B98"
+                HorizontalOptions="Center"
+                Stroke="#C49B33"
+                StrokeShape="RoundRectangle 4,4,4,4"
+                StrokeThickness="1">
+                <StackLayout Orientation="Horizontal">
+                    <Label
+                        FontSize="Medium"
+                        HorizontalOptions="Center"
+                        Text="SSID: "
+                        TextColor="White"
+                        TextTransform="Uppercase" />
+                    <Label
+                        x:Name="ssidTxt"
+                        FontSize="Medium"
+                        HorizontalOptions="Center"
+                        TextColor="White" />
+                </StackLayout>
+            </Border>
+            <Button
+                x:Name="DisConnectBtn"
+                Grid.Column="0"
+                Margin="0,32"
+                BackgroundColor="{StaticResource SecondaryDarkText}"
+                Clicked="DisConnectBtnClicked"
+                FontSize="12"
+                Text="Disconnect Wi-FI"
+                TextColor="White"
+                TextTransform="Uppercase" />
+        </VerticalStackLayout>
+    </ScrollView>
+
 </ContentPage>
