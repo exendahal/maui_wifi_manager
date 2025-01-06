@@ -4,6 +4,7 @@ using NetworkExtension;
 using Plugin.MauiWifiManager.Abstractions;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Threading.Tasks;
 using SystemConfiguration;
 using UIKit;
@@ -16,11 +17,12 @@ namespace Plugin.MauiWifiManager
     public class WifiNetworkService : IWifiNetworkService
     {
         public NEHotspotHelper hotspotHelper;
+
         public WifiNetworkService()
         {
             hotspotHelper = new NEHotspotHelper();
         }
-        
+
         /// <summary>
         /// Connect to Wifi
         /// </summary>
@@ -57,29 +59,28 @@ namespace Plugin.MauiWifiManager
                 if (error == null)
                 {
                     // Successfully connected
-                    Console.WriteLine("Successfully connected to the network.");
+                    Debug.WriteLine("Successfully connected to the network.");
                     networkData = await GetNetworkInfo();
                 }
                 else if (error.LocalizedDescription == "already associated.")
                 {
                     // Already connected
-                    Console.WriteLine("Already associated with the network.");
+                    Debug.WriteLine("Already associated with the network.");
                     networkData = await GetNetworkInfo();
                 }
                 else
                 {
                     // Connection failed
-                    Console.WriteLine($"Connection failed: {error.LocalizedDescription}");
+                    Debug.WriteLine($"Connection failed: {error.LocalizedDescription}");
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error connecting to WiFi: {ex.Message}");
+                Debug.WriteLine($"Error connecting to WiFi: {ex.Message}");
             }
 
             return networkData;
         }
-
 
         /// <summary>
         /// Disconnect Wi-Fi
@@ -92,25 +93,26 @@ namespace Plugin.MauiWifiManager
         /// <summary>
         /// Get Wi-Fi Network Info
         /// </summary>
-        public Task<NetworkData> GetNetworkInfo()
+        public async Task<NetworkData> GetNetworkInfo()
         {
-            NetworkData networkData = new NetworkData();
-            var manager = new CLLocationManager();
+            var networkData = new NetworkData();
+            var locationManager = new CLLocationManager();
 
-            // Request location permissions if iOS version is 8.0+
+            // Request location permissions for iOS 8+
             if (OperatingSystem.IsIOSVersionAtLeast(8))
-                manager.RequestWhenInUseAuthorization();
+                locationManager.RequestWhenInUseAuthorization();
 
+            // Handle iOS 14+ using NEHotspotNetwork
             if (OperatingSystem.IsIOSVersionAtLeast(14))
             {
-                if (manager.AuthorizationStatus == CLAuthorizationStatus.Authorized ||
-                    manager.AuthorizationStatus == CLAuthorizationStatus.AuthorizedAlways ||
-                    manager.AuthorizationStatus == CLAuthorizationStatus.AuthorizedWhenInUse)
+                var tcs = new TaskCompletionSource<NetworkData>();
+                if (locationManager.AuthorizationStatus == CLAuthorizationStatus.Authorized ||
+                    locationManager.AuthorizationStatus == CLAuthorizationStatus.AuthorizedAlways ||
+                    locationManager.AuthorizationStatus == CLAuthorizationStatus.AuthorizedWhenInUse)
                 {
-                    // Use NEHotspotNetwork for iOS 14.0+                  
                     NEHotspotNetwork.FetchCurrent(hotspotNetwork =>
                     {
-                        if (hotspotNetwork != null && !string.IsNullOrEmpty(hotspotNetwork.Ssid))
+                        if (hotspotNetwork != null)
                         {
                             networkData.StatusId = 1;
                             networkData.Ssid = hotspotNetwork.Ssid;
@@ -122,36 +124,52 @@ namespace Plugin.MauiWifiManager
                             }
                             networkData.NativeObject = hotspotNetwork;
                         }
+                        else
+                        {
+                            networkData.StatusId = -1; // No network available
+                        }
+                        tcs.SetResult(networkData);
                     });
-                }
 
+                }
+                else
+                {
+
+                   networkData.StatusId = -2; // Location permissions not granted
+                    tcs.SetResult(networkData);
+                }
+                return await tcs.Task;
             }
+            // Handle iOS versions less than 14 using CaptiveNetwork
             else
             {
-                if (CLLocationManager.Status is CLAuthorizationStatus.AuthorizedAlways ||
-                CLLocationManager.Status is CLAuthorizationStatus.AuthorizedWhenInUse)
+                if (CaptiveNetwork.TryGetSupportedInterfaces(out string[] supportedInterfaces) == StatusCode.OK)
                 {
-                    if (CaptiveNetwork.TryGetSupportedInterfaces(out string[] supportedInterfaces) == StatusCode.OK)
+                    if (supportedInterfaces != null)
                     {
-                        if (supportedInterfaces != null)
+                        foreach (var interfaceName in supportedInterfaces)
                         {
-                            foreach (var item in supportedInterfaces)
+                            if (CaptiveNetwork.TryCopyCurrentNetworkInfo(interfaceName, out NSDictionary? info) == StatusCode.OK)
                             {
-                                if (CaptiveNetwork.TryCopyCurrentNetworkInfo(item, out NSDictionary? info) == StatusCode.OK)
+                                networkData = new NetworkData
                                 {
-                                    networkData.StatusId = 1;
-                                    networkData.Ssid = info?[CaptiveNetwork.NetworkInfoKeySSID]?.ToString();
-                                    networkData.Bssid = info?[CaptiveNetwork.NetworkInfoKeyBSSID]?.ToString();
-                                    networkData.NativeObject = info;
-                                    break; // Get the first available network
-                                }
+                                    StatusId = 1,
+                                    Ssid = info?[CaptiveNetwork.NetworkInfoKeySSID]?.ToString(),
+                                    Bssid = info?[CaptiveNetwork.NetworkInfoKeyBSSID]?.ToString(),
+                                    NativeObject = info
+                                };
+                                break; // Use the first available network
                             }
                         }
                     }
                 }
-
+                else
+                {
+                    networkData.StatusId = -1; // No network available
+                }
             }
-            return Task.FromResult(networkData);
+
+            return networkData;
         }
 
         /// <summary>
@@ -159,14 +177,9 @@ namespace Plugin.MauiWifiManager
         /// For iOS 8 and 9, we can navigate automatically to the settings
         /// App-Pre0fs:root=WIFI is forbidden by the app store guidelines
         /// </summary>
-        public Task<bool> OpenWifiSetting()
+        public async Task<bool> OpenWifiSetting()
         {
-            if (UIDevice.CurrentDevice.CheckSystemVersion(8, 0))
-            {
-                NSUrl url = new NSUrl(UIApplication.OpenSettingsUrlString);
-                return Task.FromResult(UIApplication.SharedApplication.OpenUrl(url));
-            }
-            return Task.FromResult(false);
+            return await OpenSettings();
         }
 
         /// <summary>
@@ -174,28 +187,61 @@ namespace Plugin.MauiWifiManager
         /// </summary>
         public void Dispose()
         {
-
         }
 
         /// <summary>
-        /// Scan Wi-Fi Networks       
+        /// Scan Wi-Fi Networks
         /// </summary>
         public async Task<List<NetworkData>> ScanWifiNetworks()
         {
-            List<NetworkData> wifiNetworks = new List<NetworkData>();
+            var wifiNetworks = new List<NetworkData>();
             // ScanWifiNetworks is not supported on iOS
             return await Task.FromResult(wifiNetworks);
         }
 
-        public Task<bool> OpenWirelessSetting()
+        public async Task<bool> OpenWirelessSetting()
+        {
+            return await OpenSettings();
+        }
+
+        private static async Task<bool> OpenSettings()
         {
             if (UIDevice.CurrentDevice.CheckSystemVersion(8, 0))
             {
-                NSUrl url = new NSUrl(UIApplication.OpenSettingsUrlString);
-                return Task.FromResult(UIApplication.SharedApplication.OpenUrl(url));
-            }
-            return Task.FromResult(false);
-        }
+                try
+                {
+                    var url = new NSUrl(UIApplication.OpenSettingsUrlString);
 
+                    if (UIApplication.SharedApplication.CanOpenUrl(url))
+                    {
+                        var success = await UIApplication.SharedApplication.OpenUrlAsync(url, new UIApplicationOpenUrlOptions());
+                        if (!success)
+                        {
+                            Debug.WriteLine("Failed to open app settings.");
+                            return false;
+                        }
+                        else
+                        {
+                            return true;
+                        }
+                    }
+                    else
+                    {
+                        Debug.WriteLine("Cannot open app settings URL.");
+                        return false;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"Error: {ex.Message}");
+                    return false;
+                }
+            }
+            else
+            {
+                Debug.WriteLine("OpenWirelessSetting is not supported on this version of iOS.");
+                return false;
+            }
+        }
     }
 }
