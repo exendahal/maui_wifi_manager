@@ -27,7 +27,7 @@
                 Margin="10"
                 FontSize="10"
                 HorizontalOptions="Center"
-                Text="Version: 2.0.1"
+                Text="Version: 2.0.2"
                 TextColor="{StaticResource SecondaryDarkText}"
                 TextTransform="Uppercase" />
             <Grid Padding="40,20">
