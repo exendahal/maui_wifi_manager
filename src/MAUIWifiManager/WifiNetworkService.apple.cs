@@ -1,7 +1,7 @@
 ﻿using CoreLocation;
 using Foundation;
 using NetworkExtension;
-using Plugin.MauiWifiManager.Abstractions;
+using MauiWifiManager.Abstractions;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -9,7 +9,7 @@ using System.Threading.Tasks;
 using SystemConfiguration;
 using UIKit;
 
-namespace Plugin.MauiWifiManager
+namespace MauiWifiManager
 {
     /// <summary>
     /// Interface for WiFiNetworkService
@@ -29,10 +29,9 @@ namespace Plugin.MauiWifiManager
         /// <param name="ssid"></param>
         /// <param name="password"></param>
         /// <returns></returns>
-        public async Task<NetworkData> ConnectWifi(string ssid, string password)
+        public async Task<WifiManagerResponse<NetworkData>> ConnectWifi(string ssid, string password)
         {
-            var networkData = new NetworkData();
-
+           
             try
             {
                 // Remove any existing configuration for the SSID
@@ -60,26 +59,32 @@ namespace Plugin.MauiWifiManager
                 {
                     // Successfully connected
                     Debug.WriteLine("Successfully connected to the network.");
-                    networkData = await GetNetworkInfo();
+                    var networkData = await GetNetworkInfo();
+                    return WifiManagerResponse<NetworkData>.SuccessResponse(networkData.Data, $"Successfully connected to the network.");
                 }
                 else if (error.LocalizedDescription == "already associated.")
                 {
                     // Already connected
-                    Debug.WriteLine("Already associated with the network.");
-                    networkData = await GetNetworkInfo();
+                    var networkData = await GetNetworkInfo();
+                    return WifiManagerResponse<NetworkData>.SuccessResponse(networkData.Data, $"Already associated with the network.");
                 }
                 else
                 {
                     // Connection failed
                     Debug.WriteLine($"Connection failed: {error.LocalizedDescription}");
+                    return WifiManagerResponse<NetworkData>.ErrorResponse(
+                    WifiErrorCodes.NetworkUnavailable,
+                    $"Failed to connect: {error.LocalizedDescription}");
                 }
             }
             catch (Exception ex)
             {
                 Debug.WriteLine($"Error connecting to WiFi: {ex.Message}");
+                return WifiManagerResponse<NetworkData>.ErrorResponse(
+                WifiErrorCodes.UnknownError,
+                ex.Message
+             );
             }
-
-            return networkData;
         }
 
         /// <summary>
@@ -93,9 +98,9 @@ namespace Plugin.MauiWifiManager
         /// <summary>
         /// Get Wi-Fi Network Info
         /// </summary>
-        public async Task<NetworkData> GetNetworkInfo()
+        public async Task<WifiManagerResponse<NetworkData>> GetNetworkInfo()
         {
-            var networkData = new NetworkData();
+            var response = new WifiManagerResponse<NetworkData>();
             var locationManager = new CLLocationManager();
 
             // Request location permissions for iOS 8+
@@ -105,7 +110,7 @@ namespace Plugin.MauiWifiManager
             // Handle iOS 14+ using NEHotspotNetwork
             if (OperatingSystem.IsIOSVersionAtLeast(14))
             {
-                var tcs = new TaskCompletionSource<NetworkData>();
+                var tcs = new TaskCompletionSource<WifiManagerResponse<NetworkData>>();
                 if (locationManager.AuthorizationStatus == CLAuthorizationStatus.Authorized ||
                     locationManager.AuthorizationStatus == CLAuthorizationStatus.AuthorizedAlways ||
                     locationManager.AuthorizationStatus == CLAuthorizationStatus.AuthorizedWhenInUse)
@@ -114,29 +119,32 @@ namespace Plugin.MauiWifiManager
                     {
                         if (hotspotNetwork != null)
                         {
-                            networkData.StatusId = 1;
-                            networkData.Ssid = hotspotNetwork.Ssid;
-                            networkData.Bssid = hotspotNetwork.Bssid;
-                            networkData.SignalStrength = hotspotNetwork.SignalStrength;
-                            if (UIDevice.CurrentDevice.CheckSystemVersion(15, 0))
+                            response.ErrorCode = WifiErrorCodes.Success;
+                            response.Data = new NetworkData
                             {
-                                networkData.SecurityType = hotspotNetwork.SecurityType;
-                            }
-                            networkData.NativeObject = hotspotNetwork;
+                                StatusId = (int)WifiErrorCodes.Success,
+                                Ssid = hotspotNetwork.Ssid,
+                                Bssid = hotspotNetwork.Bssid,
+                                SignalStrength = hotspotNetwork.SignalStrength,
+                                SecurityType = UIDevice.CurrentDevice.CheckSystemVersion(15, 0)? hotspotNetwork.SecurityType: null,
+                                NativeObject = hotspotNetwork
+                            };
                         }
                         else
                         {
-                            networkData.StatusId = -1; // No network available
+                            response.ErrorCode = WifiErrorCodes.NetworkUnavailable;
+                            response.ErrorMessage = "No network is currently connected.";
                         }
-                        tcs.SetResult(networkData);
+                        tcs.SetResult(response);
                     });
 
                 }
                 else
                 {
 
-                   networkData.StatusId = -2; // Location permissions not granted
-                    tcs.SetResult(networkData);
+                    response.ErrorCode = WifiErrorCodes.PermissionDenied;
+                    response.ErrorMessage = "Location permissions are not granted.";
+                    tcs.SetResult(response);
                 }
                 return await tcs.Task;
             }
@@ -151,7 +159,8 @@ namespace Plugin.MauiWifiManager
                         {
                             if (CaptiveNetwork.TryCopyCurrentNetworkInfo(interfaceName, out NSDictionary? info) == StatusCode.OK)
                             {
-                                networkData = new NetworkData
+                                response.ErrorCode = WifiErrorCodes.Success;
+                                response.Data = new NetworkData
                                 {
                                     StatusId = 1,
                                     Ssid = info?[CaptiveNetwork.NetworkInfoKeySSID]?.ToString(),
@@ -165,11 +174,11 @@ namespace Plugin.MauiWifiManager
                 }
                 else
                 {
-                    networkData.StatusId = -1; // No network available
+                    response.ErrorCode = WifiErrorCodes.NetworkUnavailable;
+                    response.ErrorMessage = "No network is currently connected.";
                 }
             }
-
-            return networkData;
+            return response;
         }
 
         /// <summary>
@@ -192,11 +201,14 @@ namespace Plugin.MauiWifiManager
         /// <summary>
         /// Scan Wi-Fi Networks
         /// </summary>
-        public async Task<List<NetworkData>> ScanWifiNetworks()
+        public async Task<WifiManagerResponse<List<NetworkData>>> ScanWifiNetworks()
         {
+            var response = new WifiManagerResponse<List<NetworkData>>();
             var wifiNetworks = new List<NetworkData>();
-            // ScanWifiNetworks is not supported on iOS
-            return await Task.FromResult(wifiNetworks);
+            Debug.WriteLine($"ScanWifiNetworks is not supported on iOS.");
+            response.ErrorCode = WifiErrorCodes.WifiNotEnabled;
+            response.ErrorMessage = "ScanWifiNetworks is not supported on iOS.";
+            return response;
         }
 
         public async Task<bool> OpenWirelessSetting()
