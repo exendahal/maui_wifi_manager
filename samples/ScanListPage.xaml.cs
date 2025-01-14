@@ -1,5 +1,7 @@
 namespace DemoApp;
-using Plugin.MauiWifiManager;
+using MauiWifiManager;
+using MauiWifiManager.Abstractions;
+using System.Diagnostics;
 
 public partial class ScanListPage : ContentPage
 {
@@ -55,21 +57,27 @@ public partial class ScanListPage : ContentPage
             loading.IsRunning = true;
             scanCollectionView.IsVisible = false;
             var response = await CrossWifiManager.Current.ScanWifiNetworks();
-            foreach (var item in response)
+            if (response.ErrorCode == WifiErrorCodes.Success)
             {
-                networkDataModel.Add(new NetworkDataModel() 
+                networkDataModel = new();
+                foreach (var item in response.Data)
                 {
-                    StatusId = item.StatusId,
-                    IpAddress = (int)item.IpAddress, 
-                    Bssid = item.Bssid, 
-                    Ssid = item.Ssid, 
-                    GatewayAddress = item.GatewayAddress, 
-                    NativeObject = item.NativeObject 
-                });
+                    networkDataModel.Add(new NetworkDataModel()
+                    {
+                        StatusId = item.StatusId,
+                        IpAddress = (int)item.IpAddress,
+                        Bssid = item.Bssid,
+                        Ssid = item.Ssid,
+                        GatewayAddress = item.GatewayAddress,
+                        NativeObject = item.NativeObject
+                    });
+                }
+                Debug.WriteLine("Networks found: " + networkDataModel.Count);
+                scanCollectionView.ItemsSource = networkDataModel;
+                loading.IsRunning = false;
+                scanCollectionView.IsVisible = true;
             }
-            scanCollectionView.ItemsSource = networkDataModel;
-            loading.IsRunning = false;
-            scanCollectionView.IsVisible = true;
+           
         }
         else
             await DisplayAlert("No location permisson", "Please provide location permission", "OK");

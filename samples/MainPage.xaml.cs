@@ -1,5 +1,5 @@
 ﻿using DemoApp.Services.Interfaces;
-using Plugin.MauiWifiManager;
+using MauiWifiManager;
 
 namespace DemoApp
 {
