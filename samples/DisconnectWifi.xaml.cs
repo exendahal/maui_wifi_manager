@@ -1,5 +1,6 @@
 namespace DemoApp;
-using Plugin.MauiWifiManager;
+using MauiWifiManager;
+using MauiWifiManager.Abstractions;
 
 public partial class DisconnectWifi : ContentPage
 {
@@ -16,8 +17,12 @@ public partial class DisconnectWifi : ContentPage
         if (status == PermissionStatus.Granted || DeviceInfo.Current.Platform == DevicePlatform.WinUI)
         {
             var response = await CrossWifiManager.Current.GetNetworkInfo();
-            ssid = response.Ssid;
-            ssidTxt.Text = ssid;           
+            if (response.ErrorCode == WifiErrorCodes.Success)
+            {
+                ssid = response?.Data?.Ssid;
+                ssidTxt.Text = ssid;
+            }
+                   
         }
         else
             await DisplayAlert("No location permisson", "Please provide location permission", "OK");

@@ -3,14 +3,14 @@ using Android.Net;
 using Android.Net.Wifi;
 using Android.OS;
 using Android.Runtime;
-using Plugin.MauiWifiManager.Abstractions;
+using MauiWifiManager.Abstractions;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using static Android.Provider.Settings;
 using Context = Android.Content.Context;
 
-namespace Plugin.MauiWifiManager
+namespace MauiWifiManager
 {
     /// <summary>
     /// Interface for WiFiNetworkService
@@ -18,7 +18,6 @@ namespace Plugin.MauiWifiManager
     /// 
     public class WifiNetworkService : IWifiNetworkService
     {
-        private static NetworkData _networkData = null!;
         private static Context _context = null!;
         private static ConnectivityManager? _connectivityManager;
         private static bool _requested; 
@@ -36,8 +35,7 @@ namespace Plugin.MauiWifiManager
             if (context != null)
             {
                 CheckInit(context);
-                _context = context;
-                _networkData = new NetworkData();          
+                _context = context;     
             }
             else
                 throw new NullReferenceException("Context is null. Initialization cannot proceed.");
@@ -47,20 +45,35 @@ namespace Plugin.MauiWifiManager
         /// <summary>
         /// Connect Wi-Fi
         /// </summary>
-        public async Task<NetworkData> ConnectWifi(string ssid, string password)
+        public async Task<WifiManagerResponse<NetworkData>> ConnectWifi(string ssid, string password)
         {
-            var wifiManager = _context.GetSystemService(Context.WifiService) as WifiManager;
-            if (wifiManager != null)
-            {
+            var response = new WifiManagerResponse<NetworkData>();
+            var networkData = new NetworkData();
 
-                //Android version is less than 29(Android 10)
+            var wifiManager = _context.GetSystemService(Context.WifiService) as WifiManager;
+
+            if (wifiManager == null)
+            {
+                System.Diagnostics.Debug.WriteLine($"Wi-Fi Manager is unavailable. Please ensure the device has Wi-Fi capability.");
+                response.ErrorCode = WifiErrorCodes.UnsupportedHardware;
+                response.ErrorMessage = "Wi-Fi Manager is unavailable. Please ensure the device has Wi-Fi capability.";
+                return response;
+            }
+
+            try
+            {
+                // Check Android version for different connection methods
                 if (!OperatingSystem.IsAndroidVersionAtLeast(29))
                 {
+                    // Android version is less than 29 (Android 10)
                     if (!wifiManager.IsWifiEnabled)
-                        wifiManager.SetWifiEnabled(true);
+                    {
+                        wifiManager.SetWifiEnabled(true); // Enable Wi-Fi if not already enabled
+                    }
                     string wifiSsid = wifiManager.ConnectionInfo?.SSID?.ToString() ?? string.Empty;
                     if (wifiSsid != string.Format("\"{0}\"", ssid))
                     {
+                        System.Diagnostics.Debug.WriteLine("Wi-Fi connection initiated successfully.");
                         WifiConfiguration wifiConfig = new WifiConfiguration
                         {
                             Ssid = string.Format("\"{0}\"", ssid),
@@ -70,23 +83,40 @@ namespace Plugin.MauiWifiManager
                         wifiManager.Disconnect();
                         wifiManager.EnableNetwork(netId, true);
                         wifiManager.Reconnect();
-                        _networkData.Ssid = wifiConfig.Ssid;
-
+                        networkData.Ssid = wifiConfig.Ssid;
+                        networkData.StatusId = (int)WifiErrorCodes.Success;                        
+                        response.ErrorCode = WifiErrorCodes.Success;
+                        response.ErrorMessage = "Wi-Fi connection initiated successfully.";
+                        response.Data = networkData;
                     }
                     else
-                        Console.WriteLine("Cannot find valid SSID");
-                }
-                //Android version is 29(Android 10)
+                    {
+                        System.Diagnostics.Debug.WriteLine("Cannot find a valid SSID to connect.");
+                        response.ErrorCode = WifiErrorCodes.NoConnection;
+                        response.ErrorMessage = "Cannot find a valid SSID to connect.";
+                        response.Data = networkData;
+                    }
+                }               
                 else if (OperatingSystem.IsAndroidVersionAtLeast(29) && !OperatingSystem.IsAndroidVersionAtLeast(30))
-                    _networkData = await RequestNetwork(ssid, password);
-                //Android version is greater than 29(Android 10)
+                {
+                    //Android version is 29(Android 10)
+                    response = await RequestNetwork(wifiManager, ssid, password);
+                }
                 else
-                    await AddWifiSuggestion(ssid, password);
-                return _networkData;
+                {
+                    //Android version is greater than 29(Android 10)
+                    response = await AddWifiSuggestion(wifiManager, ssid, password);
+                }
             }
-            else
-                throw new InvalidOperationException("Wi-Fi Manager is unavailable. Please ensure the device has Wi-Fi capability.");
-
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error connecting to Wi-Fi: {ex.Message}");
+                response.ErrorCode = WifiErrorCodes.UnknownError;
+                response.ErrorMessage = $"Error connecting to Wi-Fi: {ex.Message}";
+                response.Data = networkData;
+            }
+            return response;
+           
         }
 
         /// <summary>
@@ -124,76 +154,121 @@ namespace Plugin.MauiWifiManager
         /// <summary>
         /// Get Wi-Fi Network Info
         /// </summary>
-        public async Task<NetworkData> GetNetworkInfo()
-        {         
+        public async Task<WifiManagerResponse<NetworkData>> GetNetworkInfo()
+        {
+            var response = new WifiManagerResponse<NetworkData>();
+            var networkData = new NetworkData();
             if (!OperatingSystem.IsAndroidVersionAtLeast(31))
             {
                 var wifiManager = _context.GetSystemService(Context.WifiService) as WifiManager;
-                if (wifiManager != null && wifiManager.IsWifiEnabled)
+
+                if (wifiManager == null)
                 {
-                    _networkData.StatusId = 1;
-                    _networkData.Ssid = wifiManager.ConnectionInfo?.SSID?.Trim(new char[] { '"', '\"' });
-                    _networkData.Bssid = wifiManager.ConnectionInfo?.BSSID;
-                    _networkData.SignalStrength = wifiManager.ConnectionInfo?.Rssi;
-                    _networkData.IpAddress = wifiManager.DhcpInfo?.IpAddress ?? 0;
-                    _networkData.GatewayAddress = wifiManager.DhcpInfo?.Gateway.ToString();
-                    _networkData.NativeObject = wifiManager.ConnectionInfo;
+                    System.Diagnostics.Debug.WriteLine($"Wi-Fi Manager is unavailable. Please ensure the device has Wi-Fi capability.");
+                    response.ErrorCode = WifiErrorCodes.UnsupportedHardware;
+                    response.ErrorMessage = "Wi-Fi Manager is unavailable. Please ensure the device has Wi-Fi capability.";
+                    return response;
                 }
-                else
+                if (!wifiManager.IsWifiEnabled)
                 {
-                    if (wifiManager == null)
-                        throw new InvalidOperationException("Wi-Fi Manager is unavailable. Please ensure the device has Wi-Fi capability.");
-                    else if (!wifiManager.IsWifiEnabled)
-                        throw new InvalidOperationException("Wi-Fi is turned off. Please enable Wi-Fi to proceed.");
+                    System.Diagnostics.Debug.WriteLine("Wi-Fi is turned off. Please enable Wi-Fi to proceed.");
+                    response.ErrorCode = WifiErrorCodes.WifiNotEnabled;
+                    response.ErrorMessage = "Wi-Fi is turned off. Please enable Wi-Fi to proceed.";
+                    return response;
                 }
+                if (wifiManager.ConnectionInfo == null )
+                {
+                    System.Diagnostics.Debug.WriteLine("Invalid ConnectionInfo.");
+                    response.ErrorCode = WifiErrorCodes.NoConnection;
+                    response.ErrorMessage = "Invalid ConnectionInfo.";
+                    return response;
+                }
+
+                if (wifiManager.ConnectionInfo.SupplicantState == SupplicantState.Completed)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Fetched Wi-Fi connection info successfully.");
+                    networkData.StatusId = (int)WifiErrorCodes.Success;
+                    networkData.Ssid = wifiManager.ConnectionInfo?.SSID?.Trim(new char[] { '"', '\"' });
+                    networkData.Bssid = wifiManager.ConnectionInfo?.BSSID;
+                    networkData.SignalStrength = wifiManager.ConnectionInfo?.Rssi;
+                    networkData.IpAddress = wifiManager.DhcpInfo?.IpAddress ?? 0;
+                    networkData.GatewayAddress = wifiManager.DhcpInfo?.Gateway.ToString();
+                    networkData.NativeObject = wifiManager.ConnectionInfo;
+
+                    response.ErrorCode = WifiErrorCodes.Success;
+                    response.ErrorMessage = "Fetched Wi-Fi connection info successfully.";
+                    response.Data = networkData;
+                    return response;
+                }
+               
             }
             else
             {
+                // For Android 12+ (API level 31 or higher), use connectivity manager to fetch network details
                 TaskCompletionSource<NetworkData> tcs = new TaskCompletionSource<NetworkData>();
                 ConnectivityManager? connectivityManager = _context.GetSystemService(Context.ConnectivityService) as ConnectivityManager;
                 if (connectivityManager == null)
                 {
-                    throw new InvalidOperationException("Connectivity service is not available on this device.");
+                    System.Diagnostics.Debug.WriteLine("Connectivity service is not available on this device.");
+                    response.ErrorCode = WifiErrorCodes.UnsupportedHardware;
+                    response.ErrorMessage = "Connectivity service is not available on this device.";
+                    return response;
+                }
+
+                NetworkInfo activeNetworkInfo = connectivityManager.ActiveNetworkInfo;
+                if (activeNetworkInfo == null)
+                {
+                    System.Diagnostics.Debug.WriteLine("No active network info.");
+                    response.ErrorCode = WifiErrorCodes.NetworkUnavailable;
+                    response.ErrorMessage = "No active network info.";
+                    return response;
+
+                }
+
+                NetworkCallbackFlags flagIncludeLocationInfo = NetworkCallbackFlags.IncludeLocationInfo;
+                NetworkCallback networkCallback = new NetworkCallback((int)flagIncludeLocationInfo)
+                {
+                    OnNetworkCapabilitiesChanged = (network, networkCapabilities) =>
+                    {
+                        WifiInfo wifiInfo = (WifiInfo)networkCapabilities.TransportInfo;
+
+                        if (wifiInfo != null && wifiInfo.SupplicantState == SupplicantState.Completed)
+                        {
+                            networkData.StatusId = 1;
+                            networkData.Ssid = wifiInfo?.SSID?.Trim(new char[] { '"', '\"' });
+                            networkData.Bssid = wifiInfo?.BSSID;
+                            networkData.IpAddress = wifiInfo?.IpAddress ?? 0;
+                            networkData.NativeObject = wifiInfo;
+                            networkData.SignalStrength = wifiInfo?.Rssi;
+                            tcs.TrySetResult(networkData);
+                        }
+                    },
+                    NetworkUnavailable = () =>
+                    {
+                        tcs.TrySetResult(new NetworkData());
+                    }
+                };
+                var request = new NetworkRequest.Builder().AddTransportType(transportType: TransportType.Wifi).Build();
+                connectivityManager.RequestNetwork(request, networkCallback);
+                connectivityManager.RegisterNetworkCallback(request, networkCallback);
+               
+                networkData = await tcs.Task;
+                if (networkData != null && networkData.StatusId == 1)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Fetched Wi-Fi connection info successfully.");
+                    response.ErrorCode = WifiErrorCodes.Success;
+                    response.ErrorMessage = "Fetched Wi-Fi connection info successfully.";
+                    response.Data = networkData;
                 }
                 else
                 {
-                    NetworkInfo activeNetworkInfo = connectivityManager.ActiveNetworkInfo;
-                    if (activeNetworkInfo != null)
-                    {
-                        NetworkCallbackFlags flagIncludeLocationInfo = NetworkCallbackFlags.IncludeLocationInfo;
-                        NetworkCallback networkCallback = new NetworkCallback((int)flagIncludeLocationInfo)
-                        {
-                            OnNetworkCapabilitiesChanged = (network, networkCapabilities) =>
-                            {
-                                WifiInfo wifiInfo = (WifiInfo)networkCapabilities.TransportInfo;
-
-                                if (wifiInfo != null && wifiInfo.SupplicantState == SupplicantState.Completed)
-                                {
-                                    _networkData.StatusId = 1;
-                                    _networkData.Ssid = wifiInfo?.SSID?.Trim(new char[] { '"', '\"' });
-                                    _networkData.Bssid = wifiInfo?.BSSID;
-                                    _networkData.IpAddress = wifiInfo?.IpAddress ?? 0;
-                                    _networkData.NativeObject = wifiInfo;
-                                    _networkData.SignalStrength = wifiInfo?.Rssi;
-                                    tcs.TrySetResult(_networkData);
-                                }
-                            },
-                            NetworkUnavailable = () =>
-                            {
-                                tcs.TrySetResult(new NetworkData());
-                            }
-                        };
-                        var request = new NetworkRequest.Builder().AddTransportType(transportType: TransportType.Wifi).Build();
-                        connectivityManager.RequestNetwork(request, networkCallback);
-                        connectivityManager.RegisterNetworkCallback(request, networkCallback);
-                        return await tcs.Task;
-                    }
-                    else
-                        return new NetworkData();
+                    System.Diagnostics.Debug.WriteLine($"Failed to fetch Wi-Fi connection info.");
+                    response.ErrorCode = WifiErrorCodes.UnknownError;
+                    response.ErrorMessage = "Failed to fetch Wi-Fi connection info.";
                 }
-               
+
             }           
-            return _networkData;
+            return response;
         }
 
         /// <summary>
@@ -229,12 +304,30 @@ namespace Plugin.MauiWifiManager
         /// <summary>
         /// Scan Wi-Fi Networks
         /// </summary>
-        public async Task<List<NetworkData>> ScanWifiNetworks()
+        public async Task<WifiManagerResponse<List<NetworkData>>> ScanWifiNetworks()
         {
-            var wifiManager = _context.GetSystemService(Context.WifiService) as WifiManager;
-            List<NetworkData> wifiNetworks = new List<NetworkData>();
-            if (wifiManager != null && wifiManager.IsWifiEnabled)
+            var response = new WifiManagerResponse<List<NetworkData>>();
+            try
             {
+                var wifiManager = _context.GetSystemService(Context.WifiService) as WifiManager;
+                if (wifiManager == null)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Wi-Fi Manager is unavailable. Please ensure the device has Wi-Fi capability.");
+                    response.ErrorCode = WifiErrorCodes.UnsupportedHardware;
+                    response.ErrorMessage = "Wi-Fi Manager is unavailable. Please ensure the device has Wi-Fi capability.";
+                    return response;
+                }
+
+                if (!wifiManager.IsWifiEnabled)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Wi-Fi is turned off. Please enable Wi-Fi to proceed.");
+                    response.ErrorCode = WifiErrorCodes.WifiNotEnabled;
+                    response.ErrorMessage = "Wi-Fi is turned off. Please enable Wi-Fi to proceed.";
+                    return response;
+                }
+
+                List<NetworkData> wifiNetworks = new List<NetworkData>();
+                System.Diagnostics.Debug.WriteLine($"Wi-Fi Scan started.");
                 wifiManager?.StartScan();
                 var scanResults = wifiManager?.ScanResults;
                 foreach (var result in scanResults)
@@ -246,41 +339,61 @@ namespace Plugin.MauiWifiManager
                         NativeObject = result
                     });
                 }
+                System.Diagnostics.Debug.WriteLine($"Wi-Fi Scan complete.");
+                response.ErrorCode = WifiErrorCodes.Success;
+                response.ErrorMessage = $"Wi-Fi Scan complete.";
+                response.Data = wifiNetworks;
             }
-            else
-                throw new InvalidOperationException("Wi-Fi is turned off. Please enable Wi-Fi to proceed.");
-            return wifiNetworks;
+            catch(Exception ex)
+            {
+
+                System.Diagnostics.Debug.WriteLine($"Error while scanning Wi-Fi: {ex.Message}");
+                response.ErrorCode = WifiErrorCodes.UnknownError;
+                response.ErrorMessage = $"Error while scanning Wi-Fi: {ex.Message}";
+            }
+            return response;
         }
 
-        private async Task<NetworkData> AddWifiSuggestion(string ssid, string psk)
+        private async Task<WifiManagerResponse<NetworkData>> AddWifiSuggestion(WifiManager wifiManager, string ssid, string psk)
         {
+            var response = new WifiManagerResponse<NetworkData>();
+            var networkData = new NetworkData();
+
             if (OperatingSystem.IsAndroidVersionAtLeast(30)) // Android 11 (API level 30) or later
             {
-                TaskCompletionSource<NetworkData> tcs = new TaskCompletionSource<NetworkData>();
-                var suggestions = new List<IParcelable>
-                                {
-                                   new WifiNetworkSuggestion.Builder()
-                                    .SetSsid(ssid)
-                                    .SetWpa2Passphrase(psk)
-                                    .SetIsUserInteractionRequired(true)
-                                    .Build()
-                                };
-                var response = await OpenWifiSetting();
-                if (response)
+                try
                 {
+                    TaskCompletionSource<NetworkData> tcs = new TaskCompletionSource<NetworkData>();
+                    var suggestions = new List<IParcelable>
+                                    {
+                                       new WifiNetworkSuggestion.Builder()
+                                        .SetSsid(ssid)
+                                        .SetWpa2Passphrase(psk)
+                                        .SetIsUserInteractionRequired(true)
+                                        .Build()
+                                    };
+                    // Open the Wi-Fi settings
+                    var wifiSettingsResponse = await OpenWifiSetting();
+                    if (!wifiSettingsResponse)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"Failed to open Wi - Fi settings.");
+                        response.ErrorCode = WifiErrorCodes.UnknownError;
+                        return response;
+                    }
+
                     var bundle = new Bundle();
                     bundle.PutParcelableArrayList("android.provider.extra.WIFI_NETWORK_LIST", suggestions);
                     var intent = new Intent("android.settings.WIFI_ADD_NETWORKS");
                     intent.PutExtras(bundle);
                     _context.StartActivity(intent);
-                    var connectivityManager = _context.GetSystemService(Context.ConnectivityService) as ConnectivityManager; ;
-                    var networkRequest = new NetworkRequest.Builder().AddTransportType(TransportType.Wifi).Build();
 
+                    var connectivityManager = _context.GetSystemService(Context.ConnectivityService) as ConnectivityManager;
+                    var networkRequest = new NetworkRequest.Builder().AddTransportType(TransportType.Wifi).Build();
                     ConnectivityManager.NetworkCallback networkCallback;
                     if (OperatingSystem.IsAndroidVersionAtLeast(31)) // Android 12 (API level 31) or later
                     {
                         NetworkCallbackFlags flagIncludeLocationInfo = NetworkCallbackFlags.IncludeLocationInfo;
-                        networkCallback = new NetworkCallback(((int)flagIncludeLocationInfo))
+                        networkCallback = new NetworkCallback((int)flagIncludeLocationInfo)
                         {
                             OnNetworkCapabilitiesChanged = (network, networkCapabilities) =>
                             {
@@ -289,18 +402,19 @@ namespace Plugin.MauiWifiManager
                                 {
                                     if (wifiInfo.SupplicantState == SupplicantState.Completed)
                                     {
-                                        _networkData.StatusId = 1;
-                                        _networkData.Ssid = wifiInfo?.SSID?.Trim(new char[] { '"', '\"' });
-                                        _networkData.Bssid = wifiInfo?.BSSID;
-                                        _networkData.IpAddress = wifiInfo?.IpAddress ?? 0;
-                                        _networkData.NativeObject = wifiInfo;
-                                        _networkData.SignalStrength = wifiInfo?.Rssi;
-                                        tcs.TrySetResult(_networkData);
+                                        networkData.StatusId = (int)WifiErrorCodes.Success;
+                                        networkData.Ssid = wifiInfo.SSID?.Trim(new char[] { '"', '\"' });
+                                        networkData.Bssid = wifiInfo.BSSID;
+                                        networkData.IpAddress = wifiInfo?.IpAddress ?? 0;
+                                        networkData.NativeObject = wifiInfo;
+                                        networkData.SignalStrength = wifiInfo.Rssi;
+                                        tcs.TrySetResult(networkData);
                                     }
                                     else if (wifiInfo.SupplicantState == SupplicantState.Invalid)
+                                    {
                                         tcs.TrySetResult(new NetworkData());
+                                    }                                       
                                 }
-
                             },
                             NetworkUnavailable = () =>
                             {
@@ -310,12 +424,11 @@ namespace Plugin.MauiWifiManager
                     }
                     else
                     {
-                        var wifiManager = _context.GetSystemService(Context.WifiService) as WifiManager;
                         networkCallback = new NetworkCallback
                         {
                             NetworkAvailable = network =>
                             {
-
+                                // Handle network available
                             },
                             OnNetworkCapabilitiesChanged = (network, networkCapabilities) =>
                             {
@@ -325,17 +438,16 @@ namespace Plugin.MauiWifiManager
                                     {
                                         if (OperatingSystem.IsAndroidVersionAtLeast(30) && !OperatingSystem.IsAndroidVersionAtLeast(31))
                                         {
-                                            _networkData.StatusId = 1;
-                                            _networkData.Ssid = wifiManager.ConnectionInfo?.SSID?.Trim(new char[] { '"', '\"' });
-                                            _networkData.Bssid = wifiManager.ConnectionInfo?.BSSID;
-                                            _networkData.SignalStrength = wifiManager.ConnectionInfo?.Rssi;
-                                            _networkData.IpAddress = wifiManager.DhcpInfo?.IpAddress ?? 0;
-                                            _networkData.GatewayAddress = wifiManager.DhcpInfo?.Gateway.ToString();
-                                            _networkData.NativeObject = wifiManager.ConnectionInfo;
+                                            networkData.StatusId = (int)WifiErrorCodes.Success;
+                                            networkData.Ssid = wifiManager.ConnectionInfo?.SSID?.Trim(new char[] { '"', '\"' });
+                                            networkData.Bssid = wifiManager.ConnectionInfo?.BSSID;
+                                            networkData.SignalStrength = wifiManager.ConnectionInfo?.Rssi;
+                                            networkData.IpAddress = wifiManager.DhcpInfo?.IpAddress ?? 0;
+                                            networkData.GatewayAddress = wifiManager.DhcpInfo?.Gateway.ToString();
+                                            networkData.NativeObject = wifiManager.ConnectionInfo;
                                         }
-                                       
-                                    }                                    
-                                    tcs.TrySetResult(_networkData);
+                                    }
+                                    tcs.TrySetResult(networkData);
                                 }
                             },
                             NetworkUnavailable = () =>
@@ -344,85 +456,141 @@ namespace Plugin.MauiWifiManager
                             }
                         };
                     }
-
                     connectivityManager?.RegisterNetworkCallback(networkRequest, networkCallback);
 
                     // Set a timeout to prevent hanging
                     var timeoutTask = Task.Delay(TimeSpan.FromSeconds(15));
                     var completedTask = await Task.WhenAny(tcs.Task, timeoutTask);
-
                     if (completedTask == timeoutTask)
                     {
                         // Timed out, return default result
                         tcs.TrySetResult(new NetworkData());
                     }
+
                     // Ensure to unregister the callback when done
                     connectivityManager?.UnregisterNetworkCallback(networkCallback);
-                    return await tcs.Task;
+                    networkData = await tcs.Task;
+
+                    if (networkData != null && networkData.StatusId == (int)WifiErrorCodes.Success)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"Wi-Fi network suggestion added successfully.");
+                        response.ErrorCode = WifiErrorCodes.Success;
+                        response.ErrorMessage = "Wi-Fi network suggestion added successfully.";
+                        response.Data = networkData;
+                    }
+                    else
+                    {
+                        System.Diagnostics.Debug.WriteLine($"Failed to add Wi-Fi network suggestion.");
+                        response.ErrorCode = WifiErrorCodes.UnknownError;
+                        response.ErrorMessage = "Failed to add Wi-Fi network suggestion.";
+                    }
                 }
-                return new NetworkData();
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Error while adding Wi-Fi suggestion: {ex.Message}");
+                    response.ErrorCode = WifiErrorCodes.UnknownError;
+                    response.ErrorMessage = $"Error while adding Wi-Fi suggestion: {ex.Message}";
+                }                
             }
-            return new NetworkData();
+            return response;
         }      
 
-        public async Task<NetworkData> RequestNetwork(string ssid, string password) 
-        {            
-            var wifiManager = _context.GetSystemService(Context.WifiService) as WifiManager;
+        public async Task<WifiManagerResponse<NetworkData>> RequestNetwork(WifiManager wifiManager, string ssid, string password) 
+        {
+            var response = new WifiManagerResponse<NetworkData>();
+            var networkData = new NetworkData();
+
             if (wifiManager == null)
-                throw new InvalidOperationException("Wi-Fi Manager is unavailable. Please ensure the device has Wi-Fi capability.");
-            if (!wifiManager.IsWifiEnabled)
-                throw new InvalidOperationException("Wi-Fi is turned off. Please enable Wi-Fi to proceed.");
-            TaskCompletionSource<NetworkData> tcs = new TaskCompletionSource<NetworkData>();
-            if (OperatingSystem.IsAndroidVersionAtLeast(29) && !OperatingSystem.IsAndroidVersionAtLeast(30))
             {
-                // Creating a connection using this API does not provide an internet connection to the app or to the device.
-                var specifier = new WifiNetworkSpecifier.Builder().SetSsid(ssid).SetWpa2Passphrase(password).Build();
-                var request = new NetworkRequest.Builder()?
-                    .AddTransportType(TransportType.Wifi)?
-                    .SetNetworkSpecifier(specifier)?                                    
-                    .Build();
-                var networkCallback = new NetworkCallback
-                {
-                    NetworkAvailable = network =>
-                    {
+                System.Diagnostics.Debug.WriteLine($"Wi-Fi Manager is unavailable. Please ensure the device has Wi-Fi capability.");
+                response.ErrorCode = WifiErrorCodes.UnsupportedHardware;
+                response.ErrorMessage = "Wi-Fi Manager is unavailable. Please ensure the device has Wi-Fi capability.";
+                return response;
+            }
 
-                    },
-                    NetworkUnavailable = () =>
+            if (!wifiManager.IsWifiEnabled)
+            {
+                System.Diagnostics.Debug.WriteLine($"Wi-Fi is turned off. Please enable Wi-Fi to proceed.");
+                response.ErrorCode = WifiErrorCodes.WifiNotEnabled;
+                response.ErrorMessage = "Wi-Fi is turned off. Please enable Wi-Fi to proceed.";
+                return response;
+            }
+
+            try
+            {
+                TaskCompletionSource<NetworkData> tcs = new TaskCompletionSource<NetworkData>();
+                if (OperatingSystem.IsAndroidVersionAtLeast(29) && !OperatingSystem.IsAndroidVersionAtLeast(30))
+                {
+                    // Creating a connection using this API does not provide an internet connection to the app or to the device.
+                    var specifier = new WifiNetworkSpecifier.Builder().SetSsid(ssid).SetWpa2Passphrase(password).Build();
+                    var request = new NetworkRequest.Builder()?
+                        .AddTransportType(TransportType.Wifi)?
+                        .SetNetworkSpecifier(specifier)?
+                        .Build();
+                    var networkCallback = new NetworkCallback
                     {
-                        tcs.TrySetResult(new NetworkData());
-                    },
-                    OnNetworkCapabilitiesChanged = (network, networkCapabilities) =>
-                    {
-                        if (!OperatingSystem.IsAndroidVersionAtLeast(31))
+                        NetworkAvailable = network =>
                         {
-                            if (networkCapabilities.HasCapability(NetCapability.Validated))
+
+                        },
+                        NetworkUnavailable = () =>
+                        {
+                            tcs.TrySetResult(new NetworkData());
+                        },
+                        OnNetworkCapabilitiesChanged = (network, networkCapabilities) =>
+                        {
+                            if (!OperatingSystem.IsAndroidVersionAtLeast(31))
                             {
-                                _networkData.StatusId = 1;
-                                _networkData.Ssid = wifiManager.ConnectionInfo?.SSID?.Trim(new char[] { '"', '\"' });
-                                _networkData.Bssid = wifiManager.ConnectionInfo?.BSSID;
-                                _networkData.SignalStrength = wifiManager.ConnectionInfo?.Rssi;
-                                _networkData.IpAddress = wifiManager.DhcpInfo?.IpAddress ?? 0;
-                                _networkData.GatewayAddress = wifiManager.DhcpInfo?.Gateway.ToString();
-                                _networkData.NativeObject = wifiManager.ConnectionInfo;
-                                tcs.TrySetResult(_networkData);
+                                if (networkCapabilities.HasCapability(NetCapability.Validated))
+                                {
+                                    networkData.StatusId = (int)WifiErrorCodes.Success;
+                                    networkData.Ssid = wifiManager.ConnectionInfo?.SSID?.Trim(new char[] { '"', '\"' });
+                                    networkData.Bssid = wifiManager.ConnectionInfo?.BSSID;
+                                    networkData.SignalStrength = wifiManager.ConnectionInfo?.Rssi;
+                                    networkData.IpAddress = wifiManager.DhcpInfo?.IpAddress ?? 0;
+                                    networkData.GatewayAddress = wifiManager.DhcpInfo?.Gateway.ToString();
+                                    networkData.NativeObject = wifiManager.ConnectionInfo;
+                                    tcs.TrySetResult(networkData);
+                                }
                             }
+
                         }
-                           
+
+                    };
+                    UnregisterNetworkCallback(networkCallback);
+
+                    _connectivityManager = _context.GetSystemService(Context.ConnectivityService) as ConnectivityManager;
+                    if (_requested)
+                        _connectivityManager?.UnregisterNetworkCallback(networkCallback);
+                    if (request != null)
+                    {
+                        _connectivityManager?.RequestNetwork(request, networkCallback);
+                        _requested = true;
                     }
-
-                };
-                UnregisterNetworkCallback(networkCallback);
-
-                _connectivityManager = _context.GetSystemService(Context.ConnectivityService) as ConnectivityManager;
-                if (_requested)
-                    _connectivityManager?.UnregisterNetworkCallback(networkCallback);
-                if (request != null)
-                {
-                    _connectivityManager?.RequestNetwork(request, networkCallback);
-                    _requested = true;
-                }                
-            }            
-            return await tcs.Task;
+                    // Await the task and set response accordingly
+                    networkData = await tcs.Task;
+                    if (networkData != null && networkData.StatusId == 1)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"Wi-Fi connected successfully.");
+                        response.ErrorCode = WifiErrorCodes.Success;
+                        response.ErrorMessage = "Wi-Fi connected successfully.";
+                        response.Data = networkData;
+                    }
+                    else
+                    {
+                        System.Diagnostics.Debug.WriteLine($"Wi-Fi connection failed.");
+                        response.ErrorCode = WifiErrorCodes.UnknownError;
+                        response.ErrorMessage = "Wi-Fi connection failed.";
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error while requesting Wi-Fi network: {ex.Message}");
+                response.ErrorCode = WifiErrorCodes.UnknownError;
+                response.ErrorMessage = "Error while requesting Wi-Fi network: {ex.Message}";
+            }
+            return response;
         }
 
         private void UnregisterNetworkCallback(NetworkCallback networkCallback)
@@ -448,7 +616,7 @@ namespace Plugin.MauiWifiManager
         {
 
         }
-
+       
     }
     public class NetworkCallback : ConnectivityManager.NetworkCallback
     {

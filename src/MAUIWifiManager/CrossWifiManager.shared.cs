@@ -1,6 +1,5 @@
 ﻿using System;
-
-namespace Plugin.MauiWifiManager
+namespace MauiWifiManager
 {
     /// <summary>
     /// Interface for WiFiNetworkService
