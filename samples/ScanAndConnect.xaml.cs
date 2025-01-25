@@ -1,5 +1,6 @@
 using CommunityToolkit.Maui.Views;
-using Plugin.MauiWifiManager;
+using MauiWifiManager;
+using MauiWifiManager.Abstractions;
 
 namespace DemoApp;
 
@@ -20,9 +21,9 @@ public partial class ScanAndConnect : ContentPage
             string ssid = responseString.Split(':')[0];
             string password = responseString.Split(':')[1];
             var response = await CrossWifiManager.Current.ConnectWifi(ssid, password);
-            if (response?.NativeObject != null)
+            if (response.ErrorCode == WifiErrorCodes.Success)
             {
-                await DisplayAlert("Wi-Fi Info", response?.NativeObject?.ToString(), "OK");
+                await DisplayAlert("Wi-Fi Info", response?.Data?.NativeObject?.ToString(), "OK");
             }
         }       
     }

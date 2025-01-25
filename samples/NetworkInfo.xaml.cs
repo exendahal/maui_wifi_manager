@@ -1,5 +1,7 @@
 namespace DemoApp;
-using Plugin.MauiWifiManager;
+using MauiWifiManager;
+using MauiWifiManager.Abstractions;
+using System.Diagnostics;
 using System.Net;
 
 public partial class NetworkInfo : ContentPage
@@ -16,15 +18,19 @@ public partial class NetworkInfo : ContentPage
         if (status == PermissionStatus.Granted || DeviceInfo.Current.Platform == DevicePlatform.WinUI)
         {
             var response = await CrossWifiManager.Current.GetNetworkInfo();
-            Console.WriteLine(response.NativeObject);
-            IPAddress ipAddress = new IPAddress(BitConverter.GetBytes(response.IpAddress));
-            wifiSsid.Text = response.Ssid;
-            wifiBssid.Text = response?.Bssid?.ToString();
-            ipAddressTxt.Text = ipAddress.ToString();
-            gatewayAddress.Text = response?.GatewayAddress;
-            nativeObject.Text = response?.NativeObject?.ToString();
+            if (response.ErrorCode == WifiErrorCodes.Success)
+            {
+                Debug.WriteLine(response?.Data?.NativeObject);
+                IPAddress ipAddress = new IPAddress(BitConverter.GetBytes(response.Data.IpAddress));
+                wifiSsid.Text = response.Data.Ssid;
+                wifiBssid.Text = response?.Data?.Bssid?.ToString();
+                ipAddressTxt.Text = ipAddress.ToString();
+                nativeObject.Text = response?.Data?.NativeObject?.ToString();
+
+            }
+            
         }
         else
-            await DisplayAlert("No location permisson", "Please provide location permission", "OK");
+            await DisplayAlert("No location permission", "Please provide location permission", "OK");
     }
 }

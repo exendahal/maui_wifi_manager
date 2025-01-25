@@ -1,17 +1,17 @@
-﻿using Plugin.MauiWifiManager.Abstractions;
+﻿using MauiWifiManager.Abstractions;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
-namespace Plugin.MauiWifiManager
+namespace MauiWifiManager
 {
     public interface IWifiNetworkService : IDisposable
     {
-        Task<NetworkData> ConnectWifi(string ssid, string password);
-        Task<NetworkData> GetNetworkInfo();
+        Task<WifiManagerResponse<NetworkData>> ConnectWifi(string ssid, string password);
+        Task<WifiManagerResponse<NetworkData>> GetNetworkInfo();
         void DisconnectWifi(string ssid);
         Task<bool> OpenWifiSetting();
-        Task<List<NetworkData>> ScanWifiNetworks();
+        Task<WifiManagerResponse<List<NetworkData>>> ScanWifiNetworks();
         Task<bool> OpenWirelessSetting();
     }    
 }

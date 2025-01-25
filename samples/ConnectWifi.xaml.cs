@@ -1,5 +1,6 @@
 namespace DemoApp;
-using Plugin.MauiWifiManager;
+using MauiWifiManager;
+using MauiWifiManager.Abstractions;
 
 public partial class ConnectWifi : ContentPage
 {
@@ -17,7 +18,7 @@ public partial class ConnectWifi : ContentPage
         }
 
         var response = await CrossWifiManager.Current.ConnectWifi(WifiSsid.Text, WifiPassword.Text);
-        if (response?.NativeObject != null)
-            await DisplayAlert("Wi-Fi Info", response?.NativeObject?.ToString(),"OK");
+        if (response.ErrorCode == WifiErrorCodes.Success)
+            await DisplayAlert("Wi-Fi Info", response?.Data?.Ssid?.ToString(),"OK");
     }
 }

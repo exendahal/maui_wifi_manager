@@ -2,25 +2,25 @@
 
 	<PropertyGroup>
 
-		<TargetFrameworks>netstandard2.0;net8.0-android;net8.0-ios;net8.0-maccatalyst;</TargetFrameworks>
+		<TargetFrameworks>netstandard2.0;net8.0-android;net8.0-ios</TargetFrameworks>
 		<TargetFrameworks Condition=" '$(OS)' == 'Windows_NT' ">$(TargetFrameworks);uap10.0.19041;net8.0-windows10.0.19041;</TargetFrameworks>
 		
-		<AssemblyName>Plugin.MauiWifiManager</AssemblyName>
-		<RootNamespace>Plugin.MauiWifiManage</RootNamespace>
+		<AssemblyName>MauiWifiManager</AssemblyName>
+		<RootNamespace>MauiWifiManager</RootNamespace>
 		<PackageId>WifiManager.Maui</PackageId>
 
 		<Product>$(AssemblyName) ($(TargetFramework))</Product>
-		<AssemblyVersion>2.0.2</AssemblyVersion>
-		<AssemblyFileVersion>2.0.2</AssemblyFileVersion>
-		<Version>2.0.2</Version>
-		<PackageVersion>2.0.2</PackageVersion>
+		<AssemblyVersion>3.0.0</AssemblyVersion>
+		<AssemblyFileVersion>3.0.0</AssemblyFileVersion>
+		<Version>3.0.0</Version>
+		<PackageVersion>3.0.0</PackageVersion>
 		<PackOnBuild>true</PackOnBuild>
 		<NeutralLanguage>en</NeutralLanguage>
 		<DefineConstants>$(DefineConstants);</DefineConstants>
 
 		<UseFullSemVerForNuGet>false</UseFullSemVerForNuGet>
 		<EnableDefaultCompileItems>false</EnableDefaultCompileItems>
-		<LangVersion>8.0</LangVersion>
+		<LangVersion>11.0</LangVersion>
 		<Nullable>enable</Nullable>
 		<DebugType>portable</DebugType>
 
@@ -91,13 +91,7 @@
 	</ItemGroup>
 
 	<ItemGroup Condition=" $(TargetFramework.StartsWith('uap10.0')) ">
-		<Compile Include="**\*.uwp.cs" />
-		<!--
-    If you need to add sdk references:
-     <SDKReference Include="WindowsMobile, Version=10.0.16299.0">
-      <Name>Windows Mobile Extensions for the UWP</Name>
-    </SDKReference>
-    -->
+		<Compile Include="**\*.windows.cs" />
 	</ItemGroup>
 
 	<ItemGroup>
@@ -116,7 +110,7 @@
 	</ItemGroup>
 
 	<ItemGroup Condition=" $(TargetFramework.Contains('-windows')) ">
-		<Compile Include="**\*.uwp.cs" />
+		<Compile Include="**\*.windows.cs" />
 	</ItemGroup>
 
 
