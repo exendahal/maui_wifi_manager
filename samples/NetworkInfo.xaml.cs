@@ -31,6 +31,6 @@ public partial class NetworkInfo : ContentPage
             
         }
         else
-            await DisplayAlert("No location permisson", "Please provide location permission", "OK");
+            await DisplayAlert("No location permission", "Please provide location permission", "OK");
     }
 }

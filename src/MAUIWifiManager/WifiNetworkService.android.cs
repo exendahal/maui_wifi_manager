@@ -262,9 +262,9 @@ namespace MauiWifiManager
                 }
                 else
                 {
-                    System.Diagnostics.Debug.WriteLine($"Failes to fetch Wi-Fi connection info.");
+                    System.Diagnostics.Debug.WriteLine($"Failed to fetch Wi-Fi connection info.");
                     response.ErrorCode = WifiErrorCodes.UnknownError;
-                    response.ErrorMessage = "Failes to fetch Wi-Fi connection info.";
+                    response.ErrorMessage = "Failed to fetch Wi-Fi connection info.";
                 }
 
             }           
