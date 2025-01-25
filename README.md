@@ -141,6 +141,8 @@ await CrossWifiManager.Current.OpenWifiSetting();
 
 ---
 
+**Starting with version 3.0.0, the namespace `Plugin.MauiWifiManager` has been updated to `MauiWifiManager`.**  
+
 ## Feature Support by Platform
 
 | Feature                          | Android | iOS       | Windows | Notes                                   |
