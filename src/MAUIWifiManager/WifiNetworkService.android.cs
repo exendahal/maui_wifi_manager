@@ -176,20 +176,31 @@ namespace MauiWifiManager
                     response.ErrorMessage = "Wi-Fi is turned off. Please enable Wi-Fi to proceed.";
                     return response;
                 }
+                if (wifiManager.ConnectionInfo == null )
+                {
+                    System.Diagnostics.Debug.WriteLine("Invalid ConnectionInfo.");
+                    response.ErrorCode = WifiErrorCodes.NoConnection;
+                    response.ErrorMessage = "Invalid ConnectionInfo.";
+                    return response;
+                }
 
-                System.Diagnostics.Debug.WriteLine($"Fetched Wi-Fi connection info successfully.");
-                networkData.StatusId = (int)WifiErrorCodes.Success;
-                networkData.Ssid = wifiManager.ConnectionInfo?.SSID?.Trim(new char[] { '"', '\"' });
-                networkData.Bssid = wifiManager.ConnectionInfo?.BSSID;
-                networkData.SignalStrength = wifiManager.ConnectionInfo?.Rssi;
-                networkData.IpAddress = wifiManager.DhcpInfo?.IpAddress ?? 0;
-                networkData.GatewayAddress = wifiManager.DhcpInfo?.Gateway.ToString();
-                networkData.NativeObject = wifiManager.ConnectionInfo;
-                
-                response.ErrorCode = WifiErrorCodes.Success;
-                response.ErrorMessage = "Fetched Wi-Fi connection info successfully.";
-                response.Data = networkData;
-                return response;
+                if (wifiManager.ConnectionInfo.SupplicantState == SupplicantState.Completed)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Fetched Wi-Fi connection info successfully.");
+                    networkData.StatusId = (int)WifiErrorCodes.Success;
+                    networkData.Ssid = wifiManager.ConnectionInfo?.SSID?.Trim(new char[] { '"', '\"' });
+                    networkData.Bssid = wifiManager.ConnectionInfo?.BSSID;
+                    networkData.SignalStrength = wifiManager.ConnectionInfo?.Rssi;
+                    networkData.IpAddress = wifiManager.DhcpInfo?.IpAddress ?? 0;
+                    networkData.GatewayAddress = wifiManager.DhcpInfo?.Gateway.ToString();
+                    networkData.NativeObject = wifiManager.ConnectionInfo;
+
+                    response.ErrorCode = WifiErrorCodes.Success;
+                    response.ErrorMessage = "Fetched Wi-Fi connection info successfully.";
+                    response.Data = networkData;
+                    return response;
+                }
+               
             }
             else
             {
