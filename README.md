@@ -141,7 +141,20 @@ await CrossWifiManager.Current.OpenWifiSetting();
 
 ---
 
-**Starting with version 3.0.0, the namespace `Plugin.MauiWifiManager` has been updated to `MauiWifiManager`.**  
+## Changes in Version 3.0.0
+
+- The namespace `Plugin.MauiWifiManager` has been updated to `MauiWifiManager`.
+- `NetworkData` is now part of `WifiManagerResponse`.
+- Addition to `WifiManagerResponse`:
+
+```csharp
+public class WifiManagerResponse<T>
+{
+    public T? Data { get; set; }
+    public WifiErrorCodes? ErrorCode { get; set; }
+    public string? ErrorMessage { get; set; }
+}
+```
 
 ## Feature Support by Platform
 
