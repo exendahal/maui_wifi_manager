@@ -402,13 +402,17 @@ namespace MauiWifiManager
                                 {
                                     if (wifiInfo.SupplicantState == SupplicantState.Completed)
                                     {
-                                        networkData.StatusId = (int)WifiErrorCodes.Success;
-                                        networkData.Ssid = wifiInfo.SSID?.Trim(new char[] { '"', '\"' });
-                                        networkData.Bssid = wifiInfo.BSSID;
-                                        networkData.IpAddress = wifiInfo?.IpAddress ?? 0;
-                                        networkData.NativeObject = wifiInfo;
-                                        networkData.SignalStrength = wifiInfo.Rssi;
-                                        tcs.TrySetResult(networkData);
+                                        var currentSsid = wifiInfo.SSID?.Trim(new char[] { '"', '\"' });
+                                        if (currentSsid == ssid)
+                                        {
+                                            networkData.StatusId = (int)WifiErrorCodes.Success;
+                                            networkData.Ssid = currentSsid;
+                                            networkData.Bssid = wifiInfo.BSSID;
+                                            networkData.IpAddress = wifiInfo?.IpAddress ?? 0;
+                                            networkData.NativeObject = wifiInfo;
+                                            networkData.SignalStrength = wifiInfo.Rssi;
+                                            tcs.TrySetResult(networkData);
+                                        }                                       
                                     }
                                     else if (wifiInfo.SupplicantState == SupplicantState.Invalid)
                                     {
@@ -459,11 +463,13 @@ namespace MauiWifiManager
                     connectivityManager?.RegisterNetworkCallback(networkRequest, networkCallback);
 
                     // Set a timeout to prevent hanging
-                    var timeoutTask = Task.Delay(TimeSpan.FromSeconds(15));
+                    var timeoutTask = Task.Delay(TimeSpan.FromSeconds(30));
                     var completedTask = await Task.WhenAny(tcs.Task, timeoutTask);
                     if (completedTask == timeoutTask)
                     {
-                        // Timed out, return default result
+                        System.Diagnostics.Debug.WriteLine($"Wi-Fi network suggestion Timeout.");
+                        response.ErrorCode = WifiErrorCodes.OperationTimeout;
+                        response.ErrorMessage = "Wi-Fi network suggestion Timeout.";
                         tcs.TrySetResult(new NetworkData());
                     }
 
@@ -477,12 +483,6 @@ namespace MauiWifiManager
                         response.ErrorCode = WifiErrorCodes.Success;
                         response.ErrorMessage = "Wi-Fi network suggestion added successfully.";
                         response.Data = networkData;
-                    }
-                    else
-                    {
-                        System.Diagnostics.Debug.WriteLine($"Failed to add Wi-Fi network suggestion.");
-                        response.ErrorCode = WifiErrorCodes.UnknownError;
-                        response.ErrorMessage = "Failed to add Wi-Fi network suggestion.";
                     }
                 }
                 catch (Exception ex)
