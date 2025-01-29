@@ -21,10 +21,10 @@
 		<Nullable>enable</Nullable>
 
 		<!-- Display name -->
-		<ApplicationTitle>DemoApp</ApplicationTitle>
+		<ApplicationTitle>MAUI Wi-FI Manager</ApplicationTitle>
 
 		<!-- App Identifier -->
-		<ApplicationId>com.companyname.demoapp</ApplicationId>
+		<ApplicationId>com.exendahal.mauiwifimanager</ApplicationId>
 
 		<!-- Versions -->
 		<ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
