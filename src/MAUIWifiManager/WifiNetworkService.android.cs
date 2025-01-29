@@ -442,13 +442,17 @@ namespace MauiWifiManager
                                     {
                                         if (OperatingSystem.IsAndroidVersionAtLeast(30) && !OperatingSystem.IsAndroidVersionAtLeast(31))
                                         {
-                                            networkData.StatusId = (int)WifiErrorCodes.Success;
-                                            networkData.Ssid = wifiManager.ConnectionInfo?.SSID?.Trim(new char[] { '"', '\"' });
-                                            networkData.Bssid = wifiManager.ConnectionInfo?.BSSID;
-                                            networkData.SignalStrength = wifiManager.ConnectionInfo?.Rssi;
-                                            networkData.IpAddress = wifiManager.DhcpInfo?.IpAddress ?? 0;
-                                            networkData.GatewayAddress = wifiManager.DhcpInfo?.Gateway.ToString();
-                                            networkData.NativeObject = wifiManager.ConnectionInfo;
+                                            var currentSsid = wifiManager.ConnectionInfo?.SSID?.Trim(new char[] { '"', '\"' });
+                                            if (currentSsid == ssid)
+                                            {
+                                                networkData.StatusId = (int)WifiErrorCodes.Success;
+                                                networkData.Ssid = currentSsid;
+                                                networkData.Bssid = wifiManager.ConnectionInfo?.BSSID;
+                                                networkData.SignalStrength = wifiManager.ConnectionInfo?.Rssi;
+                                                networkData.IpAddress = wifiManager.DhcpInfo?.IpAddress ?? 0;
+                                                networkData.GatewayAddress = wifiManager.DhcpInfo?.Gateway.ToString();
+                                                networkData.NativeObject = wifiManager.ConnectionInfo;
+                                            }                                                
                                         }
                                     }
                                     tcs.TrySetResult(networkData);
