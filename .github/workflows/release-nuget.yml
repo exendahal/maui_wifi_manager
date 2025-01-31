@@ -16,10 +16,7 @@ jobs:
       - name: Verify commit exists in origin/main
         run: |
           git fetch --no-tags --prune --depth=1 origin +refs/heads/*:refs/remotes/origin/*
-          if !(git branch --remote --contains | findstr origin/main) {
-            echo "Error: Tag is not in main branch!" 
-            exit 1
-          }
+          git branch --remote --contains | grep origin/main
 
       - name: Get version information from tag
         id: get_version
