@@ -438,20 +438,21 @@ namespace MauiWifiManager
                             {
                                 if (networkCapabilities.HasCapability(NetCapability.Validated))
                                 {
-                                    if (wifiManager != null)
+                                    if (OperatingSystem.IsAndroidVersionAtLeast(30) && !OperatingSystem.IsAndroidVersionAtLeast(31))
                                     {
-                                        if (OperatingSystem.IsAndroidVersionAtLeast(30) && !OperatingSystem.IsAndroidVersionAtLeast(31))
+                                        var currentSsid = wifiManager.ConnectionInfo?.SSID?.Trim(new char[] { '"', '\"' });
+                                        if (currentSsid == ssid)
                                         {
                                             networkData.StatusId = (int)WifiErrorCodes.Success;
-                                            networkData.Ssid = wifiManager.ConnectionInfo?.SSID?.Trim(new char[] { '"', '\"' });
+                                            networkData.Ssid = currentSsid;
                                             networkData.Bssid = wifiManager.ConnectionInfo?.BSSID;
                                             networkData.SignalStrength = wifiManager.ConnectionInfo?.Rssi;
                                             networkData.IpAddress = wifiManager.DhcpInfo?.IpAddress ?? 0;
                                             networkData.GatewayAddress = wifiManager.DhcpInfo?.Gateway.ToString();
                                             networkData.NativeObject = wifiManager.ConnectionInfo;
+                                            tcs.TrySetResult(networkData);
                                         }
                                     }
-                                    tcs.TrySetResult(networkData);
                                 }
                             },
                             NetworkUnavailable = () =>

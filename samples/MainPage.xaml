@@ -24,10 +24,11 @@
                 TextColor="{StaticResource SecondaryDarkText}"
                 TextTransform="Uppercase" />
             <Label
+                x:Name="VersionNo"
                 Margin="10"
                 FontSize="10"
                 HorizontalOptions="Center"
-                Text="Version: 3.0.1"
+                Text="Version: 0.0.0"
                 TextColor="{StaticResource SecondaryDarkText}"
                 TextTransform="Uppercase" />
             <Grid Padding="40,20">

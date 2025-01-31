@@ -1,5 +1,6 @@
 ﻿using DemoApp.Services.Interfaces;
 using MauiWifiManager;
+using System.Diagnostics;
 
 namespace DemoApp
 {
@@ -8,8 +9,19 @@ namespace DemoApp
         public MainPage()
         {
             InitializeComponent();
-        }        
+        }
 
+        protected override void OnAppearing()
+        {
+            base.OnAppearing();
+            var assemblyName = "MauiWifiManager";
+            var assembly = AppDomain.CurrentDomain.GetAssemblies().FirstOrDefault(a => a.GetName().Name == assemblyName);
+            if (assembly != null)
+            {
+                var version = assembly.GetName().Version;
+                VersionNo.Text = $"Version No: {version}";
+            }                
+        }
         private async void ScanTapped(object sender, TappedEventArgs e)
         {
             var gpsStatus = await IPlatformApplication.Current.Services.GetService<IGpsService>().GpsStatus();
