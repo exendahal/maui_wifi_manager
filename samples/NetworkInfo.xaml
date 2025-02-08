@@ -150,11 +150,46 @@
                         Grid.Column="0"
                         FontSize="18"
                         HorizontalOptions="FillAndExpand"
-                        Text="Native Object"
+                        Text="Security"
                         VerticalOptions="Start" />
                 </Border>
                 <Border
                     Grid.Row="3"
+                    Grid.Column="1"
+                    Margin="-1"
+                    Padding="8,4"
+                    Background="Transparent"
+                    HorizontalOptions="FillAndExpand"
+                    Stroke="LightGray"
+                    StrokeShape="RoundRectangle 0,0,0,0"
+                    StrokeThickness="1">
+                    <Label
+                        x:Name="securityTxt"
+                        FontSize="18"
+                        HorizontalOptions="FillAndExpand"
+                        LineBreakMode="WordWrap"
+                        VerticalOptions="Start" />
+                </Border>
+                <Border
+                    Grid.Row="4"
+                    Grid.Column="0"
+                    Margin="-1"
+                    Padding="8,4"
+                    Background="Transparent"
+                    HorizontalOptions="FillAndExpand"
+                    Stroke="LightGray"
+                    StrokeShape="RoundRectangle 0,0,0,0"
+                    StrokeThickness="1">
+                    <Label
+                        Grid.Row="4"
+                        Grid.Column="0"
+                        FontSize="18"
+                        HorizontalOptions="FillAndExpand"
+                        Text="Native Object"
+                        VerticalOptions="Start" />
+                </Border>
+                <Border
+                    Grid.Row="4"
                     Grid.Column="1"
                     Margin="-1"
                     Padding="8,4"
