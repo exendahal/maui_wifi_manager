@@ -1,4 +1,5 @@
 ﻿using Android.Content;
+using Android.Media.Midi;
 using Android.Net;
 using Android.Net.Wifi;
 using Android.OS;
@@ -194,7 +195,18 @@ namespace MauiWifiManager
                     networkData.IpAddress = wifiManager.DhcpInfo?.IpAddress ?? 0;
                     networkData.GatewayAddress = wifiManager.DhcpInfo?.Gateway.ToString();
                     networkData.NativeObject = wifiManager.ConnectionInfo;
-
+                    var networkList = wifiManager?.ScanResults;
+                    if (networkList != null)
+                    {
+                        foreach (var list in networkList)
+                        {
+                            if (list.Bssid == wifiManager?.ConnectionInfo?.BSSID)
+                            {
+                                networkData.SecurityType = list.Capabilities;
+                                break;
+                            }
+                        }
+                    }
                     response.ErrorCode = WifiErrorCodes.Success;
                     response.ErrorMessage = "Fetched Wi-Fi connection info successfully.";
                     response.Data = networkData;
@@ -239,7 +251,20 @@ namespace MauiWifiManager
                             networkData.Bssid = wifiInfo?.BSSID;
                             networkData.IpAddress = wifiInfo?.IpAddress ?? 0;
                             networkData.NativeObject = wifiInfo;
-                            networkData.SignalStrength = wifiInfo?.Rssi;
+                            networkData.SignalStrength = wifiInfo?.Rssi;                           
+                            var wifiManager = _context.GetSystemService(Context.WifiService) as WifiManager;
+                            var networkList = wifiManager?.ScanResults;
+                            if (networkList != null)
+                            {
+                                foreach (var list in networkList)
+                                {
+                                    if (list.Bssid == wifiInfo?.BSSID)
+                                    {
+                                        networkData.SecurityType = list.Capabilities;
+                                        break;
+                                    }
+                                }
+                            }
                             tcs.TrySetResult(networkData);
                         }
                     },
