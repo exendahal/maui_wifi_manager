@@ -166,9 +166,13 @@ namespace MauiWifiManager
                 networkData.Bssid = profile.NetworkAdapter.NetworkAdapterId;
                 networkData.NativeObject = profile;
                 networkData.SignalStrength = profile.GetSignalBars();
+                if (profile.NetworkSecuritySettings != null)
+                {
+                    networkData.SecurityType = GetSecurityType(profile.NetworkSecuritySettings.NetworkAuthenticationType);
+                }
                 response.ErrorCode = WifiErrorCodes.Success;
                 response.Data = networkData;
-                response.ErrorMessage = "Network information retrieved successfully.";
+                response.ErrorMessage = "Fetched Wi-Fi connection info successfully.";
             }
             catch (Exception ex)
             {
@@ -253,6 +257,26 @@ namespace MauiWifiManager
         public async Task<bool> OpenWirelessSetting()
         {
             return await Launcher.LaunchUriAsync(new Uri("ms-settings:network"));
+        }
+
+        private string GetSecurityType(NetworkAuthenticationType authType)
+        {
+            switch (authType)
+            {
+                case NetworkAuthenticationType.RsnaPsk:
+                    return "WPA2-PSK";  // WPA2 Personal (Pre-Shared Key)
+                case NetworkAuthenticationType.Rsna:
+                    return "WPA2-Enterprise";  // WPA2 Enterprise
+                case NetworkAuthenticationType.WpaPsk:
+                    return "WPA-PSK";  // WPA Personal (Pre-Shared Key)
+                case NetworkAuthenticationType.Wpa:
+                    return "WPA-Enterprise";  // WPA Enterprise
+                case NetworkAuthenticationType.Open80211:
+                    return "Open (No Security)";  // Open Network
+                case NetworkAuthenticationType.None:
+                default:
+                    return "Unknown or WPA3 (Possibly)"; // Handling missing WPA3 types
+            }
         }
     }
 }

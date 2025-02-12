@@ -120,6 +120,7 @@ namespace MauiWifiManager
                         if (hotspotNetwork != null)
                         {
                             response.ErrorCode = WifiErrorCodes.Success;
+                            response.ErrorMessage = "Fetched Wi-Fi connection info successfully.";
                             response.Data = new NetworkData
                             {
                                 StatusId = (int)WifiErrorCodes.Success,
