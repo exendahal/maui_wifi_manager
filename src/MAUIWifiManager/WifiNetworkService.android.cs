@@ -194,6 +194,7 @@ namespace MauiWifiManager
                     networkData.SignalStrength = wifiManager.ConnectionInfo?.Rssi;
                     networkData.IpAddress = wifiManager.DhcpInfo?.IpAddress ?? 0;
                     networkData.GatewayAddress = wifiManager.DhcpInfo?.Gateway.ToString();
+                    networkData.DhcpServerAddress = wifiManager.DhcpInfo?.ServerAddress.ToString();
                     networkData.NativeObject = wifiManager.ConnectionInfo;
                     var networkList = wifiManager?.ScanResults;
                     if (networkList != null)
