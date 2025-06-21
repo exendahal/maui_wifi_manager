@@ -12,7 +12,7 @@ on:
 
 env:
   BUILD_CONFIGURATION: Release
-  DOTNET_VERSION: 8.0.x
+  DOTNET_VERSION: 9.0.x
   CSPROJ_TO_BUILD: DemoApp.csproj
 jobs:
   build-sample-ci:
