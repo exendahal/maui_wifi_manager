@@ -1,12 +1,30 @@
 ﻿using DemoApp.Services.Interfaces;
+using Windows.Devices.Geolocation;
 
 namespace DemoApp.Platforms
 {
     public class GpsService : IGpsService
     {
-        public Task<bool> GpsStatus()
+        public async Task<bool> GpsStatus()
         {
-            return Task.FromResult(true);
+            try
+            {
+                var accessStatus = await Geolocator.RequestAccessAsync();
+                if (accessStatus != GeolocationAccessStatus.Allowed)
+                    return false;
+
+                var geolocator = new Geolocator();
+                var pos = await geolocator.GetGeopositionAsync();
+                return true;
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return false;
+            }
+            catch
+            {
+                return false;
+            }
         }
     }
 }
