@@ -8,6 +8,8 @@ using System.Diagnostics;
 using System.Threading.Tasks;
 using SystemConfiguration;
 using UIKit;
+using System.Net.NetworkInformation;
+using System.Linq;
 
 namespace MauiWifiManager
 {
@@ -95,6 +97,39 @@ namespace MauiWifiManager
             NEHotspotConfigurationManager.SharedManager.RemoveConfiguration(ssid);
         }
 
+        private static void UpdateNetworkData(NetworkData networkData)
+        {
+            var ni = NetworkInterface.GetAllNetworkInterfaces().FirstOrDefault(n => n.NetworkInterfaceType == NetworkInterfaceType.Wireless80211 && 
+            (n.OperationalStatus == OperationalStatus.Up || n.OperationalStatus == OperationalStatus.Unknown));
+            if (ni != null)
+            {
+                var ipp = ni.GetIPProperties();
+                var ip = ipp.UnicastAddresses.FirstOrDefault(n => n.Address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork);
+                if (ip != null)
+                {
+                    networkData.IpAddress = BitConverter.ToInt32(ip.Address.GetAddressBytes(), 0);
+                }
+                else
+                {
+                    networkData.IpAddress = 0;
+                }
+
+                var ipg = ipp.GatewayAddresses.FirstOrDefault(n => n.Address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork);
+                if (ipg != null)
+                {
+                    networkData.GatewayAddress = ipg.Address.ToString();
+                }
+
+                /* Not supported on iOS
+                var ipd = ipp.DhcpServerAddresses.FirstOrDefault(n => n.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork);
+                if (ipd != null)
+                {
+                    networkData.DhcpServerAddress = ipd.ToString();
+                }
+                */
+            }
+        }
+
         /// <summary>
         /// Get Wi-Fi Network Info
         /// </summary>
@@ -130,6 +165,8 @@ namespace MauiWifiManager
                                 SecurityType = UIDevice.CurrentDevice.CheckSystemVersion(15, 0)? hotspotNetwork.SecurityType: null,
                                 NativeObject = hotspotNetwork
                             };
+
+                            UpdateNetworkData(response.Data);
                         }
                         else
                         {
@@ -168,6 +205,9 @@ namespace MauiWifiManager
                                     Bssid = info?[CaptiveNetwork.NetworkInfoKeyBSSID]?.ToString(),
                                     NativeObject = info
                                 };
+
+                                UpdateNetworkData(response.Data);
+
                                 break; // Use the first available network
                             }
                         }
