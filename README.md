@@ -34,12 +34,22 @@ The Wi-Fi Manager for .NET MAUI is a simple and powerful library that helps you 
 
 Before using the library, make sure to initialize it properly:
 
-#### For Android
-
-Add the following to your Android app initialization:
+In your MauiProgram.cs, add the UseMauiWifiManager() extension method:
 
 ```csharp
-WifiNetworkService.Init(this);
+public static class MauiProgram
+{
+    public static MauiApp CreateMauiApp()
+    {
+        var builder = MauiApp.CreateBuilder();
+
+        builder
+            .UseMauiApp<App>()
+            .UseMauiWifiManager();
+
+        return builder.Build();
+    }
+}
 ```
 
 Also, include these permissions in your `AndroidManifest.xml` file:

@@ -3,6 +3,7 @@ using DemoApp.Platforms;
 using DemoApp.Services.Interfaces;
 using Microsoft.Extensions.Logging;
 using ZXing.Net.Maui.Controls;
+using MauiWifiManager;
 
 namespace DemoApp
 {
@@ -15,6 +16,7 @@ namespace DemoApp
                 .UseMauiApp<App>()
                 .UseBarcodeReader()
                 .UseMauiCommunityToolkit()
+                .UseMauiWifiManager()
                 .ConfigureFonts(fonts =>
                 {
                     fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");

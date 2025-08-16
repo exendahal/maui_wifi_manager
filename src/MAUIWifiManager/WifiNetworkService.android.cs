@@ -1,5 +1,4 @@
 ﻿using Android.Content;
-using Android.Media.Midi;
 using Android.Net;
 using Android.Net.Wifi;
 using Android.OS;
@@ -31,7 +30,7 @@ namespace MauiWifiManager
             if (context == null)
                 throw new ArgumentNullException(nameof(_context), "Please call WifiNetworkService.Init(this) inside the MainActivity's OnCreate function.");
         }
-        public static void Init(Context context)
+        public static void Init(Context? context)
         {
             if (context != null)
             {
