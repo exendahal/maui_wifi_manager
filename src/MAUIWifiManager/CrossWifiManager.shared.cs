@@ -1,4 +1,6 @@
-﻿using System;
+﻿using Microsoft.Maui.Hosting;
+using Microsoft.Maui.LifecycleEvents;
+using System;
 namespace MauiWifiManager
 {
     /// <summary>
@@ -49,6 +51,23 @@ namespace MauiWifiManager
                 implementation.Value.Dispose();
                 implementation = new Lazy<IWifiNetworkService>(() => CreateWifiManager(), System.Threading.LazyThreadSafetyMode.PublicationOnly);
             }
+        }
+    }
+    public static class Initialize
+    {
+        public static MauiAppBuilder UseMauiWifiManager(this MauiAppBuilder builder)
+        {
+        #if ANDROID
+            builder.ConfigureLifecycleEvents(events =>
+            {
+                events.AddAndroid(android => android.OnCreate((activity, bundle) =>
+                {                    
+                    WifiNetworkService.Init(Microsoft.Maui.ApplicationModel.Platform.CurrentActivity);
+                }));
+            });
+          
+        #endif
+            return builder;
         }
     }
 }
