@@ -1,5 +1,4 @@
 ﻿using Android.Content;
-using Android.Media.Midi;
 using Android.Net;
 using Android.Net.Wifi;
 using Android.OS;
