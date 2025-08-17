@@ -6,6 +6,7 @@
 		<TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('windows'))">$(TargetFrameworks);net8.0-windows10.0.19041.0;net9.0-windows10.0.19041.0</TargetFrameworks>
 
 		<UseMaui>true</UseMaui>
+		<SkipValidateMauiImplicitPackageReferences>true</SkipValidateMauiImplicitPackageReferences>
 
 		<AssemblyName>MauiWifiManager</AssemblyName>
 		<RootNamespace>MauiWifiManager</RootNamespace>
@@ -68,6 +69,10 @@
 		<EmbedUntrackedSources>true</EmbedUntrackedSources>
 		<!-- sourcelink: Include PDB in the built .nupkg -->
 		<AllowedOutputExtensionsInPackageBuildOutputFolder>$(AllowedOutputExtensionsInPackageBuildOutputFolder);.pdb</AllowedOutputExtensionsInPackageBuildOutputFolder>
+	</PropertyGroup>
+
+	<PropertyGroup>
+		<NoWarn>VSSpell001;CS1591</NoWarn>
 	</PropertyGroup>
 	
 		

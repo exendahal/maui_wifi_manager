@@ -6,6 +6,8 @@ using Android.Runtime;
 using MauiWifiManager.Abstractions;
 using System;
 using System.Collections.Generic;
+using System.Linq;
+using System.Runtime.Versioning;
 using System.Threading.Tasks;
 using static Android.Provider.Settings;
 using Context = Android.Content.Context;
@@ -18,9 +20,11 @@ namespace MauiWifiManager
     /// 
     public class WifiNetworkService : IWifiNetworkService
     {
-        private static Context _context = null!;
-        private static ConnectivityManager? _connectivityManager;
-        private static bool _requested; 
+        private static Context _Context = null!;
+        private static ConnectivityManager? _ConnectivityManager;
+        private static bool _Requested;
+        private static readonly char[] _TrimChars = new char[] { '"', '\"' };
+
         public WifiNetworkService() 
         {
             
@@ -28,14 +32,14 @@ namespace MauiWifiManager
         public static void CheckInit(Context context)
         {
             if (context == null)
-                throw new ArgumentNullException(nameof(_context), "Please call WifiNetworkService.Init(this) inside the MainActivity's OnCreate function.");
+                throw new ArgumentNullException(nameof(_Context), "Please call WifiNetworkService.Init(this) inside the MainActivity's OnCreate function.");
         }
         public static void Init(Context? context)
         {
             if (context != null)
             {
                 CheckInit(context);
-                _context = context;     
+                _Context = context;     
             }
             else
                 throw new NullReferenceException("Context is null. Initialization cannot proceed.");
@@ -50,7 +54,7 @@ namespace MauiWifiManager
             var response = new WifiManagerResponse<NetworkData>();
             var networkData = new NetworkData();
 
-            var wifiManager = _context.GetSystemService(Context.WifiService) as WifiManager;
+            var wifiManager = _Context.GetSystemService(Context.WifiService) as WifiManager;
 
             if (wifiManager == null)
             {
@@ -126,17 +130,17 @@ namespace MauiWifiManager
         /// </summary>
         public void DisconnectWifi(string? ssid)
         {
-            if (_context != null)
+            if (_Context != null)
             {
-                CheckInit(_context);
+                CheckInit(_Context);
                 if (OperatingSystem.IsAndroidVersionAtLeast(29))
                 {
                     Intent panelIntent = new Intent(Panel.ActionWifi);
-                    _context.StartActivity(panelIntent);
+                    _Context.StartActivity(panelIntent);
                 }
                 else
                 {
-                    var wifiManager = _context.GetSystemService(Context.WifiService) as WifiManager;
+                    var wifiManager = _Context.GetSystemService(Context.WifiService) as WifiManager;
                     if (wifiManager != null)
                     {
                         wifiManager.SetWifiEnabled(false); // Disable Wi-Fi
@@ -160,7 +164,7 @@ namespace MauiWifiManager
             var networkData = new NetworkData();
             if (!OperatingSystem.IsAndroidVersionAtLeast(31))
             {
-                var wifiManager = _context.GetSystemService(Context.WifiService) as WifiManager;
+                var wifiManager = _Context.GetSystemService(Context.WifiService) as WifiManager;
 
                 if (wifiManager == null)
                 {
@@ -188,7 +192,7 @@ namespace MauiWifiManager
                 {
                     System.Diagnostics.Debug.WriteLine($"Fetched Wi-Fi connection info successfully.");
                     networkData.StatusId = (int)WifiErrorCodes.Success;
-                    networkData.Ssid = wifiManager.ConnectionInfo?.SSID?.Trim(new char[] { '"', '\"' });
+                    networkData.Ssid = wifiManager.ConnectionInfo?.SSID?.Trim(_TrimChars);
                     networkData.Bssid = wifiManager.ConnectionInfo?.BSSID;
                     networkData.SignalStrength = wifiManager.ConnectionInfo?.Rssi;
                     networkData.IpAddress = wifiManager.DhcpInfo?.IpAddress ?? 0;
@@ -216,80 +220,114 @@ namespace MauiWifiManager
             else
             {
                 // For Android 12+ (API level 31 or higher), use connectivity manager to fetch network details
-                TaskCompletionSource<NetworkData> tcs = new TaskCompletionSource<NetworkData>();
-                ConnectivityManager? connectivityManager = _context.GetSystemService(Context.ConnectivityService) as ConnectivityManager;
+                TaskCompletionSource<NetworkData> tcs = new();
+                ConnectivityManager? connectivityManager = _Context.GetSystemService(Context.ConnectivityService) as ConnectivityManager;
                 if (connectivityManager == null)
                 {
                     System.Diagnostics.Debug.WriteLine("Connectivity service is not available on this device.");
                     response.ErrorCode = WifiErrorCodes.UnsupportedHardware;
                     response.ErrorMessage = "Connectivity service is not available on this device.";
                     return response;
-                }
-
-                NetworkInfo activeNetworkInfo = connectivityManager.ActiveNetworkInfo;
-                if (activeNetworkInfo == null)
+                }                
+                var activeNetwork = connectivityManager?.ActiveNetwork;
+                if (activeNetwork == null)
                 {
-                    System.Diagnostics.Debug.WriteLine("No active network info.");
+                    System.Diagnostics.Debug.WriteLine("No active network.");
                     response.ErrorCode = WifiErrorCodes.NetworkUnavailable;
-                    response.ErrorMessage = "No active network info.";
+                    response.ErrorMessage = "No active network.";
                     return response;
 
                 }
+                var linkProperties = connectivityManager?.GetLinkProperties(activeNetwork);
 
                 NetworkCallbackFlags flagIncludeLocationInfo = NetworkCallbackFlags.IncludeLocationInfo;
-                NetworkCallback networkCallback = new NetworkCallback((int)flagIncludeLocationInfo)
+                NetworkCallback networkCallback = new((int)flagIncludeLocationInfo)
                 {
                     OnNetworkCapabilitiesChanged = (network, networkCapabilities) =>
                     {
-                        WifiInfo wifiInfo = (WifiInfo)networkCapabilities.TransportInfo;
-
-                        if (wifiInfo != null && wifiInfo.SupplicantState == SupplicantState.Completed)
+                        if (OperatingSystem.IsAndroidVersionAtLeast(29))
                         {
-                            networkData.StatusId = 1;
-                            networkData.Ssid = wifiInfo?.SSID?.Trim(new char[] { '"', '\"' });
-                            networkData.Bssid = wifiInfo?.BSSID;
-                            networkData.IpAddress = wifiInfo?.IpAddress ?? 0;
-                            networkData.NativeObject = wifiInfo;
-                            networkData.SignalStrength = wifiInfo?.Rssi;                           
-                            var wifiManager = _context.GetSystemService(Context.WifiService) as WifiManager;
-                            var networkList = wifiManager?.ScanResults;
-                            if (networkList != null)
+                            WifiInfo? wifiInfo = networkCapabilities?.TransportInfo as WifiInfo;
+
+                            if (wifiInfo != null && wifiInfo.SupplicantState == SupplicantState.Completed)
                             {
-                                foreach (var list in networkList)
+                                networkData.StatusId = 1;
+                                networkData.Ssid = wifiInfo?.SSID?.Trim(_TrimChars);
+                                networkData.Bssid = wifiInfo?.BSSID;
+                                if (OperatingSystem.IsAndroidVersionAtLeast(31))
                                 {
-                                    if (list.Bssid == wifiInfo?.BSSID)
+                                    var inetAddress = linkProperties?.LinkAddresses .Select(la => la.Address).FirstOrDefault(addr => addr is Java.Net.Inet4Address);
+                                    if (inetAddress != null)
                                     {
-                                        networkData.SecurityType = list.Capabilities;
-                                        break;
+                                        var bytes = inetAddress.GetAddress();
+                                        if (bytes != null)
+                                        {
+                                            networkData.IpAddress = GetIpAddressFromBytes(bytes);
+                                        }
+                                        else
+                                        {
+                                            networkData.IpAddress = 0;
+                                        }
+                                    }
+                                    else
+                                    {
+                                        networkData.IpAddress = 0;
                                     }
                                 }
+                                else
+                                    networkData.IpAddress = wifiInfo?.IpAddress ?? 0;
+                                networkData.NativeObject = wifiInfo;
+                                networkData.SignalStrength = wifiInfo?.Rssi;
+                                var wifiManager = _Context.GetSystemService(Context.WifiService) as WifiManager;
+                                var networkList = wifiManager?.ScanResults;
+                                if (networkList != null)
+                                {
+                                    foreach (var list in networkList)
+                                    {
+                                        if (list.Bssid == wifiInfo?.BSSID)
+                                        {
+                                            networkData.SecurityType = list.Capabilities;
+                                            break;
+                                        }
+                                    }
+                                }
+                                tcs.TrySetResult(networkData);
                             }
-                            tcs.TrySetResult(networkData);
-                        }
+                        }                            
                     },
                     NetworkUnavailable = () =>
                     {
                         tcs.TrySetResult(new NetworkData());
                     }
                 };
-                var request = new NetworkRequest.Builder().AddTransportType(transportType: TransportType.Wifi).Build();
-                connectivityManager.RequestNetwork(request, networkCallback);
-                connectivityManager.RegisterNetworkCallback(request, networkCallback);
-               
-                networkData = await tcs.Task;
-                if (networkData != null && networkData.StatusId == 1)
+                NetworkRequest? request = new NetworkRequest.Builder()?.AddTransportType(transportType: TransportType.Wifi)?.Build();
+                if (request != null)
                 {
-                    System.Diagnostics.Debug.WriteLine($"Fetched Wi-Fi connection info successfully.");
-                    response.ErrorCode = WifiErrorCodes.Success;
-                    response.ErrorMessage = "Fetched Wi-Fi connection info successfully.";
-                    response.Data = networkData;
+                    connectivityManager?.RequestNetwork(request, networkCallback);
+                    connectivityManager?.RegisterNetworkCallback(request, networkCallback);
+
+                    networkData = await tcs.Task;
+                    if (networkData != null && networkData.StatusId == 1)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"Fetched Wi-Fi connection info successfully.");
+                        response.ErrorCode = WifiErrorCodes.Success;
+                        response.ErrorMessage = "Fetched Wi-Fi connection info successfully.";
+                        response.Data = networkData;
+                    }
+                    else
+                    {
+                        System.Diagnostics.Debug.WriteLine($"Failed to fetch Wi-Fi connection info.");
+                        response.ErrorCode = WifiErrorCodes.UnknownError;
+                        response.ErrorMessage = "Failed to fetch Wi-Fi connection info.";
+                    }
                 }
                 else
                 {
-                    System.Diagnostics.Debug.WriteLine($"Failed to fetch Wi-Fi connection info.");
+                    System.Diagnostics.Debug.WriteLine($"Network request is null.");
                     response.ErrorCode = WifiErrorCodes.UnknownError;
-                    response.ErrorMessage = "Failed to fetch Wi-Fi connection info.";
+                    response.ErrorMessage = "Network request is null.";
                 }
+                
 
             }           
             return response;
@@ -300,14 +338,14 @@ namespace MauiWifiManager
         /// </summary>
         public Task<bool> OpenWifiSetting()
         {
-            CheckInit(_context);
+            CheckInit(_Context);
             var taskCompletionSource = new TaskCompletionSource<bool>();
             Intent panelIntent;
             if (OperatingSystem.IsAndroidVersionAtLeast(29))
                 panelIntent = new Intent(Panel.ActionWifi);
             else
                 panelIntent = new Intent(ActionWifiSettings);
-            _context.StartActivity(panelIntent);
+            _Context.StartActivity(panelIntent);
             taskCompletionSource.TrySetResult(true);
             return taskCompletionSource.Task;
         }
@@ -317,10 +355,10 @@ namespace MauiWifiManager
         /// </summary>
         public Task<bool> OpenWirelessSetting()
         {
-            CheckInit(_context);
+            CheckInit(_Context);
             var taskCompletionSource = new TaskCompletionSource<bool>();
             var panelIntent = new Intent(ActionWirelessSettings);
-            _context.StartActivity(panelIntent);
+            _Context.StartActivity(panelIntent);
             taskCompletionSource.TrySetResult(true);
             return taskCompletionSource.Task;
         }
@@ -328,18 +366,18 @@ namespace MauiWifiManager
         /// <summary>
         /// Scan Wi-Fi Networks
         /// </summary>
-        public async Task<WifiManagerResponse<List<NetworkData>>> ScanWifiNetworks()
+        public Task<WifiManagerResponse<List<NetworkData>>> ScanWifiNetworks()
         {
             var response = new WifiManagerResponse<List<NetworkData>>();
             try
             {
-                var wifiManager = _context.GetSystemService(Context.WifiService) as WifiManager;
+                var wifiManager = _Context.GetSystemService(Context.WifiService) as WifiManager;
                 if (wifiManager == null)
                 {
                     System.Diagnostics.Debug.WriteLine($"Wi-Fi Manager is unavailable. Please ensure the device has Wi-Fi capability.");
                     response.ErrorCode = WifiErrorCodes.UnsupportedHardware;
                     response.ErrorMessage = "Wi-Fi Manager is unavailable. Please ensure the device has Wi-Fi capability.";
-                    return response;
+                    return Task.FromResult(response);
                 }
 
                 if (!wifiManager.IsWifiEnabled)
@@ -347,22 +385,29 @@ namespace MauiWifiManager
                     System.Diagnostics.Debug.WriteLine($"Wi-Fi is turned off. Please enable Wi-Fi to proceed.");
                     response.ErrorCode = WifiErrorCodes.WifiNotEnabled;
                     response.ErrorMessage = "Wi-Fi is turned off. Please enable Wi-Fi to proceed.";
-                    return response;
+                    return Task.FromResult(response);
                 }
 
-                List<NetworkData> wifiNetworks = new List<NetworkData>();
+                List<NetworkData> wifiNetworks = new();
                 System.Diagnostics.Debug.WriteLine($"Wi-Fi Scan started.");
-                wifiManager?.StartScan();
-                var scanResults = wifiManager?.ScanResults;
-                foreach (var result in scanResults)
+                if (!OperatingSystem.IsAndroidVersionAtLeast(28))
                 {
-                    wifiNetworks.Add(new NetworkData()
-                    {
-                        Bssid = result.Bssid,
-                        Ssid = result.Ssid,
-                        NativeObject = result
-                    });
+                    // Legacy API < 28: allowed to trigger scans
+                    wifiManager.StartScan();
                 }
+                var scanResults = wifiManager?.ScanResults;
+                if (scanResults != null)
+                {
+                    foreach (var result in scanResults)
+                    {
+                        wifiNetworks.Add(new NetworkData()
+                        {
+                            Bssid = result.Bssid,
+                            Ssid = OperatingSystem.IsAndroidVersionAtLeast(33) ? result?.WifiSsid?.ToString() : result.Ssid,
+                            NativeObject = result
+                        });
+                    }
+                }                
                 System.Diagnostics.Debug.WriteLine($"Wi-Fi Scan complete.");
                 response.ErrorCode = WifiErrorCodes.Success;
                 response.ErrorMessage = $"Wi-Fi Scan complete.";
@@ -375,7 +420,7 @@ namespace MauiWifiManager
                 response.ErrorCode = WifiErrorCodes.UnknownError;
                 response.ErrorMessage = $"Error while scanning Wi-Fi: {ex.Message}";
             }
-            return response;
+            return Task.FromResult(response);
         }
 
         private async Task<WifiManagerResponse<NetworkData>> AddWifiSuggestion(WifiManager wifiManager, string ssid, string psk)
@@ -387,7 +432,7 @@ namespace MauiWifiManager
             {
                 try
                 {
-                    TaskCompletionSource<NetworkData> tcs = new TaskCompletionSource<NetworkData>();
+                    TaskCompletionSource<NetworkData> tcs = new();
                     var suggestions = new List<IParcelable>
                                     {
                                        new WifiNetworkSuggestion.Builder()
@@ -409,11 +454,13 @@ namespace MauiWifiManager
                     bundle.PutParcelableArrayList("android.provider.extra.WIFI_NETWORK_LIST", suggestions);
                     var intent = new Intent("android.settings.WIFI_ADD_NETWORKS");
                     intent.PutExtras(bundle);
-                    _context.StartActivity(intent);
+                    _Context.StartActivity(intent);
 
-                    var connectivityManager = _context.GetSystemService(Context.ConnectivityService) as ConnectivityManager;
-                    var networkRequest = new NetworkRequest.Builder().AddTransportType(TransportType.Wifi).Build();
+                    var connectivityManager = _Context.GetSystemService(Context.ConnectivityService) as ConnectivityManager;
+                    var networkRequest = new NetworkRequest.Builder()?.AddTransportType(TransportType.Wifi)?.Build();
                     ConnectivityManager.NetworkCallback networkCallback;
+                    var activeNetwork = connectivityManager?.ActiveNetwork;
+                    var linkProperties = connectivityManager?.GetLinkProperties(activeNetwork);
                     if (OperatingSystem.IsAndroidVersionAtLeast(31)) // Android 12 (API level 31) or later
                     {
                         NetworkCallbackFlags flagIncludeLocationInfo = NetworkCallbackFlags.IncludeLocationInfo;
@@ -421,28 +468,52 @@ namespace MauiWifiManager
                         {
                             OnNetworkCapabilitiesChanged = (network, networkCapabilities) =>
                             {
-                                WifiInfo wifiInfo = (WifiInfo)networkCapabilities.TransportInfo;
-                                if (wifiInfo != null)
+                                if (OperatingSystem.IsAndroidVersionAtLeast(29))
                                 {
-                                    if (wifiInfo.SupplicantState == SupplicantState.Completed)
+                                    WifiInfo? wifiInfo = networkCapabilities?.TransportInfo as WifiInfo;
+                                    if (wifiInfo != null)
                                     {
-                                        var currentSsid = wifiInfo.SSID?.Trim(new char[] { '"', '\"' });
-                                        if (currentSsid == ssid)
+                                        if (wifiInfo.SupplicantState == SupplicantState.Completed)
                                         {
-                                            networkData.StatusId = (int)WifiErrorCodes.Success;
-                                            networkData.Ssid = currentSsid;
-                                            networkData.Bssid = wifiInfo.BSSID;
-                                            networkData.IpAddress = wifiInfo?.IpAddress ?? 0;
-                                            networkData.NativeObject = wifiInfo;
-                                            networkData.SignalStrength = wifiInfo.Rssi;
-                                            tcs.TrySetResult(networkData);
-                                        }                                       
+                                            var currentSsid = wifiInfo.SSID?.Trim(_TrimChars);
+                                            if (currentSsid == ssid)
+                                            {
+                                                networkData.StatusId = (int)WifiErrorCodes.Success;
+                                                networkData.Ssid = currentSsid;
+                                                networkData.Bssid = wifiInfo.BSSID;
+                                                if (OperatingSystem.IsAndroidVersionAtLeast(31))
+                                                {
+                                                    var inetAddress = linkProperties?.LinkAddresses.Select(la => la.Address).FirstOrDefault(addr => addr is Java.Net.Inet4Address);
+                                                    if (inetAddress != null)
+                                                    {
+                                                        var bytes = inetAddress.GetAddress();
+                                                        if (bytes != null)
+                                                        {
+                                                            networkData.IpAddress = GetIpAddressFromBytes(bytes);
+                                                        }
+                                                        else
+                                                        {
+                                                            networkData.IpAddress = 0;
+                                                        }
+                                                    }
+                                                    else
+                                                    {
+                                                        networkData.IpAddress = 0;
+                                                    }
+                                                }
+                                                else
+                                                    networkData.IpAddress = wifiInfo?.IpAddress ?? 0;
+                                                networkData.NativeObject = wifiInfo;
+                                                networkData.SignalStrength = wifiInfo?.Rssi;
+                                                tcs.TrySetResult(networkData);
+                                            }
+                                        }
+                                        else if (wifiInfo.SupplicantState == SupplicantState.Invalid)
+                                        {
+                                            tcs.TrySetResult(new NetworkData());
+                                        }
                                     }
-                                    else if (wifiInfo.SupplicantState == SupplicantState.Invalid)
-                                    {
-                                        tcs.TrySetResult(new NetworkData());
-                                    }                                       
-                                }
+                                }                                
                             },
                             NetworkUnavailable = () =>
                             {
@@ -452,6 +523,7 @@ namespace MauiWifiManager
                     }
                     else
                     {
+                        //Android version 11
                         networkCallback = new NetworkCallback
                         {
                             NetworkAvailable = network =>
@@ -460,11 +532,11 @@ namespace MauiWifiManager
                             },
                             OnNetworkCapabilitiesChanged = (network, networkCapabilities) =>
                             {
-                                if (networkCapabilities.HasCapability(NetCapability.Validated))
+                                if (OperatingSystem.IsAndroidVersionAtLeast(23) && networkCapabilities.HasCapability(NetCapability.Validated))
                                 {
                                     if (OperatingSystem.IsAndroidVersionAtLeast(30) && !OperatingSystem.IsAndroidVersionAtLeast(31))
                                     {
-                                        var currentSsid = wifiManager.ConnectionInfo?.SSID?.Trim(new char[] { '"', '\"' });
+                                        var currentSsid = wifiManager.ConnectionInfo?.SSID?.Trim(_TrimChars);
                                         if (currentSsid == ssid)
                                         {
                                             networkData.StatusId = (int)WifiErrorCodes.Success;
@@ -485,7 +557,10 @@ namespace MauiWifiManager
                             }
                         };
                     }
-                    connectivityManager?.RegisterNetworkCallback(networkRequest, networkCallback);
+                    if (networkRequest != null)
+                    {
+                        connectivityManager?.RegisterNetworkCallback(networkRequest, networkCallback);
+                    }                   
 
                     // Set a timeout to prevent hanging
                     var timeoutTask = Task.Delay(TimeSpan.FromSeconds(30));
@@ -543,7 +618,7 @@ namespace MauiWifiManager
 
             try
             {
-                TaskCompletionSource<NetworkData> tcs = new TaskCompletionSource<NetworkData>();
+                TaskCompletionSource<NetworkData> tcs = new();
                 if (OperatingSystem.IsAndroidVersionAtLeast(29) && !OperatingSystem.IsAndroidVersionAtLeast(30))
                 {
                     // Creating a connection using this API does not provide an internet connection to the app or to the device.
@@ -564,12 +639,12 @@ namespace MauiWifiManager
                         },
                         OnNetworkCapabilitiesChanged = (network, networkCapabilities) =>
                         {
-                            if (!OperatingSystem.IsAndroidVersionAtLeast(31))
+                            if (!OperatingSystem.IsAndroidVersionAtLeast(31) && OperatingSystem.IsAndroidVersionAtLeast(23))
                             {
                                 if (networkCapabilities.HasCapability(NetCapability.Validated))
                                 {
                                     networkData.StatusId = (int)WifiErrorCodes.Success;
-                                    networkData.Ssid = wifiManager.ConnectionInfo?.SSID?.Trim(new char[] { '"', '\"' });
+                                    networkData.Ssid = wifiManager.ConnectionInfo?.SSID?.Trim(_TrimChars);
                                     networkData.Bssid = wifiManager.ConnectionInfo?.BSSID;
                                     networkData.SignalStrength = wifiManager.ConnectionInfo?.Rssi;
                                     networkData.IpAddress = wifiManager.DhcpInfo?.IpAddress ?? 0;
@@ -584,13 +659,13 @@ namespace MauiWifiManager
                     };
                     UnregisterNetworkCallback(networkCallback);
 
-                    _connectivityManager = _context.GetSystemService(Context.ConnectivityService) as ConnectivityManager;
-                    if (_requested)
-                        _connectivityManager?.UnregisterNetworkCallback(networkCallback);
+                    _ConnectivityManager = _Context.GetSystemService(Context.ConnectivityService) as ConnectivityManager;
+                    if (_Requested)
+                        _ConnectivityManager?.UnregisterNetworkCallback(networkCallback);
                     if (request != null)
                     {
-                        _connectivityManager?.RequestNetwork(request, networkCallback);
-                        _requested = true;
+                        _ConnectivityManager?.RequestNetwork(request, networkCallback);
+                        _Requested = true;
                     }
                     // Await the task and set response accordingly
                     networkData = await tcs.Task;
@@ -618,14 +693,14 @@ namespace MauiWifiManager
             return response;
         }
 
-        private void UnregisterNetworkCallback(NetworkCallback networkCallback)
+        private void UnregisterNetworkCallback(NetworkCallback? networkCallback)
         {
             if (networkCallback != null)
             {
                 try
                 {
-                    _connectivityManager = _context.GetSystemService(Context.ConnectivityService) as ConnectivityManager;
-                    _connectivityManager?.UnregisterNetworkCallback(networkCallback);
+                    _ConnectivityManager = _Context.GetSystemService(Context.ConnectivityService) as ConnectivityManager;
+                    _ConnectivityManager?.UnregisterNetworkCallback(networkCallback);
                 }
                 catch
                 {
@@ -641,15 +716,34 @@ namespace MauiWifiManager
         {
 
         }
+
+        int GetIpAddressFromBytes(byte[] address)
+        {
+            try
+            {
+                return (address[3] & 0xFF) << 24 |
+                  (address[2] & 0xFF) << 16 |
+                  (address[1] & 0xFF) << 8 |
+                  (address[0] & 0xFF);
+            }
+            catch(Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Invalid IP address: {ex.Message}");
+            }
+            return 0;
+        }
        
     }
     public class NetworkCallback : ConnectivityManager.NetworkCallback
     {
-        public Action<Network> NetworkAvailable { get; set; }
-        public Action NetworkUnavailable { get; set; }
-        public Action<Network, NetworkCapabilities> OnNetworkCapabilitiesChanged { get; set; }
+        public Action<Network>? NetworkAvailable { get; set; }
+        public Action? NetworkUnavailable { get; set; }
+        public Action<Network, NetworkCapabilities>? OnNetworkCapabilitiesChanged { get; set; }
+
+        [SupportedOSPlatform("android31.0")]
         public NetworkCallback(int flags) : base(flags)
         {
+
         }
         public NetworkCallback()
         {
@@ -662,7 +756,10 @@ namespace MauiWifiManager
 
         public override void OnUnavailable()
         {
-            base.OnUnavailable();
+            if(OperatingSystem.IsAndroidVersionAtLeast(26))
+            {
+                base.OnUnavailable();
+            }           
             NetworkUnavailable?.Invoke();
         }
         public override void OnCapabilitiesChanged(Network network, NetworkCapabilities networkCapabilities)
@@ -694,8 +791,9 @@ namespace MauiWifiManager
         {
             ScanResults = new List<ScanResult>();
         }
-        public override void OnReceive(Context context, Intent intent)
+        public override void OnReceive(Context? context, Intent? intent)
         {
+            
         }
     }
 
