@@ -49,5 +49,4 @@
         InvalidCredential = 7,
         UnknownError = 8
     }
-
 }
