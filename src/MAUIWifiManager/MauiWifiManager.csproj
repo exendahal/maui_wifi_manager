@@ -5,15 +5,18 @@
 		<TargetFrameworks>net8.0-android;net8.0-ios;net8.0-maccatalyst;net9.0-android;net9.0-ios;net9.0-maccatalyst</TargetFrameworks>
 		<TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('windows'))">$(TargetFrameworks);net8.0-windows10.0.19041.0;net9.0-windows10.0.19041.0</TargetFrameworks>
 
+		<UseMaui>true</UseMaui>
+		<SkipValidateMauiImplicitPackageReferences>true</SkipValidateMauiImplicitPackageReferences>
+
 		<AssemblyName>MauiWifiManager</AssemblyName>
 		<RootNamespace>MauiWifiManager</RootNamespace>
 		<PackageId>WifiManager.Maui</PackageId>
 
 		<Product>$(AssemblyName) ($(TargetFramework))</Product>
-		<AssemblyVersion>9.0.2</AssemblyVersion>
-		<AssemblyFileVersion>9.0.2</AssemblyFileVersion>
-		<Version>9.0.2</Version>
-		<PackageVersion>9.0.2</PackageVersion>
+		<AssemblyVersion>9.0.3</AssemblyVersion>
+		<AssemblyFileVersion>9.0.3</AssemblyFileVersion>
+		<Version>9.0.3</Version>
+		<PackageVersion>9.0.3</PackageVersion>
 		<PackOnBuild>true</PackOnBuild>
 		<NeutralLanguage>en</NeutralLanguage>
 		<DefineConstants>$(DefineConstants);</DefineConstants>
@@ -66,6 +69,10 @@
 		<EmbedUntrackedSources>true</EmbedUntrackedSources>
 		<!-- sourcelink: Include PDB in the built .nupkg -->
 		<AllowedOutputExtensionsInPackageBuildOutputFolder>$(AllowedOutputExtensionsInPackageBuildOutputFolder);.pdb</AllowedOutputExtensionsInPackageBuildOutputFolder>
+	</PropertyGroup>
+
+	<PropertyGroup>
+		<NoWarn>VSSpell001;CS1591</NoWarn>
 	</PropertyGroup>
 	
 		

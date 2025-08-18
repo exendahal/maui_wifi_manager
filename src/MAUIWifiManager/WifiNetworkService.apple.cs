@@ -16,11 +16,11 @@ namespace MauiWifiManager
     /// </summary>
     public class WifiNetworkService : IWifiNetworkService
     {
-        public NEHotspotHelper hotspotHelper;
+        public NEHotspotHelper _HotspotHelper;
 
         public WifiNetworkService()
         {
-            hotspotHelper = new NEHotspotHelper();
+            _HotspotHelper = new NEHotspotHelper();
         }
 
         /// <summary>
@@ -127,10 +127,10 @@ namespace MauiWifiManager
                                 Ssid = hotspotNetwork.Ssid,
                                 Bssid = hotspotNetwork.Bssid,
                                 SignalStrength = hotspotNetwork.SignalStrength,
-                                SecurityType = UIDevice.CurrentDevice.CheckSystemVersion(15, 0)? hotspotNetwork.SecurityType: null,
+                                SecurityType = OperatingSystem.IsIOSVersionAtLeast(15) ? hotspotNetwork.SecurityType : null,
                                 NativeObject = hotspotNetwork
                             };
-                        }
+                         }
                         else
                         {
                             response.ErrorCode = WifiErrorCodes.NetworkUnavailable;
@@ -148,10 +148,10 @@ namespace MauiWifiManager
                     tcs.SetResult(response);
                 }
                 return await tcs.Task;
-            }
-            // Handle iOS versions less than 14 using CaptiveNetwork
+            }           
             else
             {
+                // Handle iOS versions less than 14 using CaptiveNetwork
                 if (CaptiveNetwork.TryGetSupportedInterfaces(out string[] supportedInterfaces) == StatusCode.OK)
                 {
                     if (supportedInterfaces != null)
@@ -202,14 +202,14 @@ namespace MauiWifiManager
         /// <summary>
         /// Scan Wi-Fi Networks
         /// </summary>
-        public async Task<WifiManagerResponse<List<NetworkData>>> ScanWifiNetworks()
+        public Task<WifiManagerResponse<List<NetworkData>>> ScanWifiNetworks()
         {
             var response = new WifiManagerResponse<List<NetworkData>>();
             var wifiNetworks = new List<NetworkData>();
             Debug.WriteLine($"ScanWifiNetworks is not supported on iOS.");
             response.ErrorCode = WifiErrorCodes.WifiNotEnabled;
             response.ErrorMessage = "ScanWifiNetworks is not supported on iOS.";
-            return response;
+            return Task.FromResult(response);
         }
 
         public async Task<bool> OpenWirelessSetting()
