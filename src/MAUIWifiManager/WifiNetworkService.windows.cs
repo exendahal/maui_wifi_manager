@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Net;
+using System.Net.NetworkInformation;
 using System.Threading.Tasks;
 using Windows.Devices.WiFi;
 using Windows.Networking;
@@ -152,17 +153,6 @@ namespace MauiWifiManager
                     networkData.Ssid = profile.WlanConnectionProfileDetails.GetConnectedSsid();
                 }
                 
-                var hostNames = NetworkInformation.GetHostNames();
-                var ipAddressString = hostNames.FirstOrDefault(h => h.Type == HostNameType.Ipv4)?.DisplayName;
-                if (!string.IsNullOrEmpty(ipAddressString))
-                {
-                    IPAddress ipAddress = IPAddress.Parse(ipAddressString);
-                    networkData.IpAddress = BitConverter.ToInt32(ipAddress.GetAddressBytes(), 0);
-                }
-                else
-                {
-                    networkData.IpAddress = 0; // Default value if no IPv4 address is found
-                }
                 networkData.Bssid = profile.NetworkAdapter.NetworkAdapterId;
                 networkData.NativeObject = profile;
                 networkData.SignalStrength = profile.GetSignalBars();
@@ -170,6 +160,34 @@ namespace MauiWifiManager
                 {
                     networkData.SecurityType = GetSecurityType(profile.NetworkSecuritySettings.NetworkAuthenticationType);
                 }
+
+                var networkInterface = NetworkInterface.GetAllNetworkInterfaces().FirstOrDefault(n => n.NetworkInterfaceType == NetworkInterfaceType.Wireless80211 && n.OperationalStatus == OperationalStatus.Up);
+                if (networkInterface != null)
+                {
+                    var ipaddress = networkInterface.GetIPProperties();
+                    var ip = ipaddress.UnicastAddresses.FirstOrDefault(n => n.Address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork);
+                    if (ip != null)
+                    {
+                        networkData.IpAddress = BitConverter.ToInt32(ip.Address.GetAddressBytes(), 0);
+                    }
+                    else
+                    {
+                        networkData.IpAddress = 0;
+                    }
+
+                    var gatewayInfo = ipaddress.GatewayAddresses.FirstOrDefault(n => n.Address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork);
+                    if (gatewayInfo != null)
+                    {
+                        networkData.GatewayAddress = gatewayInfo.Address.ToString();
+                    }
+
+                    var internetworkAddress = ipaddress.DhcpServerAddresses.FirstOrDefault(n => n.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork);
+                    if (internetworkAddress != null)
+                    {
+                        networkData.DhcpServerAddress = internetworkAddress.ToString();
+                    }
+                }
+
                 response.ErrorCode = WifiErrorCodes.Success;
                 response.Data = networkData;
                 response.ErrorMessage = "Fetched Wi-Fi connection info successfully.";

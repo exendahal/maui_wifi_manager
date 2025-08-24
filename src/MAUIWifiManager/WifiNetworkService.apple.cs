@@ -1,10 +1,14 @@
 ﻿using CoreLocation;
 using Foundation;
-using NetworkExtension;
 using MauiWifiManager.Abstractions;
+using NetworkExtension;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
+using System.Net;
+using System.Net.NetworkInformation;
+using System.Net.Sockets;
 using System.Threading.Tasks;
 using SystemConfiguration;
 using UIKit;
@@ -95,6 +99,44 @@ namespace MauiWifiManager
             NEHotspotConfigurationManager.SharedManager.RemoveConfiguration(ssid);
         }
 
+        private static void PopulateNetworkInterfaceData(NetworkData networkData)
+        {
+            var wifiInterface = NetworkInterface
+                                .GetAllNetworkInterfaces()
+                                .FirstOrDefault(iface =>
+                                    iface.NetworkInterfaceType == NetworkInterfaceType.Wireless80211 &&
+                                    (iface.OperationalStatus == OperationalStatus.Up || iface.OperationalStatus == OperationalStatus.Unknown));
+            if (wifiInterface == null)
+            {
+                // No active Wi-Fi interface found              
+                networkData.IpAddress = 0;
+                networkData.GatewayAddress = string.Empty;
+                networkData.DhcpServerAddress = string.Empty;
+                return;
+            }
+            var ipProperties = wifiInterface.GetIPProperties();
+            var unicastIpInfo = ipProperties.UnicastAddresses
+                            .FirstOrDefault(u => u.Address.AddressFamily == AddressFamily.InterNetwork);
+            if (unicastIpInfo != null)
+            {
+                // Convert to int in network byte order
+                networkData.IpAddress = IPAddress.NetworkToHostOrder(
+                    BitConverter.ToInt32(unicastIpInfo.Address.GetAddressBytes(), 0));
+            }
+            else
+            {
+                networkData.IpAddress = 0;
+            }
+
+            // --- Gateway Address ---
+            var gatewayInfo = ipProperties.GatewayAddresses
+                .FirstOrDefault(g => g.Address.AddressFamily == AddressFamily.InterNetwork);
+
+            networkData.GatewayAddress = gatewayInfo?.Address.ToString() ?? string.Empty;
+            // --- DHCP Server Address ---
+            // Not supported on iOS (will remain blank)
+        }
+
         /// <summary>
         /// Get Wi-Fi Network Info
         /// </summary>
@@ -168,6 +210,9 @@ namespace MauiWifiManager
                                     Bssid = info?[CaptiveNetwork.NetworkInfoKeyBSSID]?.ToString(),
                                     NativeObject = info
                                 };
+
+                                PopulateNetworkInterfaceData(response.Data);
+
                                 break; // Use the first available network
                             }
                         }
