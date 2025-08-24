@@ -204,8 +204,8 @@ namespace MauiWifiManager
                     networkData.Bssid = wifiManager.ConnectionInfo?.BSSID;
                     networkData.SignalStrength = wifiManager.ConnectionInfo?.Rssi;
                     networkData.IpAddress = wifiManager.DhcpInfo?.IpAddress ?? 0;
-                    networkData.GatewayAddress = GetIPAddress(wifiManager.DhcpInfo?.Gateway);
-                    networkData.DhcpServerAddress = GetIPAddress(wifiManager.DhcpInfo?.ServerAddress);
+                    networkData.GatewayAddress = wifiManager.DhcpInfo?.Gateway ?? 0;
+                    networkData.DhcpServerAddress = wifiManager.DhcpInfo?.ServerAddress ?? 0;
                     networkData.NativeObject = wifiManager.ConnectionInfo;
                     var networkList = wifiManager?.ScanResults;
                     if (networkList != null)
@@ -276,7 +276,19 @@ namespace MauiWifiManager
                                         else
                                         {
                                             networkData.IpAddress = 0;
-                                        }
+                                        }                                       
+                                        networkData.DhcpServerAddress = GetIpAddressFromInetAddress(linkProperties?.DhcpServerAddress);
+                                        if (linkProperties?.Routes != null)
+                                        {
+                                            foreach (var route in linkProperties.Routes)
+                                            {
+                                                if (route.IsDefaultRoute && route.Gateway != null)
+                                                {
+                                                    networkData.GatewayAddress = GetIpAddressFromString(route.Gateway.HostAddress);
+                                                }
+                                            }
+                                        }                                       
+                                           
                                     }
                                     else
                                     {
@@ -284,7 +296,7 @@ namespace MauiWifiManager
                                     }
                                 }
                                 else
-                                    networkData.IpAddress = wifiInfo?.IpAddress ?? 0;
+                                    networkData.IpAddress = wifiInfo?.IpAddress ?? 0;                               
                                 networkData.NativeObject = wifiInfo;
                                 networkData.SignalStrength = wifiInfo?.Rssi;
                                 var wifiManager = _Context.GetSystemService(Context.WifiService) as WifiManager;
@@ -553,7 +565,8 @@ namespace MauiWifiManager
                                             networkData.Bssid = wifiManager.ConnectionInfo?.BSSID;
                                             networkData.SignalStrength = wifiManager.ConnectionInfo?.Rssi;
                                             networkData.IpAddress = wifiManager.DhcpInfo?.IpAddress ?? 0;
-                                            networkData.GatewayAddress = wifiManager.DhcpInfo?.Gateway.ToString();
+                                            networkData.GatewayAddress = wifiManager.DhcpInfo?.Gateway ?? 0;
+                                            networkData.DhcpServerAddress = wifiManager.DhcpInfo?.ServerAddress ?? 0;
                                             networkData.NativeObject = wifiManager.ConnectionInfo;
                                             tcs.TrySetResult(networkData);
                                         }
@@ -657,7 +670,8 @@ namespace MauiWifiManager
                                     networkData.Bssid = wifiManager.ConnectionInfo?.BSSID;
                                     networkData.SignalStrength = wifiManager.ConnectionInfo?.Rssi;
                                     networkData.IpAddress = wifiManager.DhcpInfo?.IpAddress ?? 0;
-                                    networkData.GatewayAddress = wifiManager.DhcpInfo?.Gateway.ToString();
+                                    networkData.GatewayAddress = wifiManager.DhcpInfo?.Gateway ?? 0;
+                                    networkData.DhcpServerAddress = wifiManager.DhcpInfo?.ServerAddress ?? 0;
                                     networkData.NativeObject = wifiManager.ConnectionInfo;
                                     tcs.TrySetResult(networkData);
                                 }
@@ -741,7 +755,29 @@ namespace MauiWifiManager
             }
             return 0;
         }
-       
+
+        int GetIpAddressFromInetAddress(Java.Net.InetAddress? address)
+        {
+            var bytes = address?.GetAddress();
+            return bytes is { Length: 4 } ? GetIpAddressFromBytes(bytes) : 0;
+        }
+        int GetIpAddressFromString(string? hostAddress)
+        {
+            if (string.IsNullOrEmpty(hostAddress))
+                return 0;
+
+            try
+            {
+                var inet = Java.Net.InetAddress.GetByName(hostAddress);
+                var bytes = inet?.GetAddress();
+                return bytes is { Length: 4 } ? GetIpAddressFromBytes(bytes) : 0;
+            }
+            catch
+            {
+                return 0;
+            }
+        }
+
     }
     public class NetworkCallback : ConnectivityManager.NetworkCallback
     {

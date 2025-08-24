@@ -68,7 +68,7 @@ public partial class ScanListPage : ContentPage
                         IpAddress = (int)item.IpAddress,
                         Bssid = item.Bssid,
                         Ssid = item.Ssid,
-                        GatewayAddress = item.GatewayAddress,
+                        GatewayAddress = item.GatewayAddress.ToString(),
                         NativeObject = item.NativeObject
                     });
                 }

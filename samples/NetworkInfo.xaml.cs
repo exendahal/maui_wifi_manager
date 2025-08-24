@@ -26,9 +26,11 @@ public partial class NetworkInfo : ContentPage
                     if (response.Data != null)
                     {
                         IPAddress ipAddress = new(BitConverter.GetBytes(response.Data.IpAddress));
+                        IPAddress gateway = new(BitConverter.GetBytes(response.Data.GatewayAddress));
+                        IPAddress serverAddress = new(BitConverter.GetBytes(response.Data.DhcpServerAddress));
                         wifiSsid.Text = response.Data.Ssid;
                         wifiBssid.Text = response.Data.Bssid?.ToString();
-                        ipAddressTxt.Text = ipAddress.ToString();
+                        ipAddressTxt.Text = $"IP:{ipAddress.ToString()}\nGateway:{gateway.ToString()}\nDHCP Server:{serverAddress.ToString()}";
                         securityTxt.Text = response.Data.SecurityType?.ToString();
                         if (response.Data.NativeObject != null)
                         {
