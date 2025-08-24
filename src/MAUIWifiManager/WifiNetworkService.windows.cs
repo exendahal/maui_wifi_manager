@@ -178,13 +178,13 @@ namespace MauiWifiManager
                     var gatewayInfo = ipaddress.GatewayAddresses.FirstOrDefault(n => n.Address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork);
                     if (gatewayInfo != null)
                     {
-                        networkData.GatewayAddress = gatewayInfo.Address.ToString();
+                        networkData.GatewayAddress = IpAddressToInt(gatewayInfo.Address);
                     }
 
                     var internetworkAddress = ipaddress.DhcpServerAddresses.FirstOrDefault(n => n.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork);
                     if (internetworkAddress != null)
                     {
-                        networkData.DhcpServerAddress = internetworkAddress.ToString();
+                        networkData.DhcpServerAddress = IpAddressToInt(internetworkAddress);
                     }
                 }
 
@@ -295,6 +295,20 @@ namespace MauiWifiManager
                 default:
                     return "Unknown or WPA3 (Possibly)"; // Handling missing WPA3 types
             }
+        }
+
+        private int IpAddressToInt(IPAddress? ip)
+        {
+            if (ip == null) return 0;
+
+            var bytes = ip.GetAddressBytes();
+            if (bytes.Length != 4) return 0;
+
+            // Convert big-endian network order → little-endian int
+            return (bytes[0] & 0xFF) |
+                   ((bytes[1] & 0xFF) << 8) |
+                   ((bytes[2] & 0xFF) << 16) |
+                   ((bytes[3] & 0xFF) << 24);
         }
     }
 }

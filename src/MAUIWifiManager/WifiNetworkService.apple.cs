@@ -99,7 +99,7 @@ namespace MauiWifiManager
             NEHotspotConfigurationManager.SharedManager.RemoveConfiguration(ssid);
         }
 
-        private static void PopulateNetworkInterfaceData(NetworkData networkData)
+        void PopulateNetworkInterfaceData(NetworkData networkData)
         {
             var wifiInterface = NetworkInterface
                                 .GetAllNetworkInterfaces()
@@ -110,8 +110,8 @@ namespace MauiWifiManager
             {
                 // No active Wi-Fi interface found              
                 networkData.IpAddress = 0;
-                networkData.GatewayAddress = string.Empty;
-                networkData.DhcpServerAddress = string.Empty;
+                networkData.GatewayAddress = 0;
+                networkData.DhcpServerAddress = 0;
                 return;
             }
             var ipProperties = wifiInterface.GetIPProperties();
@@ -132,7 +132,7 @@ namespace MauiWifiManager
             var gatewayInfo = ipProperties.GatewayAddresses
                 .FirstOrDefault(g => g.Address.AddressFamily == AddressFamily.InterNetwork);
 
-            networkData.GatewayAddress = gatewayInfo?.Address.ToString() ?? string.Empty;
+            networkData.GatewayAddress = gatewayInfo != null ? IpAddressToInt(gatewayInfo.Address) : 0;
             // --- DHCP Server Address ---
             // Not supported on iOS (will remain blank)
         }
@@ -300,6 +300,19 @@ namespace MauiWifiManager
                 Debug.WriteLine("OpenWirelessSetting is not supported on this version of iOS.");
                 return false;
             }
+        }
+        private int IpAddressToInt(IPAddress? ip)
+        {
+            if (ip == null) return 0;
+
+            var bytes = ip.GetAddressBytes();
+            if (bytes.Length != 4) return 0;
+
+            // Convert big-endian network order → little-endian int
+            return (bytes[0] & 0xFF) |
+                   ((bytes[1] & 0xFF) << 8) |
+                   ((bytes[2] & 0xFF) << 16) |
+                   ((bytes[3] & 0xFF) << 24);
         }
     }
 }
