@@ -6,6 +6,11 @@
         public string? Ssid { get; set; }
         public int IpAddress { get; set; }
         public string? GatewayAddress { get; set; }
+
+        /// <summary>
+        ///Supported on Android and Windows only
+        /// </summary>
+        /// 
         public string? DhcpServerAddress { get; set; }
         public object? NativeObject { get; set; }
         public object? Bssid { get; set; }

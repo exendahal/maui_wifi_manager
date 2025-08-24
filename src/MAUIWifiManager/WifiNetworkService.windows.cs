@@ -161,11 +161,11 @@ namespace MauiWifiManager
                     networkData.SecurityType = GetSecurityType(profile.NetworkSecuritySettings.NetworkAuthenticationType);
                 }
 
-                var ni = NetworkInterface.GetAllNetworkInterfaces().FirstOrDefault(n => n.NetworkInterfaceType == NetworkInterfaceType.Wireless80211 && n.OperationalStatus == OperationalStatus.Up);
-                if (ni != null)
+                var networkInterface = NetworkInterface.GetAllNetworkInterfaces().FirstOrDefault(n => n.NetworkInterfaceType == NetworkInterfaceType.Wireless80211 && n.OperationalStatus == OperationalStatus.Up);
+                if (networkInterface != null)
                 {
-                    var ipp = ni.GetIPProperties();
-                    var ip = ipp.UnicastAddresses.FirstOrDefault(n => n.Address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork);
+                    var ipaddress = networkInterface.GetIPProperties();
+                    var ip = ipaddress.UnicastAddresses.FirstOrDefault(n => n.Address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork);
                     if (ip != null)
                     {
                         networkData.IpAddress = BitConverter.ToInt32(ip.Address.GetAddressBytes(), 0);
@@ -175,16 +175,16 @@ namespace MauiWifiManager
                         networkData.IpAddress = 0;
                     }
 
-                    var ipg = ipp.GatewayAddresses.FirstOrDefault(n => n.Address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork);
-                    if (ipg != null)
+                    var gatewayInfo = ipaddress.GatewayAddresses.FirstOrDefault(n => n.Address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork);
+                    if (gatewayInfo != null)
                     {
-                        networkData.GatewayAddress = ipg.Address.ToString();
+                        networkData.GatewayAddress = gatewayInfo.Address.ToString();
                     }
 
-                    var ipd = ipp.DhcpServerAddresses.FirstOrDefault(n => n.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork);
-                    if (ipd != null)
+                    var internetworkAddress = ipaddress.DhcpServerAddresses.FirstOrDefault(n => n.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork);
+                    if (internetworkAddress != null)
                     {
-                        networkData.DhcpServerAddress = ipd.ToString();
+                        networkData.DhcpServerAddress = internetworkAddress.ToString();
                     }
                 }
 

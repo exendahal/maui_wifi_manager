@@ -1,15 +1,17 @@
 ﻿using CoreLocation;
 using Foundation;
-using NetworkExtension;
 using MauiWifiManager.Abstractions;
+using NetworkExtension;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
+using System.Net;
+using System.Net.NetworkInformation;
+using System.Net.Sockets;
 using System.Threading.Tasks;
 using SystemConfiguration;
 using UIKit;
-using System.Net.NetworkInformation;
-using System.Linq;
 
 namespace MauiWifiManager
 {
@@ -97,37 +99,42 @@ namespace MauiWifiManager
             NEHotspotConfigurationManager.SharedManager.RemoveConfiguration(ssid);
         }
 
-        private static void UpdateNetworkData(NetworkData networkData)
+        private static void PopulateNetworkInterfaceData(NetworkData networkData)
         {
-            var ni = NetworkInterface.GetAllNetworkInterfaces().FirstOrDefault(n => n.NetworkInterfaceType == NetworkInterfaceType.Wireless80211 && 
-            (n.OperationalStatus == OperationalStatus.Up || n.OperationalStatus == OperationalStatus.Unknown));
-            if (ni != null)
+            var wifiInterface = NetworkInterface
+                                .GetAllNetworkInterfaces()
+                                .FirstOrDefault(iface =>
+                                    iface.NetworkInterfaceType == NetworkInterfaceType.Wireless80211 &&
+                                    (iface.OperationalStatus == OperationalStatus.Up || iface.OperationalStatus == OperationalStatus.Unknown));
+            if (wifiInterface == null)
             {
-                var ipp = ni.GetIPProperties();
-                var ip = ipp.UnicastAddresses.FirstOrDefault(n => n.Address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork);
-                if (ip != null)
-                {
-                    networkData.IpAddress = BitConverter.ToInt32(ip.Address.GetAddressBytes(), 0);
-                }
-                else
-                {
-                    networkData.IpAddress = 0;
-                }
-
-                var ipg = ipp.GatewayAddresses.FirstOrDefault(n => n.Address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork);
-                if (ipg != null)
-                {
-                    networkData.GatewayAddress = ipg.Address.ToString();
-                }
-
-                /* Not supported on iOS
-                var ipd = ipp.DhcpServerAddresses.FirstOrDefault(n => n.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork);
-                if (ipd != null)
-                {
-                    networkData.DhcpServerAddress = ipd.ToString();
-                }
-                */
+                // No active Wi-Fi interface found              
+                networkData.IpAddress = 0;
+                networkData.GatewayAddress = string.Empty;
+                networkData.DhcpServerAddress = string.Empty;
+                return;
             }
+            var ipProperties = wifiInterface.GetIPProperties();
+            var unicastIpInfo = ipProperties.UnicastAddresses
+                            .FirstOrDefault(u => u.Address.AddressFamily == AddressFamily.InterNetwork);
+            if (unicastIpInfo != null)
+            {
+                // Convert to int in network byte order
+                networkData.IpAddress = IPAddress.NetworkToHostOrder(
+                    BitConverter.ToInt32(unicastIpInfo.Address.GetAddressBytes(), 0));
+            }
+            else
+            {
+                networkData.IpAddress = 0;
+            }
+
+            // --- Gateway Address ---
+            var gatewayInfo = ipProperties.GatewayAddresses
+                .FirstOrDefault(g => g.Address.AddressFamily == AddressFamily.InterNetwork);
+
+            networkData.GatewayAddress = gatewayInfo?.Address.ToString() ?? string.Empty;
+            // --- DHCP Server Address ---
+            // Not supported on iOS (will remain blank)
         }
 
         /// <summary>
@@ -204,7 +211,7 @@ namespace MauiWifiManager
                                     NativeObject = info
                                 };
 
-                                UpdateNetworkData(response.Data);
+                                PopulateNetworkInterfaceData(response.Data);
 
                                 break; // Use the first available network
                             }
