@@ -155,6 +155,14 @@ namespace MauiWifiManager
 
         }
 
+        private static string? GetIPAddress(int? ipAddress)
+        {
+            if (ipAddress == null)
+                return null;
+
+            return Java.Net.InetAddress.GetByAddress(BitConverter.GetBytes((int)ipAddress)).HostAddress;
+        }       
+
         /// <summary>
         /// Get Wi-Fi Network Info
         /// </summary>
@@ -196,7 +204,8 @@ namespace MauiWifiManager
                     networkData.Bssid = wifiManager.ConnectionInfo?.BSSID;
                     networkData.SignalStrength = wifiManager.ConnectionInfo?.Rssi;
                     networkData.IpAddress = wifiManager.DhcpInfo?.IpAddress ?? 0;
-                    networkData.GatewayAddress = wifiManager.DhcpInfo?.Gateway.ToString();
+                    networkData.GatewayAddress = GetIPAddress(wifiManager.DhcpInfo?.Gateway);
+                    networkData.DhcpServerAddress = GetIPAddress(wifiManager.DhcpInfo?.ServerAddress);
                     networkData.NativeObject = wifiManager.ConnectionInfo;
                     var networkList = wifiManager?.ScanResults;
                     if (networkList != null)
