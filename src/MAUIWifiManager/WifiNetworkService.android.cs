@@ -161,15 +161,7 @@ namespace MauiWifiManager
                 return null;
 
             return Java.Net.InetAddress.GetByAddress(BitConverter.GetBytes((int)ipAddress)).HostAddress;
-        }
-
-        private static int GetIPAddress(Java.Net.InetAddress? inetAddress)
-        {
-            if (inetAddress == null || !(inetAddress is Java.Net.Inet4Address))
-                return 0;
-
-            return BitConverter.ToInt32(inetAddress.GetAddress(), 0);
-        }
+        }       
 
         /// <summary>
         /// Get Wi-Fi Network Info
