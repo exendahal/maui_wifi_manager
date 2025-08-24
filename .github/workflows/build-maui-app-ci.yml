@@ -12,7 +12,7 @@ on:
 
 env:
   BUILD_CONFIGURATION: Release
-  DOTNET_VERSION: 8.0.x
+  DOTNET_VERSION: 9.0.x
   CSPROJ_TO_BUILD: DemoApp.csproj
 jobs:
   build-sample-ci:
@@ -34,4 +34,4 @@ jobs:
       run: dotnet restore samples\${{ env.CSPROJ_TO_BUILD }}
 
     - name: Build Demo App ${{ env.CSPROJ_TO_BUILD }}
-      run: dotnet build samples\${{ env.CSPROJ_TO_BUILD }} -c ${{ env.BUILD_CONFIGURATION }} -f:net8.0-android
+      run: dotnet build samples\${{ env.CSPROJ_TO_BUILD }} -c ${{ env.BUILD_CONFIGURATION }} -f:net9.0-android

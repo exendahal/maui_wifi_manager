@@ -56,7 +56,7 @@ namespace MauiWifiManager
             if (adapter != null)
             {
                 await adapter.ScanAsync();
-                WiFiAvailableNetwork wiFiAvailableNetwork = null;
+                WiFiAvailableNetwork? wiFiAvailableNetwork = null;
                 foreach (var network in adapter.NetworkReport.AvailableNetworks)
                 {
                     if (network.Ssid == ssid)
@@ -132,7 +132,7 @@ namespace MauiWifiManager
         /// <summary>
         /// Get Network Info
         /// </summary>
-        public async Task<WifiManagerResponse<NetworkData>> GetNetworkInfo()
+        public Task<WifiManagerResponse<NetworkData>> GetNetworkInfo()
         {
             var response = new WifiManagerResponse<NetworkData>();
             var networkData = new NetworkData();
@@ -144,7 +144,7 @@ namespace MauiWifiManager
                 {
                     response.ErrorCode = WifiErrorCodes.NoConnection;
                     response.ErrorMessage = "No active network connection found.";
-                    return response;
+                    return Task.FromResult(response);
                 }
                 networkData.StatusId = (int)profile.GetNetworkConnectivityLevel();
 
@@ -197,7 +197,7 @@ namespace MauiWifiManager
                 response.ErrorCode = WifiErrorCodes.UnknownError;
                 response.ErrorMessage = $"An error occurred while retrieving network info: {ex.Message}";
             }
-            return response;
+            return Task.FromResult(response);
         }
 
         /// <summary>

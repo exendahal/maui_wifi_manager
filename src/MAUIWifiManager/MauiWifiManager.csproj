@@ -2,18 +2,21 @@
 
 	<PropertyGroup>
 
-		<TargetFrameworks>net8.0-android;net8.0-ios</TargetFrameworks>
-		<TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('windows'))">$(TargetFrameworks);net8.0-windows10.0.19041.0</TargetFrameworks>
-		
+		<TargetFrameworks>net8.0-android;net8.0-ios;net8.0-maccatalyst;net9.0-android;net9.0-ios;net9.0-maccatalyst</TargetFrameworks>
+		<TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('windows'))">$(TargetFrameworks);net8.0-windows10.0.19041.0;net9.0-windows10.0.19041.0</TargetFrameworks>
+
+		<UseMaui>true</UseMaui>
+		<SkipValidateMauiImplicitPackageReferences>true</SkipValidateMauiImplicitPackageReferences>
+
 		<AssemblyName>MauiWifiManager</AssemblyName>
 		<RootNamespace>MauiWifiManager</RootNamespace>
 		<PackageId>WifiManager.Maui</PackageId>
 
 		<Product>$(AssemblyName) ($(TargetFramework))</Product>
-		<AssemblyVersion>3.0.3</AssemblyVersion>
-		<AssemblyFileVersion>3.0.3</AssemblyFileVersion>
-		<Version>3.0.3</Version>
-		<PackageVersion>3.0.3</PackageVersion>
+		<AssemblyVersion>9.0.3</AssemblyVersion>
+		<AssemblyFileVersion>9.0.3</AssemblyFileVersion>
+		<Version>9.0.3</Version>
+		<PackageVersion>9.0.3</PackageVersion>
 		<PackOnBuild>true</PackOnBuild>
 		<NeutralLanguage>en</NeutralLanguage>
 		<DefineConstants>$(DefineConstants);</DefineConstants>
@@ -48,7 +51,8 @@
 
 	<!-- platform version number information -->
 	<PropertyGroup>
-		<SupportedOSPlatformVersion Condition="$(TargetFramework.Contains('-ios'))">10.0</SupportedOSPlatformVersion>		
+		<SupportedOSPlatformVersion Condition="$(TargetFramework.Contains('-ios'))">14.2</SupportedOSPlatformVersion>
+		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst'">15.0</SupportedOSPlatformVersion>
 		<SupportedOSPlatformVersion Condition="$(TargetFramework.Contains('-android'))">21.0</SupportedOSPlatformVersion>
 		<SupportedOSPlatformVersion Condition="$(TargetFramework.Contains('-windows10'))">10.0.17763.0</SupportedOSPlatformVersion>
 		<TargetPlatformMinVersion Condition="$(TargetFramework.Contains('-windows10'))">10.0.17763.0</TargetPlatformMinVersion>
@@ -65,6 +69,10 @@
 		<EmbedUntrackedSources>true</EmbedUntrackedSources>
 		<!-- sourcelink: Include PDB in the built .nupkg -->
 		<AllowedOutputExtensionsInPackageBuildOutputFolder>$(AllowedOutputExtensionsInPackageBuildOutputFolder);.pdb</AllowedOutputExtensionsInPackageBuildOutputFolder>
+	</PropertyGroup>
+
+	<PropertyGroup>
+		<NoWarn>VSSpell001;CS1591</NoWarn>
 	</PropertyGroup>
 	
 		
