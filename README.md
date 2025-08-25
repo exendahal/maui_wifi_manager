@@ -13,7 +13,7 @@ The Wi-Fi Manager for .NET MAUI is a simple and powerful library that helps you 
 | Android   | ✅        |                                  |
 | iOS       | ✅        |                                  |
 | Windows   | ✅        |                                  |
-| Mac       | ❌        |                                  |
+| Mac       | ⚠️        | Testing required via Mac Catalyst|
 | Tizen     | ❌        |                                  |
 
 ---
