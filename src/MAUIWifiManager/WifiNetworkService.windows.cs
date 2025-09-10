@@ -139,19 +139,15 @@ namespace MauiWifiManager
 
             try
             {
-                ConnectionProfile profile = NetworkInformation.GetInternetConnectionProfile();
+                ConnectionProfile? profile = NetworkInformation.GetConnectionProfiles().FirstOrDefault(x => x.IsWlanConnectionProfile);
                 if (profile == null)
                 {
                     response.ErrorCode = WifiErrorCodes.NoConnection;
-                    response.ErrorMessage = "No active network connection found.";
+                    response.ErrorMessage = "No active Wi-Fi network connection found.";
                     return Task.FromResult(response);
                 }
                 networkData.StatusId = (int)profile.GetNetworkConnectivityLevel();
-
-                if (profile.IsWlanConnectionProfile)
-                {
-                    networkData.Ssid = profile.WlanConnectionProfileDetails.GetConnectedSsid();
-                }
+                networkData.Ssid = profile.WlanConnectionProfileDetails.GetConnectedSsid();
                 
                 networkData.Bssid = profile.NetworkAdapter.NetworkAdapterId;
                 networkData.NativeObject = profile;
