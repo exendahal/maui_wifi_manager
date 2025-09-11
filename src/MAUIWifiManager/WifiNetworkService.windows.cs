@@ -139,7 +139,7 @@ namespace MauiWifiManager
 
             try
             {
-                ConnectionProfile? profile = NetworkInformation.GetConnectionProfiles().FirstOrDefault(x => x.IsWlanConnectionProfile);
+                ConnectionProfile? profile = NetworkInformation.GetConnectionProfiles().FirstOrDefault(x => x.IsWlanConnectionProfile && x.GetNetworkConnectivityLevel() > NetworkConnectivityLevel.None);
                 if (profile == null)
                 {
                     response.ErrorCode = WifiErrorCodes.NoConnection;
