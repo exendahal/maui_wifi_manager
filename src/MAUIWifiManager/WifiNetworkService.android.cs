@@ -155,14 +155,6 @@ namespace MauiWifiManager
 
         }
 
-        private static string? GetIPAddress(int? ipAddress)
-        {
-            if (ipAddress == null)
-                return null;
-
-            return Java.Net.InetAddress.GetByAddress(BitConverter.GetBytes((int)ipAddress)).HostAddress;
-        }       
-
         /// <summary>
         /// Get Wi-Fi Network Info
         /// </summary>
@@ -247,7 +239,6 @@ namespace MauiWifiManager
                     return response;
 
                 }
-                var linkProperties = connectivityManager?.GetLinkProperties(activeNetwork);
 
                 NetworkCallbackFlags flagIncludeLocationInfo = NetworkCallbackFlags.IncludeLocationInfo;
                 NetworkCallback networkCallback = new((int)flagIncludeLocationInfo)
@@ -265,18 +256,11 @@ namespace MauiWifiManager
                                 networkData.Bssid = wifiInfo?.BSSID;
                                 if (OperatingSystem.IsAndroidVersionAtLeast(31))
                                 {
-                                    var inetAddress = linkProperties?.LinkAddresses .Select(la => la.Address).FirstOrDefault(addr => addr is Java.Net.Inet4Address);
+                                    var linkProperties = connectivityManager?.GetLinkProperties(network);
+                                    var inetAddress = linkProperties?.LinkAddresses.Select(la => la.Address).FirstOrDefault(addr => addr is Java.Net.Inet4Address);
                                     if (inetAddress != null)
                                     {
-                                        var bytes = inetAddress.GetAddress();
-                                        if (bytes != null)
-                                        {
-                                            networkData.IpAddress = GetIpAddressFromBytes(bytes);
-                                        }
-                                        else
-                                        {
-                                            networkData.IpAddress = 0;
-                                        }                                       
+                                        networkData.IpAddress = GetIpAddressFromInetAddress(inetAddress);
                                         networkData.DhcpServerAddress = GetIpAddressFromInetAddress(linkProperties?.DhcpServerAddress);
                                         if (linkProperties?.Routes != null)
                                         {
@@ -284,7 +268,7 @@ namespace MauiWifiManager
                                             {
                                                 if (route.IsDefaultRoute && route.Gateway != null)
                                                 {
-                                                    networkData.GatewayAddress = GetIpAddressFromString(route.Gateway.HostAddress);
+                                                    networkData.GatewayAddress = GetIpAddressFromInetAddress(route.Gateway);
                                                 }
                                             }
                                         }                                       
@@ -740,7 +724,7 @@ namespace MauiWifiManager
 
         }
 
-        int GetIpAddressFromBytes(byte[] address)
+        private static int GetIpAddressFromBytes(byte[] address)
         {
             try
             {
@@ -756,28 +740,11 @@ namespace MauiWifiManager
             return 0;
         }
 
-        int GetIpAddressFromInetAddress(Java.Net.InetAddress? address)
+        private static int GetIpAddressFromInetAddress(Java.Net.InetAddress? address)
         {
             var bytes = address?.GetAddress();
             return bytes is { Length: 4 } ? GetIpAddressFromBytes(bytes) : 0;
         }
-        int GetIpAddressFromString(string? hostAddress)
-        {
-            if (string.IsNullOrEmpty(hostAddress))
-                return 0;
-
-            try
-            {
-                var inet = Java.Net.InetAddress.GetByName(hostAddress);
-                var bytes = inet?.GetAddress();
-                return bytes is { Length: 4 } ? GetIpAddressFromBytes(bytes) : 0;
-            }
-            catch
-            {
-                return 0;
-            }
-        }
-
     }
     public class NetworkCallback : ConnectivityManager.NetworkCallback
     {
