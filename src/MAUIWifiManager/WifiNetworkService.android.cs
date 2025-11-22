@@ -405,10 +405,13 @@ namespace MauiWifiManager
                 {
                     foreach (var result in scanResults)
                     {
-                        wifiNetworks.Add(new NetworkData()
+                        var rawSsid = OperatingSystem.IsAndroidVersionAtLeast(33)
+                            ? result.WifiSsid?.ToString()
+                            : result.Ssid;
+                        wifiNetworks.Add(new NetworkData
                         {
                             Bssid = result.Bssid,
-                            Ssid = OperatingSystem.IsAndroidVersionAtLeast(33) ? result?.WifiSsid?.ToString() : result.Ssid,
+                            Ssid = rawSsid?.Trim(_TrimChars),
                             NativeObject = result
                         });
                     }
