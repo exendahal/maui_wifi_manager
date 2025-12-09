@@ -63,6 +63,7 @@ namespace MauiWifiManager
                 }
             }
 
+            // Should never be null, but return a safe error response just in case
             return lastResponse ?? WifiManagerResponse<NetworkData>.ErrorResponse(
                 WifiErrorCodes.UnknownError,
                 "Connection failed after multiple attempts.");

@@ -131,19 +131,29 @@ namespace MauiWifiManager.Abstractions
         public bool IsSuccess => ErrorCode == WifiErrorCodes.Success;
 
         /// <summary>
-        /// Creates a successful response with data and an optional message.
+        /// Creates a successful response with data and a message.
         /// </summary>
         /// <param name="data">The data to include in the response.</param>
-        /// <param name="message">An optional success message. Defaults to "Operation completed successfully."</param>
+        /// <param name="message">The success message.</param>
         /// <returns>A <see cref="WifiManagerResponse{T}"/> indicating success.</returns>
-        public static WifiManagerResponse<T> SuccessResponse(T? data, string? message = null)
+        public static WifiManagerResponse<T> SuccessResponse(T? data, string message)
         {
             return new WifiManagerResponse<T>
             {
                 Data = data,
                 ErrorCode = WifiErrorCodes.Success,
-                ErrorMessage = message ?? "Operation completed successfully."
+                ErrorMessage = message
             };
+        }
+
+        /// <summary>
+        /// Creates a successful response with data and a default success message.
+        /// </summary>
+        /// <param name="data">The data to include in the response.</param>
+        /// <returns>A <see cref="WifiManagerResponse{T}"/> indicating success with a default message.</returns>
+        public static WifiManagerResponse<T> SuccessResponse(T? data)
+        {
+            return SuccessResponse(data, "Operation completed successfully.");
         }
 
         /// <summary>
