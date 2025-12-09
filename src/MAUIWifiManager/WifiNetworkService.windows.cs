@@ -29,6 +29,22 @@ namespace MauiWifiManager
         /// </summary>
         public async Task<WifiManagerResponse<NetworkData>> ConnectWifi(string ssid, string password, System.Threading.CancellationToken cancellationToken = default)
         {
+            // Validate inputs if enabled in options
+            if (CrossWifiManager.Options.ValidateInputs)
+            {
+                try
+                {
+                    WifiValidationHelper.ValidateCredentials(ssid, password, CrossWifiManager.Options.AllowEmptyPassword);
+                }
+                catch (ArgumentException ex)
+                {
+                    WifiLogger.LogError($"Validation failed: {ex.Message}");
+                    return WifiManagerResponse<NetworkData>.ErrorResponse(
+                        WifiErrorCodes.InvalidCredential,
+                        ex.Message);
+                }
+            }
+
             var response = new WifiManagerResponse<NetworkData>();
             var credential = new PasswordCredential
             {

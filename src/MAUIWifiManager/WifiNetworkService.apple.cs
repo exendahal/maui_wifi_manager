@@ -1,6 +1,7 @@
 ﻿using CoreLocation;
 using Foundation;
 using MauiWifiManager.Abstractions;
+using MauiWifiManager.Helpers;
 using NetworkExtension;
 using System;
 using System.Collections.Generic;
@@ -36,7 +37,22 @@ namespace MauiWifiManager
         /// <returns>A task that represents the asynchronous operation with network data.</returns>
         public async Task<WifiManagerResponse<NetworkData>> ConnectWifi(string ssid, string password, System.Threading.CancellationToken cancellationToken = default)
         {
-           
+            // Validate inputs if enabled in options
+            if (CrossWifiManager.Options.ValidateInputs)
+            {
+                try
+                {
+                    WifiValidationHelper.ValidateCredentials(ssid, password, CrossWifiManager.Options.AllowEmptyPassword);
+                }
+                catch (ArgumentException ex)
+                {
+                    WifiLogger.LogError($"Validation failed: {ex.Message}");
+                    return WifiManagerResponse<NetworkData>.ErrorResponse(
+                        WifiErrorCodes.InvalidCredential,
+                        ex.Message);
+                }
+            }
+
             try
             {
                 // Remove any existing configuration for the SSID
