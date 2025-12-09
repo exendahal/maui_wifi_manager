@@ -49,7 +49,7 @@ namespace MauiWifiManager
         /// <summary>
         /// Connect Wi-Fi
         /// </summary>
-        public async Task<WifiManagerResponse<NetworkData>> ConnectWifi(string ssid, string password)
+        public async Task<WifiManagerResponse<NetworkData>> ConnectWifi(string ssid, string password, System.Threading.CancellationToken cancellationToken = default)
         {
             var response = new WifiManagerResponse<NetworkData>();
             var networkData = new NetworkData();
@@ -128,7 +128,7 @@ namespace MauiWifiManager
         /// From Android Q (Android 10) you can't enable/disable Wi-Fi programmatically anymore. 
         /// So, use Settings Panel to toggle Wi-Fi connectivity
         /// </summary>
-        public void DisconnectWifi(string? ssid)
+        public Task DisconnectWifi(string? ssid)
         {
             if (_Context != null)
             {
@@ -153,12 +153,13 @@ namespace MauiWifiManager
             else
                 throw new NullReferenceException("Context is null. Disconnect Wi-Fi cannot proceed.");
 
+            return Task.CompletedTask;
         }
 
         /// <summary>
         /// Get Wi-Fi Network Info
         /// </summary>
-        public async Task<WifiManagerResponse<NetworkData>> GetNetworkInfo()
+        public async Task<WifiManagerResponse<NetworkData>> GetNetworkInfo(System.Threading.CancellationToken cancellationToken = default)
         {
             var response = new WifiManagerResponse<NetworkData>();
             var networkData = new NetworkData();
@@ -371,7 +372,7 @@ namespace MauiWifiManager
         /// <summary>
         /// Scan Wi-Fi Networks
         /// </summary>
-        public Task<WifiManagerResponse<List<NetworkData>>> ScanWifiNetworks()
+        public Task<WifiManagerResponse<List<NetworkData>>> ScanWifiNetworks(System.Threading.CancellationToken cancellationToken = default)
         {
             var response = new WifiManagerResponse<List<NetworkData>>();
             try
