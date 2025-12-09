@@ -179,24 +179,81 @@ public class WifiManagerResponse<T>
 
 ---
 
-## Feedback & Issues
+## Advanced Features
 
-If you encounter any issues or have suggestions, please open an issue on the project's GitHub repository.
+The library now includes powerful features for better Wi-Fi management:
+
+### Configuration Options
+
+Customize Wi-Fi Manager behavior:
+
+```csharp
+builder.UseMauiWifiManager(new WifiManagerOptions
+{
+    ConnectionTimeoutSeconds = 45,
+    ConnectionRetryCount = 3,
+    ValidateInputs = true,
+    MinimumSignalStrength = -60
+});
+```
+
+### Extension Methods
+
+- **ConnectWifiWithRetry()**: Automatic retry logic for failed connections
+- **IsConnectedToWifi()**: Quick connectivity check
+- **FilterBySignalStrength()**: Filter networks by signal strength
+- **SortBySignalStrength()**: Sort networks by signal quality
+- **RemoveDuplicateSsids()**: Deduplicate network lists
+
+### Enhanced Error Handling
+
+```csharp
+var response = await CrossWifiManager.Current.ConnectWifi("MyNetwork", "password");
+if (response.IsSuccess)
+{
+    Console.WriteLine($"Connected! IP: {response.Data?.GetIpAddressString()}");
+}
+else
+{
+    Console.WriteLine($"Error: {response.ErrorMessage}");
+}
+```
+
+For detailed examples and advanced usage, see [ADVANCED_USAGE.md](ADVANCED_USAGE.md).
 
 ---
 
-## Contributing Guidelines
+## Documentation
 
- contributions to this project are always welcomed. To ensure a smooth collaboration, please follow these guidelines:
+- **[ADVANCED_USAGE.md](ADVANCED_USAGE.md)** - Comprehensive guide with examples
+- **[CODE_STYLE.md](CODE_STYLE.md)** - Coding standards and best practices
+- **[CONTRIBUTING.md](CONTRIBUTING.md)** - Contribution guidelines
+- **[CHANGELOG.md](CHANGELOG.md)** - Version history and changes
 
-### **Branching Strategy**
+---
 
-- **`develop`**: This is the **development branch** where all new features and bug fixes should be merged. Always branch out from `develop` for your work.
-- **`main`**: This is the **release branch** containing production-ready code. Only merge into `main` after thorough testing and reviews.
+## Feedback & Issues
 
-### **Using Issue Templates**
+If you encounter any issues or have suggestions, please:
+- Check existing [issues](https://github.com/exendahal/maui_wifi_manager/issues)
+- Use the provided issue templates
+- Include platform, version, and reproduction steps
 
-Create a new issue using one of the provided **issue templates**. These templates ensure we have all the necessary information to understand and address the issue effectively.
+---
+
+## Contributing
+
+Contributions are always welcome! Please read our [Contributing Guidelines](CONTRIBUTING.md) to get started.
+
+### Quick Start
+
+1. Fork the repository
+2. Create a feature branch from `develop`
+3. Make your changes following the [Code Style Guide](CODE_STYLE.md)
+4. Add tests and documentation
+5. Submit a pull request
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed instructions.
 
 ---
 
