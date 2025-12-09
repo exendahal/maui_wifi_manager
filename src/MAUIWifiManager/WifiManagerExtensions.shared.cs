@@ -13,6 +13,16 @@ namespace MauiWifiManager
     public static class WifiManagerExtensions
     {
         /// <summary>
+        /// Error codes that should not trigger retry attempts.
+        /// </summary>
+        private static readonly WifiErrorCodes[] NonRetryableErrorCodes =
+        {
+            WifiErrorCodes.InvalidCredential,
+            WifiErrorCodes.PermissionDenied,
+            WifiErrorCodes.UnsupportedHardware
+        };
+
+        /// <summary>
         /// Connects to a Wi-Fi network with retry logic.
         /// </summary>
         /// <param name="service">The Wi-Fi network service.</param>
@@ -48,10 +58,9 @@ namespace MauiWifiManager
                     return lastResponse;
                 }
 
-                // Don't retry for certain error codes
-                if (lastResponse.ErrorCode == WifiErrorCodes.InvalidCredential ||
-                    lastResponse.ErrorCode == WifiErrorCodes.PermissionDenied ||
-                    lastResponse.ErrorCode == WifiErrorCodes.UnsupportedHardware)
+                // Don't retry for non-retryable error codes (e.g., wrong password, missing permissions)
+                if (lastResponse.ErrorCode.HasValue && 
+                    Array.Exists(NonRetryableErrorCodes, code => code == lastResponse.ErrorCode.Value))
                 {
                     return lastResponse;
                 }
@@ -101,19 +110,29 @@ namespace MauiWifiManager
         /// Filters scanned networks by minimum signal strength.
         /// </summary>
         /// <param name="networks">List of networks to filter.</param>
-        /// <param name="minimumSignalStrength">Minimum signal strength threshold (RSSI value, typically -100 to 0).</param>
+        /// <param name="minimumSignalStrength">Minimum signal strength threshold (RSSI value, typically -100 to 0).
+        /// Note: Windows uses 0-5 bars. Networks with non-integer signal strength are included by default.</param>
         /// <returns>Filtered list of networks.</returns>
+        /// <remarks>
+        /// Signal strength format varies by platform:
+        /// - Android/iOS: RSSI (int), range -100 to 0, higher is better
+        /// - Windows: Bars (int?), range 0-5, higher is better
+        /// Networks where signal strength cannot be determined are included in the results.
+        /// </remarks>
         public static List<NetworkData> FilterBySignalStrength(
             this List<NetworkData> networks,
             int minimumSignalStrength = -70)
         {
             return networks.Where(n =>
             {
+                // Android/iOS use RSSI (negative values, -100 to 0)
                 if (n.SignalStrength is int rssi)
                 {
                     return rssi >= minimumSignalStrength;
                 }
-                return true; // Include networks where signal strength is unknown or in different format
+                // Include networks where signal strength is unknown or in different format
+                // (e.g., Windows uses nullable int for bars 0-5)
+                return true;
             }).ToList();
         }
 
@@ -141,15 +160,21 @@ namespace MauiWifiManager
         /// </summary>
         /// <param name="networks">List of networks to sort.</param>
         /// <returns>Sorted list of networks.</returns>
+        /// <remarks>
+        /// Works with integer signal strength values (RSSI on Android/iOS, bars on Windows).
+        /// Networks with unknown or non-integer signal strength are placed at the end.
+        /// </remarks>
         public static List<NetworkData> SortBySignalStrength(this List<NetworkData> networks)
         {
             return networks.OrderByDescending(n =>
             {
+                // Handle integer signal strength (RSSI or bars)
                 if (n.SignalStrength is int rssi)
                 {
                     return rssi;
                 }
-                return int.MinValue; // Put unknown signal strength at the end
+                // Put networks with unknown signal strength at the end
+                return int.MinValue;
             }).ToList();
         }
 
