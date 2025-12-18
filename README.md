@@ -200,6 +200,13 @@ Create a new issue using one of the provided **issue templates**. These template
 
 ---
 
+## Support & Motivation
+
+Maintaining and improving this library takes time and effort.  
+If you find it useful and would like to support future enhancements or ongoing maintenance, you can do so [here](https://buymemomo.com/exendahal).
+
+Thank you for using and supporting the project.
+
 ## License
 
 This project is licensed under the MIT License. See the [LICENSE](LICENSE.md) file for details.
