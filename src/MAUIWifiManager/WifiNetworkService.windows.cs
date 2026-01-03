@@ -71,7 +71,7 @@ namespace MauiWifiManager
                     if (status.ConnectionStatus == WiFiConnectionStatus.Success)
                     {
                         Debug.WriteLine("Connected successfully to the network.");
-                        ConnectionProfile InternetConnectionProfile = NetworkInformation.GetInternetConnectionProfile();
+                        Windows.Networking.Connectivity.ConnectionProfile InternetConnectionProfile = NetworkInformation.GetInternetConnectionProfile();
                         var hostname = NetworkInformation.GetHostNames().FirstOrDefault(hn => hn.IPInformation?.NetworkAdapter != null && hn.IPInformation.NetworkAdapter.NetworkAdapterId == InternetConnectionProfile?.NetworkAdapter.NetworkAdapterId);
                         var networkData = await GetNetworkInfo();
                         if (networkData.ErrorCode == WifiErrorCodes.Success)
@@ -139,7 +139,7 @@ namespace MauiWifiManager
 
             try
             {
-                ConnectionProfile? profile = NetworkInformation.GetConnectionProfiles().FirstOrDefault(x => x.IsWlanConnectionProfile && x.GetNetworkConnectivityLevel() > NetworkConnectivityLevel.None);
+                Windows.Networking.Connectivity.ConnectionProfile? profile = NetworkInformation.GetConnectionProfiles().FirstOrDefault(x => x.IsWlanConnectionProfile && x.GetNetworkConnectivityLevel() > NetworkConnectivityLevel.None);
                 if (profile == null)
                 {
                     response.ErrorCode = WifiErrorCodes.NoConnection;
@@ -201,7 +201,7 @@ namespace MauiWifiManager
         /// </summary>
         public async Task<bool> OpenWifiSetting()
         {
-            return await Launcher.LaunchUriAsync(new Uri("ms-settings:network-wifi"));
+            return await Windows.System.Launcher.LaunchUriAsync(new Uri("ms-settings:network-wifi"));
         }
 
         /// <summary>
@@ -270,7 +270,7 @@ namespace MauiWifiManager
         /// </summary>
         public async Task<bool> OpenWirelessSetting()
         {
-            return await Launcher.LaunchUriAsync(new Uri("ms-settings:network"));
+            return await Windows.System.Launcher.LaunchUriAsync(new Uri("ms-settings:network"));
         }
 
         private string GetSecurityType(NetworkAuthenticationType authType)
