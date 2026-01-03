@@ -1,141 +1,103 @@
-﻿<Project Sdk="MSBuild.Sdk.Extras/3.0.44">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
+		<TargetFrameworks>net9.0-android;net9.0-ios;net9.0-maccatalyst;net9.0;net10.0-android;net10.0-ios;net10.0-maccatalyst;net10.0</TargetFrameworks>
+		<TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('windows'))">$(TargetFrameworks);net9.0-windows10.0.19041.0;net10.0-windows10.0.19041.0</TargetFrameworks>
 
-		<TargetFrameworks>net8.0-android;net8.0-ios;net8.0-maccatalyst;net9.0-android;net9.0-ios;net9.0-maccatalyst</TargetFrameworks>
-		<TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('windows'))">$(TargetFrameworks);net8.0-windows10.0.19041.0;net9.0-windows10.0.19041.0</TargetFrameworks>
-
+		<SingleProject>true</SingleProject>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
 		<UseMaui>true</UseMaui>
-		<SkipValidateMauiImplicitPackageReferences>true</SkipValidateMauiImplicitPackageReferences>
 
 		<AssemblyName>MauiWifiManager</AssemblyName>
 		<RootNamespace>MauiWifiManager</RootNamespace>
 		<PackageId>WifiManager.Maui</PackageId>
 
 		<Product>$(AssemblyName) ($(TargetFramework))</Product>
-		<AssemblyVersion>9.0.5</AssemblyVersion>
-		<AssemblyFileVersion>9.0.5</AssemblyFileVersion>
-		<Version>9.0.5</Version>
-		<PackageVersion>9.0.5</PackageVersion>
+		<AssemblyVersion>10.0.0</AssemblyVersion>
+		<AssemblyFileVersion>10.0.0</AssemblyFileVersion>
+		<Version>10.0.0</Version>
+		<PackageVersion>10.0.0</PackageVersion>
 		<PackOnBuild>true</PackOnBuild>
 		<NeutralLanguage>en</NeutralLanguage>
 		<DefineConstants>$(DefineConstants);</DefineConstants>
 
-		<UseFullSemVerForNuGet>false</UseFullSemVerForNuGet>
-		<EnableDefaultCompileItems>false</EnableDefaultCompileItems>
 		<LangVersion>11.0</LangVersion>
-		<Nullable>enable</Nullable>
 		<DebugType>portable</DebugType>
 
-		
 		<PackageLicenseExpression>MIT</PackageLicenseExpression>
 		<PackageProjectUrl>https://github.com/exendahal/WifiManagerMAUI</PackageProjectUrl>
 		<RepositoryUrl>https://github.com/exendahal/WifiManagerMAUI</RepositoryUrl>
 		<PackageIcon>icon.png</PackageIcon>
 		<PackageReadmeFile>README.md</PackageReadmeFile>
-		<PackageTags>MAUI, xamarin, windows, ios, android, xamarin.forms, plugin, Wifi.Manager</PackageTags>
+		<PackageTags>MAUI;windows;ios;android;plugin;Wifi.Manager</PackageTags>
 
-		<Title>Wi-Fi Manager Plugin for MAUI</Title>		
+		<Title>Wi-Fi Manager Plugin for MAUI</Title>
 		<Description>MAUI Wi-Fi Manager is solution for Wi-Fi management features. With these APIs, effortlessly connect, add, and retrieve Wi-Fi network information in cross-platform MAUI applications.</Description>
-
 
 		<Owners>exendahal</Owners>
 		<Authors>exendahal</Authors>
 		<Copyright>Santosh Dahal</Copyright>
 
-		<NeutralLanguage>en</NeutralLanguage>
-		<EnableDefaultCompileItems>false</EnableDefaultCompileItems>
-
-	</PropertyGroup>
-
-
-	<!-- platform version number information -->
-	<PropertyGroup>
-		<SupportedOSPlatformVersion Condition="$(TargetFramework.Contains('-ios'))">14.2</SupportedOSPlatformVersion>
-		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst'">15.0</SupportedOSPlatformVersion>
-		<SupportedOSPlatformVersion Condition="$(TargetFramework.Contains('-android'))">21.0</SupportedOSPlatformVersion>
-		<SupportedOSPlatformVersion Condition="$(TargetFramework.Contains('-windows10'))">10.0.17763.0</SupportedOSPlatformVersion>
-		<TargetPlatformMinVersion Condition="$(TargetFramework.Contains('-windows10'))">10.0.17763.0</TargetPlatformMinVersion>
-	</PropertyGroup>
-
-	<PropertyGroup Condition=" $(TargetFramework.StartsWith('uap10.0')) ">
-		<TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
-	</PropertyGroup>
-
-	<PropertyGroup Condition=" '$(Configuration)'=='Release' And '$(OS)' == 'Windows_NT' ">
-		<!-- sourcelink: Declare that the Repository URL can be published to NuSpec -->
 		<PublishRepositoryUrl>true</PublishRepositoryUrl>
-		<!-- sourcelink: Embed source files that are not tracked by the source control manager to the PDB -->
 		<EmbedUntrackedSources>true</EmbedUntrackedSources>
-		<!-- sourcelink: Include PDB in the built .nupkg -->
 		<AllowedOutputExtensionsInPackageBuildOutputFolder>$(AllowedOutputExtensionsInPackageBuildOutputFolder);.pdb</AllowedOutputExtensionsInPackageBuildOutputFolder>
+		<IsPackable>True</IsPackable>
 	</PropertyGroup>
 
 	<PropertyGroup>
-		<NoWarn>VSSpell001;CS1591</NoWarn>
+		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">14.2</SupportedOSPlatformVersion>
+		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst'">15.0</SupportedOSPlatformVersion>
+		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">21.0</SupportedOSPlatformVersion>
+		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</SupportedOSPlatformVersion>
+		<TargetPlatformMinVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</TargetPlatformMinVersion>
 	</PropertyGroup>
-	
-		
-	<ItemGroup Condition=" '$(Configuration)'=='Release' And '$(OS)' == 'Windows_NT' ">
+
+	<ItemGroup>
 		<PackageReference Include="Microsoft.SourceLink.GitHub" Version="1.1.1" PrivateAssets="All" />
+	</ItemGroup>
+
+	<!-- iOS & MacCatalyst: exclude when not targeting these frameworks -->
+	<ItemGroup Condition="$(TargetFramework.StartsWith('net')) == true AND $(TargetFramework.Contains('-ios')) != true AND $(TargetFramework.Contains('-maccatalyst')) != true ">
+		<Compile Remove="**\*.ios.cs" />
+		<Compile Remove="**\*.apple.cs" />
+		<None Include="**\*.ios.cs" Exclude="$(DefaultItemExcludes);$(DefaultExcludesInProjectFolder)" />
+		<None Include="**\*.apple.cs" Exclude="$(DefaultItemExcludes);$(DefaultExcludesInProjectFolder)" />
+		<Compile Remove="**\ios\**\*.cs" />
+		<None Include="**\ios\**\*.cs" Exclude="$(DefaultItemExcludes);$(DefaultExcludesInProjectFolder)" />
+		<Compile Remove="**\*.macios.cs" />
+		<None Include="**\*.macios.cs" Exclude="$(DefaultItemExcludes);$(DefaultExcludesInProjectFolder)" />
+		<Compile Remove="**\macios\**\*.cs" />
+		<None Include="**\macios\**\*.cs" Exclude="$(DefaultItemExcludes);$(DefaultExcludesInProjectFolder)" />
+	</ItemGroup>
+
+	<!-- Android: exclude when not targeting android -->
+	<ItemGroup Condition="$(TargetFramework.StartsWith('net')) == true AND $(TargetFramework.Contains('-android')) != true">
+		<Compile Remove="**\*.android.cs" />
+		<None Include="**\*.android.cs" Exclude="$(DefaultItemExcludes);$(DefaultExcludesInProjectFolder)" />
+		<Compile Remove="**\android\**\*.cs" />
+		<None Include="**\android\**\*.cs" Exclude="$(DefaultItemExcludes);$(DefaultExcludesInProjectFolder)" />
+	</ItemGroup>
+
+	<!-- Windows: exclude when not targeting windows -->
+	<ItemGroup Condition="$(TargetFramework.StartsWith('net')) == true AND $(TargetFramework.Contains('-windows')) != true">
+		<Compile Remove="**\*.windows.cs" />
+		<None Include="**\*.windows.cs" Exclude="$(DefaultItemExcludes);$(DefaultExcludesInProjectFolder)" />
+		<Compile Remove="**\windows\**\*.cs" />
+		<None Include="**\windows\**\*.cs" Exclude="$(DefaultItemExcludes);$(DefaultExcludesInProjectFolder)" />
+	</ItemGroup>
+
+	<!-- .NET (generic) -->
+	<ItemGroup Condition="!($(TargetFramework.StartsWith('net')) == true AND $(TargetFramework.EndsWith('.0')) == true AND $(TargetFramework.Contains('-')) != true)">
+		<Compile Remove="**\*.net.cs" />
+		<None Include="**\*.net.cs" Exclude="$(DefaultItemExcludes);$(DefaultExcludesInProjectFolder)" />
+	</ItemGroup>
+
+	<ItemGroup>
 		<None Include="docs\README.md" Pack="true" PackagePath="\" />
 		<None Include="images\icon.png" Pack="true" PackagePath="\" />
 	</ItemGroup>
 
-	<PropertyGroup Condition=" '$(Configuration)'=='Debug' ">
-		<DebugSymbols>true</DebugSymbols>
-		<GenerateDocumentationFile>false</GenerateDocumentationFile>
-	</PropertyGroup>
-	<PropertyGroup Condition=" '$(Configuration)'=='Release' ">
-		<GeneratePackageOnBuild>true</GeneratePackageOnBuild>
-		<GenerateDocumentationFile>true</GenerateDocumentationFile>
-	</PropertyGroup>
+	<!-- NetworkData.cs is included implicitly by the SDK; explicit include removed to avoid duplicates -->
 
-	<ItemGroup>
-		<Compile Include="**\*.shared.cs" />
-	</ItemGroup>
-
-	<ItemGroup Condition=" $(TargetFramework.StartsWith('netstandard')) ">
-	</ItemGroup>
-
-	<ItemGroup Condition=" $(TargetFramework.StartsWith('uap10.0')) ">
-		<Compile Include="**\*.windows.cs" />
-	</ItemGroup>
-
-	<ItemGroup>
-	<Compile Include="**\*.shared.cs" />
-	</ItemGroup>
-
-	<ItemGroup Condition=" $(TargetFramework.StartsWith('netstandard')) ">
-	</ItemGroup>
-
-	<ItemGroup Condition=" $(TargetFramework.StartsWith('MonoAndroid')) ">
-		<Compile Include="**\*.android.cs" />
-	</ItemGroup>
-
-	<ItemGroup Condition=" $(TargetFramework.StartsWith('Xamarin.iOS')) ">
-		<Compile Include="**\*.apple.cs" />
-	</ItemGroup>
-
-	<ItemGroup Condition=" $(TargetFramework.Contains('-windows')) ">
-		<Compile Include="**\*.windows.cs" />
-	</ItemGroup>
-
-
-	<ItemGroup Condition=" $(TargetFramework.Contains('-android')) ">
-		<Compile Include="**\*.android.cs" />
-	</ItemGroup>
-
-	<ItemGroup Condition=" $(TargetFramework.Contains('-ios')) ">
-		<Compile Include="**\*.apple.cs" />
-	</ItemGroup>
-
-	<ItemGroup Condition=" $(TargetFramework.Contains('-maccatalyst')) ">
-		<Compile Include="**\*.apple.cs" />
-	</ItemGroup>
-
-	<ItemGroup>
-		<Compile Include="NetworkData.cs" />
-	</ItemGroup>
-	
 </Project>
