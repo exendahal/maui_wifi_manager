@@ -13,15 +13,15 @@ public partial class ConnectWifi : ContentPage
     {
         if (string.IsNullOrWhiteSpace(WifiSsid.Text) || string.IsNullOrWhiteSpace(WifiPassword.Text))
         {
-            await DisplayAlert("Empty SSID or Password", "SSID and Password cannot be empty", "OK");
+            await DisplayAlertAsync("Empty SSID or Password", "SSID and Password cannot be empty", "OK");
             return;
         }
 
         var response = await CrossWifiManager.Current.ConnectWifi(WifiSsid.Text, WifiPassword.Text);
         if (response.ErrorCode == WifiErrorCodes.Success)
-            await DisplayAlert("Wi-Fi Info", response?.Data?.Ssid?.ToString(),"OK");
+            await DisplayAlertAsync("Wi-Fi Info", response?.Data?.Ssid?.ToString(),"OK");
         else
-            await DisplayAlert("Wi-Fi Info", response.ErrorMessage, "OK");
+            await DisplayAlertAsync("Wi-Fi Info", response.ErrorMessage, "OK");
 
     }
 }

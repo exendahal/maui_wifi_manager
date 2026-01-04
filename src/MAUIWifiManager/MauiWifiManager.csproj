@@ -54,6 +54,10 @@
 	</PropertyGroup>
 
 	<ItemGroup>
+	  <Compile Remove="WifiManagerExtensions.shared.cs" />
+	</ItemGroup>
+
+	<ItemGroup>
 		<PackageReference Include="Microsoft.SourceLink.GitHub" Version="1.1.1" PrivateAssets="All" />
 	</ItemGroup>
 
@@ -96,6 +100,7 @@
 	<ItemGroup>
 		<None Include="docs\README.md" Pack="true" PackagePath="\" />
 		<None Include="images\icon.png" Pack="true" PackagePath="\" />
+		<None Include="WifiManagerExtensions.shared.cs" />
 	</ItemGroup>
 
 	<!-- NetworkData.cs is included implicitly by the SDK; explicit include removed to avoid duplicates -->

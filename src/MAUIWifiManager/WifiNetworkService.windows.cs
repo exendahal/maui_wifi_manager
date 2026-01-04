@@ -1,4 +1,5 @@
 ﻿using MauiWifiManager.Abstractions;
+using MauiWifiManager.Helpers;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -26,8 +27,24 @@ namespace MauiWifiManager
         /// <summary>
         /// Connect Wi-Fi
         /// </summary>
-        public async Task<WifiManagerResponse<NetworkData>> ConnectWifi(string ssid, string password)
+        public async Task<WifiManagerResponse<NetworkData>> ConnectWifi(string ssid, string password, CancellationToken cancellationToken = default)
         {
+            // Validate inputs if enabled in options
+            if (CrossWifiManager.Options.ValidateInputs)
+            {
+                try
+                {
+                    WifiValidationHelper.ValidateCredentials(ssid, password, CrossWifiManager.Options.AllowEmptyPassword);
+                }
+                catch (ArgumentException ex)
+                {
+                    WifiLogger.LogError($"Validation failed: {ex.Message}");
+                    return WifiManagerResponse<NetworkData>.ErrorResponse(
+                        WifiErrorCodes.InvalidCredential,
+                        ex.Message);
+                }
+            }
+
             var response = new WifiManagerResponse<NetworkData>();
             var credential = new PasswordCredential
             {
@@ -37,7 +54,7 @@ namespace MauiWifiManager
             var access = await WiFiAdapter.RequestAccessAsync();
             if (access != WiFiAccessStatus.Allowed)
             {
-                Debug.WriteLine("No Wi-Fi Access Status");
+                WifiLogger.LogWarning("No Wi-Fi Access Status");
                 response.ErrorCode = WifiErrorCodes.PermissionDenied;
                 response.ErrorMessage = "No Wi-Fi Access Status.";
                 return response;
@@ -70,7 +87,7 @@ namespace MauiWifiManager
                     var status = await adapter.ConnectAsync(wiFiAvailableNetwork, WiFiReconnectionKind.Automatic, credential);
                     if (status.ConnectionStatus == WiFiConnectionStatus.Success)
                     {
-                        Debug.WriteLine("Connected successfully to the network.");
+                        WifiLogger.LogInfo("Connected successfully to the network.");
                         Windows.Networking.Connectivity.ConnectionProfile InternetConnectionProfile = NetworkInformation.GetInternetConnectionProfile();
                         var hostname = NetworkInformation.GetHostNames().FirstOrDefault(hn => hn.IPInformation?.NetworkAdapter != null && hn.IPInformation.NetworkAdapter.NetworkAdapterId == InternetConnectionProfile?.NetworkAdapter.NetworkAdapterId);
                         var networkData = await GetNetworkInfo();
@@ -81,7 +98,7 @@ namespace MauiWifiManager
                         }
                         else
                         {
-                            Debug.WriteLine("Failed to get network info.");
+                            WifiLogger.LogError("Failed to get network info.");
                             response.ErrorCode = WifiErrorCodes.UnknownError;
                             response.ErrorMessage = "Failed to get network info.";
                         }
@@ -95,20 +112,20 @@ namespace MauiWifiManager
                             WiFiConnectionStatus.Timeout => WifiErrorCodes.OperationTimeout,
                             _ => WifiErrorCodes.UnknownError
                         };
-                        Debug.WriteLine($"Connection failed: {status.ConnectionStatus}");
+                        WifiLogger.LogWarning($"Connection failed: {status.ConnectionStatus}");
                         response.ErrorMessage = $"Connection failed: {status.ConnectionStatus}";
                     }
                 }
                 else
                 {
-                    Debug.WriteLine("The specified network was not found.");
+                    WifiLogger.LogWarning("The specified network was not found.");
                     response.ErrorCode = WifiErrorCodes.NoConnection;
                     response.ErrorMessage = "The specified network was not found.";
                 }
             }
             else
             {
-                Debug.WriteLine("Failed to get Wi-Fi adapter.");
+                WifiLogger.LogError("Failed to get Wi-Fi adapter.");
                 response.ErrorCode = WifiErrorCodes.UnsupportedHardware;
                 response.ErrorMessage = "Failed to get Wi-Fi adapter.";
             }
@@ -118,7 +135,7 @@ namespace MauiWifiManager
         /// <summary>
         /// Disconnect Wi-Fi
         /// </summary>
-        public async void DisconnectWifi(string ssid)
+        public async Task DisconnectWifi(string ssid)
         {
             WiFiAdapter adapter;
             var result = await Windows.Devices.Enumeration.DeviceInformation.FindAllAsync(WiFiAdapter.GetDeviceSelector());
@@ -132,7 +149,7 @@ namespace MauiWifiManager
         /// <summary>
         /// Get Network Info
         /// </summary>
-        public Task<WifiManagerResponse<NetworkData>> GetNetworkInfo()
+        public Task<WifiManagerResponse<NetworkData>> GetNetworkInfo(CancellationToken cancellationToken = default)
         {
             var response = new WifiManagerResponse<NetworkData>();
             var networkData = new NetworkData();
@@ -215,7 +232,7 @@ namespace MauiWifiManager
         /// <summary>
         /// Scan Wi-Fi Networks
         /// </summary>
-        public async Task<WifiManagerResponse<List<NetworkData>>> ScanWifiNetworks()
+        public async Task<WifiManagerResponse<List<NetworkData>>> ScanWifiNetworks(CancellationToken cancellationToken = default)
         {
             var response = new WifiManagerResponse<List<NetworkData>>();
             try
@@ -229,7 +246,7 @@ namespace MauiWifiManager
                     if (result.Count > 0)
                     {
                         var wifiAdapter = result[0];
-                        Debug.WriteLine($"Wi-Fi Scan started.");
+                        WifiLogger.LogInfo("Wi-Fi Scan started.");
                         await wifiAdapter.ScanAsync();
                         var availableNetworks = wifiAdapter.NetworkReport.AvailableNetworks;
                         foreach (var network in availableNetworks)
@@ -243,21 +260,21 @@ namespace MauiWifiManager
                             });
                         }
                     }
-                    Debug.WriteLine($"Wi-Fi Scan complete.");
+                    WifiLogger.LogInfo("Wi-Fi Scan complete.");
                     response.ErrorCode = WifiErrorCodes.Success;
                     response.ErrorMessage = $"Wi-Fi Scan complete.";
                     response.Data = wifiNetworks;
                 }
                 else
                 {
-                    Debug.WriteLine($"Request Access Async failed.");
+                    WifiLogger.LogError("Request Access Async failed.");
                     response.ErrorCode = WifiErrorCodes.UnknownError;
-                    response.ErrorMessage = $"Request Access Async failed.";
+                    response.ErrorMessage = "Request Access Async failed.";
                 }
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"Error while scanning Wi-Fi: {ex.Message}");
+                WifiLogger.LogError("Error while scanning Wi-Fi", ex);
                 response.ErrorCode = WifiErrorCodes.UnknownError;
                 response.ErrorMessage = $"Error while scanning Wi-Fi: {ex.Message}";
             }

@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Net;
+using MauiWifiManager.Helpers;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Threading.Tasks;
@@ -27,15 +28,31 @@ namespace MauiWifiManager
             _HotspotHelper = new NEHotspotHelper();
         }
 
-        /// <summary>
+        // <summary>
         /// Connect to Wifi
         /// </summary>
-        /// <param name="ssid"></param>
-        /// <param name="password"></param>
-        /// <returns></returns>
-        public async Task<WifiManagerResponse<NetworkData>> ConnectWifi(string ssid, string password)
+        /// <param name="ssid">The Service Set Identifier (SSID) of the Wi-Fi network.</param>
+        /// <param name="password">The password for the Wi-Fi network.</param>
+        /// <param name="cancellationToken">A token to cancel the asynchronous operation.</param>
+        /// <returns>A task that represents the asynchronous operation with network data.</returns>
+        public async Task<WifiManagerResponse<NetworkData>> ConnectWifi(string ssid, string password, CancellationToken cancellationToken = default)
         {
-           
+            // Validate inputs if enabled in options
+            if (CrossWifiManager.Options.ValidateInputs)
+            {
+                try
+                {
+                    WifiValidationHelper.ValidateCredentials(ssid, password, CrossWifiManager.Options.AllowEmptyPassword);
+                }
+                catch (ArgumentException ex)
+                {
+                    WifiLogger.LogError($"Validation failed: {ex.Message}");
+                    return WifiManagerResponse<NetworkData>.ErrorResponse(
+                        WifiErrorCodes.InvalidCredential,
+                        ex.Message);
+                }
+            }
+
             try
             {
                 // Remove any existing configuration for the SSID
@@ -94,9 +111,10 @@ namespace MauiWifiManager
         /// <summary>
         /// Disconnect Wi-Fi
         /// </summary>
-        public void DisconnectWifi(string ssid)
+        public Task DisconnectWifi(string ssid)
         {
             NEHotspotConfigurationManager.SharedManager.RemoveConfiguration(ssid);
+            return Task.CompletedTask;
         }
 
         void PopulateNetworkInterfaceData(NetworkData networkData)
@@ -140,7 +158,7 @@ namespace MauiWifiManager
         /// <summary>
         /// Get Wi-Fi Network Info
         /// </summary>
-        public async Task<WifiManagerResponse<NetworkData>> GetNetworkInfo()
+        public async Task<WifiManagerResponse<NetworkData>> GetNetworkInfo(CancellationToken cancellationToken = default)
         {
             var response = new WifiManagerResponse<NetworkData>();
             var locationManager = new CLLocationManager();
@@ -247,7 +265,7 @@ namespace MauiWifiManager
         /// <summary>
         /// Scan Wi-Fi Networks
         /// </summary>
-        public Task<WifiManagerResponse<List<NetworkData>>> ScanWifiNetworks()
+        public Task<WifiManagerResponse<List<NetworkData>>> ScanWifiNetworks(CancellationToken cancellationToken = default)
         {
             var response = new WifiManagerResponse<List<NetworkData>>();
             var wifiNetworks = new List<NetworkData>();

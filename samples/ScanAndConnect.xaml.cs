@@ -23,7 +23,7 @@ public partial class ScanAndConnect : ContentPage
             var response = await CrossWifiManager.Current.ConnectWifi(ssid, password);
             if (response.ErrorCode == WifiErrorCodes.Success)
             {
-                await DisplayAlert("Wi-Fi Info", response?.Data?.NativeObject?.ToString(), "OK");
+                await DisplayAlertAsync("Wi-Fi Info", response?.Data?.NativeObject?.ToString(), "OK");
             }
         }       
     }

@@ -41,7 +41,7 @@ public partial class ScanListPage : ContentPage
                $"GatewayAddress: {model.GatewayAddress ?? "N/A"}, " +
                $"NativeObject: {model.NativeObject}, " +
                $"Bssid: {model.Bssid}";
-        await DisplayAlert("Network info", info, "OK");
+        await DisplayAlertAsync("Network info", info, "OK");
     }   
     private async void ScanClicked(object sender, EventArgs e)
     {
@@ -80,6 +80,6 @@ public partial class ScanListPage : ContentPage
            
         }
         else
-            await DisplayAlert("No location permisson", "Please provide location permission", "OK");
+            await DisplayAlertAsync("No location permisson", "Please provide location permission", "OK");
     }
 }

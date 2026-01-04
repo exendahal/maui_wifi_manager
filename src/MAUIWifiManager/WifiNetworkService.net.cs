@@ -1,6 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Threading.Tasks;
 using MauiWifiManager.Abstractions;
 
 namespace MauiWifiManager
@@ -14,19 +11,19 @@ namespace MauiWifiManager
     {
         public WifiNetworkService() { }
 
-        public Task<WifiManagerResponse<NetworkData>> ConnectWifi(string ssid, string password)
+        public Task<WifiManagerResponse<NetworkData>> ConnectWifi(string ssid, string password, CancellationToken cancellationToken = default)
         {
             return Task.FromResult(WifiManagerResponse<NetworkData>.ErrorResponse(WifiErrorCodes.NetworkUnavailable, "Platform Wi-Fi implementation is not available in this build."));
         }
 
-        public Task<WifiManagerResponse<NetworkData>> GetNetworkInfo()
+        public Task<WifiManagerResponse<NetworkData>> GetNetworkInfo(CancellationToken cancellationToken = default)
         {
             return Task.FromResult(WifiManagerResponse<NetworkData>.ErrorResponse(WifiErrorCodes.NetworkUnavailable, "Platform Wi-Fi implementation is not available in this build."));
         }
 
-        public void DisconnectWifi(string ssid)
-        {
-            // No-op on unsupported targets
+        public Task DisconnectWifi(string ssid)
+        {            
+            return Task.CompletedTask;
         }
 
         public Task<bool> OpenWifiSetting()
@@ -34,7 +31,7 @@ namespace MauiWifiManager
             return Task.FromResult(false);
         }
 
-        public Task<WifiManagerResponse<List<NetworkData>>> ScanWifiNetworks()
+        public Task<WifiManagerResponse<List<NetworkData>>> ScanWifiNetworks(CancellationToken cancellationToken = default)
         {
             return Task.FromResult(WifiManagerResponse<List<NetworkData>>.ErrorResponse(WifiErrorCodes.NetworkUnavailable, "Platform Wi-Fi implementation is not available in this build."));
         }
