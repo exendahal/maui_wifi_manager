@@ -2,15 +2,11 @@
 using Foundation;
 using MauiWifiManager.Abstractions;
 using NetworkExtension;
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
 using System.Net;
 using MauiWifiManager.Helpers;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
-using System.Threading.Tasks;
 using SystemConfiguration;
 using UIKit;
 
@@ -72,8 +68,32 @@ namespace MauiWifiManager
                     tcs.TrySetResult(err);
                 });
 
+                // Hook cancellation: try to remove configuration and cancel the TCS
+                CancellationTokenRegistration ctr = default;
+                if (cancellationToken.CanBeCanceled)
+                {
+                    ctr = cancellationToken.Register(() =>
+                    {
+                        try { NEHotspotConfigurationManager.SharedManager.RemoveConfiguration(ssid); } catch { }
+                        tcs.TrySetCanceled();
+                    });
+                }
+
                 // Await the result of the configuration task
-                var error = await tcs.Task;
+                NSError error;
+                try
+                {
+                    error = await tcs.Task;
+                }
+                catch (OperationCanceledException)
+                {
+                    ctr.Dispose();
+                    return WifiManagerResponse<NetworkData>.ErrorResponse(WifiErrorCodes.UnknownError, "Operation canceled.");
+                }
+                finally
+                {
+                    ctr.Dispose();
+                }
 
                 // Handle connection status
                 if (error == null)
@@ -175,6 +195,21 @@ namespace MauiWifiManager
                     locationManager.AuthorizationStatus == CLAuthorizationStatus.AuthorizedAlways ||
                     locationManager.AuthorizationStatus == CLAuthorizationStatus.AuthorizedWhenInUse)
                 {
+                    // Register cancellation to avoid hanging while waiting for callback
+                    CancellationTokenRegistration ctr = default;
+                    if (cancellationToken.CanBeCanceled)
+                    {
+                        ctr = cancellationToken.Register(() =>
+                        {
+                            var cancelledResponse = new WifiManagerResponse<NetworkData>
+                            {
+                                ErrorCode = WifiErrorCodes.UnknownError,
+                                ErrorMessage = "Operation canceled."
+                            };
+                            tcs.TrySetResult(cancelledResponse);
+                        });
+                    }
+
                     NEHotspotNetwork.FetchCurrent(hotspotNetwork =>
                     {
                         if (hotspotNetwork != null)
@@ -196,6 +231,7 @@ namespace MauiWifiManager
                             response.ErrorCode = WifiErrorCodes.NetworkUnavailable;
                             response.ErrorMessage = "No network is currently connected.";
                         }
+                        ctr.Dispose();
                         tcs.SetResult(response);
                     });
 

@@ -5,6 +5,7 @@ using Android.OS;
 using Android.Runtime;
 using MauiWifiManager.Abstractions;
 using MauiWifiManager.Helpers;
+using System.Threading;
 using System.Runtime.Versioning;
 using static Android.Provider.Settings;
 using Context = Android.Content.Context;
@@ -116,12 +117,12 @@ namespace MauiWifiManager
                 else if (OperatingSystem.IsAndroidVersionAtLeast(29) && !OperatingSystem.IsAndroidVersionAtLeast(30))
                 {
                     //Android version is 29(Android 10)
-                    response = await RequestNetwork(wifiManager, ssid, password);
+                    response = await RequestNetwork(wifiManager, ssid, password, cancellationToken);
                 }
                 else
                 {
                     //Android version is greater than 29(Android 10)
-                    response = await AddWifiSuggestion(wifiManager, ssid, password);
+                    response = await AddWifiSuggestion(wifiManager, ssid, password, cancellationToken);
                 }
             }
             catch (Exception ex)
@@ -323,19 +324,42 @@ namespace MauiWifiManager
                     connectivityManager?.RequestNetwork(request, networkCallback);
                     connectivityManager?.RegisterNetworkCallback(request, networkCallback);
 
-                    networkData = await tcs.Task;
-                    if (networkData != null && networkData.StatusId == 1)
+                    // Register cancellation to unregister callback and cancel the TCS
+                    CancellationTokenRegistration ctr = default;
+                    if (cancellationToken.CanBeCanceled)
                     {
-                        System.Diagnostics.Debug.WriteLine($"Fetched Wi-Fi connection info successfully.");
-                        response.ErrorCode = WifiErrorCodes.Success;
-                        response.ErrorMessage = "Fetched Wi-Fi connection info successfully.";
-                        response.Data = networkData;
+                        ctr = cancellationToken.Register(() =>
+                        {
+                            try { connectivityManager?.UnregisterNetworkCallback(networkCallback); } catch { }
+                            tcs.TrySetCanceled();
+                        });
                     }
-                    else
+
+                    try
                     {
-                        System.Diagnostics.Debug.WriteLine($"Failed to fetch Wi-Fi connection info.");
+                        networkData = await tcs.Task;
+                        if (networkData != null && networkData.StatusId == 1)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"Fetched Wi-Fi connection info successfully.");
+                            response.ErrorCode = WifiErrorCodes.Success;
+                            response.ErrorMessage = "Fetched Wi-Fi connection info successfully.";
+                            response.Data = networkData;
+                        }
+                        else
+                        {
+                            System.Diagnostics.Debug.WriteLine($"Failed to fetch Wi-Fi connection info.");
+                            response.ErrorCode = WifiErrorCodes.UnknownError;
+                            response.ErrorMessage = "Failed to fetch Wi-Fi connection info.";
+                        }
+                    }
+                    catch (System.OperationCanceledException)
+                    {
                         response.ErrorCode = WifiErrorCodes.UnknownError;
-                        response.ErrorMessage = "Failed to fetch Wi-Fi connection info.";
+                        response.ErrorMessage = "Operation canceled.";
+                    }
+                    finally
+                    {
+                        ctr.Dispose();
                     }
                 }
                 else
@@ -386,6 +410,8 @@ namespace MauiWifiManager
         public Task<WifiManagerResponse<List<NetworkData>>> ScanWifiNetworks(CancellationToken cancellationToken = default)
         {
             var response = new WifiManagerResponse<List<NetworkData>>();
+            if (cancellationToken.IsCancellationRequested)
+                return Task.FromCanceled<WifiManagerResponse<List<NetworkData>>>(cancellationToken);
             try
             {
                 var wifiManager = _Context.GetSystemService(Context.WifiService) as WifiManager;
@@ -443,7 +469,7 @@ namespace MauiWifiManager
             return Task.FromResult(response);
         }
 
-        private async Task<WifiManagerResponse<NetworkData>> AddWifiSuggestion(WifiManager wifiManager, string ssid, string psk)
+        private async Task<WifiManagerResponse<NetworkData>> AddWifiSuggestion(WifiManager wifiManager, string ssid, string psk, CancellationToken cancellationToken = default)
         {
             var response = new WifiManagerResponse<NetworkData>();
             var networkData = new NetworkData();
@@ -581,7 +607,18 @@ namespace MauiWifiManager
                     if (networkRequest != null)
                     {
                         connectivityManager?.RegisterNetworkCallback(networkRequest, networkCallback);
-                    }                   
+                    }
+
+                    // Register cancellation to unregister callback and cancel the TCS
+                    CancellationTokenRegistration ctr = default;
+                    if (cancellationToken.CanBeCanceled)
+                    {
+                        ctr = cancellationToken.Register(() =>
+                        {
+                            try { connectivityManager?.UnregisterNetworkCallback(networkCallback); } catch { }
+                            tcs.TrySetCanceled();
+                        });
+                    }
 
                     // Set a timeout to prevent hanging
                     var timeoutTask = Task.Delay(TimeSpan.FromSeconds(30));
@@ -596,7 +633,17 @@ namespace MauiWifiManager
 
                     // Ensure to unregister the callback when done
                     connectivityManager?.UnregisterNetworkCallback(networkCallback);
-                    networkData = await tcs.Task;
+                    ctr.Dispose();
+                    try
+                    {
+                        networkData = await tcs.Task;
+                    }
+                    catch (System.OperationCanceledException)
+                    {
+                        response.ErrorCode = WifiErrorCodes.UnknownError;
+                        response.ErrorMessage = "Operation canceled.";
+                        return response;
+                    }
 
                     if (networkData != null && networkData.StatusId == (int)WifiErrorCodes.Success)
                     {
@@ -616,7 +663,7 @@ namespace MauiWifiManager
             return response;
         }      
 
-        public async Task<WifiManagerResponse<NetworkData>> RequestNetwork(WifiManager wifiManager, string ssid, string password) 
+        public async Task<WifiManagerResponse<NetworkData>> RequestNetwork(WifiManager wifiManager, string ssid, string password, CancellationToken cancellationToken = default) 
         {
             var response = new WifiManagerResponse<NetworkData>();
             var networkData = new NetworkData();
@@ -689,8 +736,34 @@ namespace MauiWifiManager
                         _ConnectivityManager?.RequestNetwork(request, networkCallback);
                         _Requested = true;
                     }
+
+                    // Register cancellation to unregister callback and cancel the TCS
+                    CancellationTokenRegistration ctr = default;
+                    if (cancellationToken.CanBeCanceled)
+                    {
+                        ctr = cancellationToken.Register(() =>
+                        {
+                            try { _ConnectivityManager?.UnregisterNetworkCallback(networkCallback); } catch { }
+                            tcs.TrySetCanceled();
+                        });
+                    }
+
                     // Await the task and set response accordingly
-                    networkData = await tcs.Task;
+                    try
+                    {
+                        networkData = await tcs.Task;
+                    }
+                    catch (System.OperationCanceledException)
+                    {
+                        response.ErrorCode = WifiErrorCodes.UnknownError;
+                        response.ErrorMessage = "Operation canceled.";
+                        ctr.Dispose();
+                        return response;
+                    }
+                    finally
+                    {
+                        ctr.Dispose();
+                    }
                     if (networkData != null && networkData.StatusId == 1)
                     {
                         System.Diagnostics.Debug.WriteLine($"Wi-Fi connected successfully.");

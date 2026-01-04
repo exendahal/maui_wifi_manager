@@ -1,17 +1,10 @@
 ﻿using MauiWifiManager.Abstractions;
 using MauiWifiManager.Helpers;
-using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Linq;
 using System.Net;
 using System.Net.NetworkInformation;
-using System.Threading.Tasks;
 using Windows.Devices.WiFi;
-using Windows.Networking;
 using Windows.Networking.Connectivity;
 using Windows.Security.Credentials;
-using Windows.System;
 
 namespace MauiWifiManager
 {
@@ -72,7 +65,7 @@ namespace MauiWifiManager
             adapter = await WiFiAdapter.FromIdAsync(result[0].Id);
             if (adapter != null)
             {
-                await adapter.ScanAsync();
+                await adapter.ScanAsync().AsTask(cancellationToken);
                 WiFiAvailableNetwork? wiFiAvailableNetwork = null;
                 foreach (var network in adapter.NetworkReport.AvailableNetworks)
                 {
@@ -84,7 +77,7 @@ namespace MauiWifiManager
                 }
                 if (wiFiAvailableNetwork != null)
                 {
-                    var status = await adapter.ConnectAsync(wiFiAvailableNetwork, WiFiReconnectionKind.Automatic, credential);
+                    var status = await adapter.ConnectAsync(wiFiAvailableNetwork, WiFiReconnectionKind.Automatic, credential).AsTask(cancellationToken);
                     if (status.ConnectionStatus == WiFiConnectionStatus.Success)
                     {
                         WifiLogger.LogInfo("Connected successfully to the network.");
@@ -151,6 +144,8 @@ namespace MauiWifiManager
         /// </summary>
         public Task<WifiManagerResponse<NetworkData>> GetNetworkInfo(CancellationToken cancellationToken = default)
         {
+            if (cancellationToken.IsCancellationRequested)
+                return Task.FromCanceled<WifiManagerResponse<NetworkData>>(cancellationToken);
             var response = new WifiManagerResponse<NetworkData>();
             var networkData = new NetworkData();
 
@@ -247,7 +242,7 @@ namespace MauiWifiManager
                     {
                         var wifiAdapter = result[0];
                         WifiLogger.LogInfo("Wi-Fi Scan started.");
-                        await wifiAdapter.ScanAsync();
+                        await wifiAdapter.ScanAsync().AsTask(cancellationToken);
                         var availableNetworks = wifiAdapter.NetworkReport.AvailableNetworks;
                         foreach (var network in availableNetworks)
                         {
