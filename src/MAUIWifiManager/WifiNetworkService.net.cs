@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using MAUIWifiManager;
 using MauiWifiManager.Abstractions;
 
 namespace MauiWifiManager
@@ -14,7 +15,7 @@ namespace MauiWifiManager
     {
         public WifiNetworkService() { }
 
-        public Task<WifiManagerResponse<NetworkData>> ConnectWifi(string ssid, string password)
+        public Task<WifiManagerResponse<NetworkData>> ConnectWifi(string identifier, string password, WifiNetworkIdentifier type = WifiNetworkIdentifier.Ssid)
         {
             return Task.FromResult(WifiManagerResponse<NetworkData>.ErrorResponse(WifiErrorCodes.NetworkUnavailable, "Platform Wi-Fi implementation is not available in this build."));
         }

@@ -10,6 +10,7 @@ using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Threading.Tasks;
+using MAUIWifiManager;
 using SystemConfiguration;
 using UIKit;
 
@@ -30,19 +31,28 @@ namespace MauiWifiManager
         /// <summary>
         /// Connect to Wifi
         /// </summary>
-        /// <param name="ssid"></param>
+        /// <param name="identifier"></param>
         /// <param name="password"></param>
+        /// <param name="type"></param>
         /// <returns></returns>
-        public async Task<WifiManagerResponse<NetworkData>> ConnectWifi(string ssid, string password)
+        public async Task<WifiManagerResponse<NetworkData>> ConnectWifi(string identifier, string password, WifiNetworkIdentifier type = WifiNetworkIdentifier.Ssid)
         {
            
+            if (type == WifiNetworkIdentifier.Bssid)
+            {
+                Debug.WriteLine("Connecting by BSSID is not supported on iOS.");
+                return WifiManagerResponse<NetworkData>.ErrorResponse(
+                    WifiErrorCodes.UnsupportedHardware,
+                    "Connecting by BSSID is not supported on iOS.");
+            }
+
             try
             {
                 // Remove any existing configuration for the SSID
-                NEHotspotConfigurationManager.SharedManager.RemoveConfiguration(ssid);
+                NEHotspotConfigurationManager.SharedManager.RemoveConfiguration(identifier);
 
                 // Create a new configuration for the SSID and password
-                var config = new NEHotspotConfiguration(ssid, password, isWep: false)
+                var config = new NEHotspotConfiguration(identifier, password, isWep: false)
                 {
                     JoinOnce = false
                 };

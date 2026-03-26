@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using MAUIWifiManager;
 
 namespace MauiWifiManager
 {
@@ -13,7 +14,7 @@ namespace MauiWifiManager
         /// <summary>
         /// Connects to a Wi-Fi network with the specified SSID and password.
         /// </summary>
-        Task<WifiManagerResponse<NetworkData>> ConnectWifi(string ssid, string password);
+        Task<WifiManagerResponse<NetworkData>> ConnectWifi(string identifier, string password, WifiNetworkIdentifier type = WifiNetworkIdentifier.Ssid);
 
         /// <summary>
         /// Retrieves details of the currently connected Wi-Fi network.

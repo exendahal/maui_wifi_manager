@@ -9,6 +9,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.Versioning;
 using System.Threading.Tasks;
+using MAUIWifiManager;
 using static Android.Provider.Settings;
 using Context = Android.Content.Context;
 
@@ -49,7 +50,7 @@ namespace MauiWifiManager
         /// <summary>
         /// Connect Wi-Fi
         /// </summary>
-        public async Task<WifiManagerResponse<NetworkData>> ConnectWifi(string ssid, string password)
+        public async Task<WifiManagerResponse<NetworkData>> ConnectWifi(string identifier, string password, WifiNetworkIdentifier type = WifiNetworkIdentifier.Ssid)
         {
             var response = new WifiManagerResponse<NetworkData>();
             var networkData = new NetworkData();
@@ -75,14 +76,21 @@ namespace MauiWifiManager
                         wifiManager.SetWifiEnabled(true); // Enable Wi-Fi if not already enabled
                     }
                     string wifiSsid = wifiManager.ConnectionInfo?.SSID?.ToString() ?? string.Empty;
-                    if (wifiSsid != string.Format("\"{0}\"", ssid))
+                    if (wifiSsid != string.Format("\"{0}\"", identifier))
                     {
                         System.Diagnostics.Debug.WriteLine("Wi-Fi connection initiated successfully.");
                         WifiConfiguration wifiConfig = new WifiConfiguration
                         {
-                            Ssid = string.Format("\"{0}\"", ssid),
                             PreSharedKey = string.Format("\"{0}\"", password)
                         };
+                        if (type == WifiNetworkIdentifier.Bssid)
+                        {
+                            wifiConfig.Bssid = identifier;
+                        }
+                        else
+                        {
+                            wifiConfig.Ssid = string.Format("\"{0}\"", identifier);
+                        }
                         int netId = wifiManager.AddNetwork(wifiConfig);
                         wifiManager.Disconnect();
                         wifiManager.EnableNetwork(netId, true);
@@ -104,12 +112,12 @@ namespace MauiWifiManager
                 else if (OperatingSystem.IsAndroidVersionAtLeast(29) && !OperatingSystem.IsAndroidVersionAtLeast(30))
                 {
                     //Android version is 29(Android 10)
-                    response = await RequestNetwork(wifiManager, ssid, password);
+                    response = await RequestNetwork(wifiManager, identifier, password, type);
                 }
                 else
                 {
                     //Android version is greater than 29(Android 10)
-                    response = await AddWifiSuggestion(wifiManager, ssid, password);
+                    response = await AddWifiSuggestion(wifiManager, identifier, password, type);
                 }
             }
             catch (Exception ex)
@@ -431,7 +439,7 @@ namespace MauiWifiManager
             return Task.FromResult(response);
         }
 
-        private async Task<WifiManagerResponse<NetworkData>> AddWifiSuggestion(WifiManager wifiManager, string ssid, string psk)
+        private async Task<WifiManagerResponse<NetworkData>> AddWifiSuggestion(WifiManager wifiManager, string ssid, string psk, WifiNetworkIdentifier type = WifiNetworkIdentifier.Ssid)
         {
             var response = new WifiManagerResponse<NetworkData>();
             var networkData = new NetworkData();
@@ -441,10 +449,18 @@ namespace MauiWifiManager
                 try
                 {
                     TaskCompletionSource<NetworkData> tcs = new();
+                    var builder = new WifiNetworkSuggestion.Builder();
+                    if (type == WifiNetworkIdentifier.Bssid)
+                    {
+                        builder.SetBssid(Android.Net.MacAddress.FromString(ssid));
+                    }
+                    else
+                    {
+                        builder.SetSsid(ssid);
+                    }
                     var suggestions = new List<IParcelable>
                                     {
-                                       new WifiNetworkSuggestion.Builder()
-                                        .SetSsid(ssid)
+                                       builder
                                         .SetWpa2Passphrase(psk)
                                         .SetIsUserInteractionRequired(true)
                                         .Build()
@@ -604,7 +620,7 @@ namespace MauiWifiManager
             return response;
         }      
 
-        public async Task<WifiManagerResponse<NetworkData>> RequestNetwork(WifiManager wifiManager, string ssid, string password) 
+        public async Task<WifiManagerResponse<NetworkData>> RequestNetwork(WifiManager wifiManager, string ssid, string password, WifiNetworkIdentifier type = WifiNetworkIdentifier.Ssid)
         {
             var response = new WifiManagerResponse<NetworkData>();
             var networkData = new NetworkData();
@@ -631,7 +647,16 @@ namespace MauiWifiManager
                 if (OperatingSystem.IsAndroidVersionAtLeast(29) && !OperatingSystem.IsAndroidVersionAtLeast(30))
                 {
                     // Creating a connection using this API does not provide an internet connection to the app or to the device.
-                    var specifier = new WifiNetworkSpecifier.Builder().SetSsid(ssid).SetWpa2Passphrase(password).Build();
+                    var specifierBuilder = new WifiNetworkSpecifier.Builder();
+                    if (type == WifiNetworkIdentifier.Bssid)
+                    {
+                        specifierBuilder.SetBssid(Android.Net.MacAddress.FromString(ssid));
+                    }
+                    else
+                    {
+                        specifierBuilder.SetSsid(ssid);
+                    }
+                    var specifier = specifierBuilder.SetWpa2Passphrase(password).Build();
                     var request = new NetworkRequest.Builder()?
                         .AddTransportType(TransportType.Wifi)?
                         .SetNetworkSpecifier(specifier)?

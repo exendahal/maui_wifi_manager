@@ -11,6 +11,7 @@ using Windows.Networking;
 using Windows.Networking.Connectivity;
 using Windows.Security.Credentials;
 using Windows.System;
+using MAUIWifiManager;
 
 namespace MauiWifiManager
 {
@@ -26,7 +27,7 @@ namespace MauiWifiManager
         /// <summary>
         /// Connect Wi-Fi
         /// </summary>
-        public async Task<WifiManagerResponse<NetworkData>> ConnectWifi(string ssid, string password)
+        public async Task<WifiManagerResponse<NetworkData>> ConnectWifi(string identifier, string password, WifiNetworkIdentifier type = WifiNetworkIdentifier.Ssid)
         {
             var response = new WifiManagerResponse<NetworkData>();
             var credential = new PasswordCredential
@@ -59,7 +60,8 @@ namespace MauiWifiManager
                 WiFiAvailableNetwork? wiFiAvailableNetwork = null;
                 foreach (var network in adapter.NetworkReport.AvailableNetworks)
                 {
-                    if (network.Ssid == ssid)
+                    if (type == WifiNetworkIdentifier.Ssid && network.Ssid == identifier ||
+                        type == WifiNetworkIdentifier.Bssid && network.Bssid == identifier)
                     {
                         wiFiAvailableNetwork = network;
                         break;
