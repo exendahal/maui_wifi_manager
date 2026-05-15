@@ -4,6 +4,8 @@ on:
   push:
     tags:
       - "[0-9]+.[0-9]+.[0-9]+"
+      - "[0-9]+.[0-9]+.[0-9]+-beta"
+      - "[0-9]+.[0-9]+.[0-9]+-beta[0-9]+"
       - "[0-9]+.[0-9]+.[0-9]+-preview[0-9]+"
 
 jobs:
@@ -29,16 +31,16 @@ jobs:
       - name: Get version information from tag
         id: get_version
         run: |
-          echo "version=${{ github.ref_name }}" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "version=${{ github.ref_name }}" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
 
       - name: Restore dependencies
         run: dotnet restore samples\DemoApp.csproj
 
       - name: Build
-        run: dotnet build src\MAUIWifiManager\MauiWifiManager.csproj -c Release /p:Version=${{ env.version }}
+        run: dotnet build src\MAUIWifiManager\MauiWifiManager.csproj -c Release /p:Version=${{ steps.get_version.outputs.version }}
 
       - name: Pack
-        run: dotnet pack src\MAUIWifiManager\MauiWifiManager.csproj -c Release /p:Version=${{ env.version }} --no-build --output .
+        run: dotnet pack src\MAUIWifiManager\MauiWifiManager.csproj -c Release /p:Version=${{ steps.get_version.outputs.version }} --no-build --output .
 
       - name: Push
         run: dotnet nuget push "*.nupkg" -s https://api.nuget.org/v3/index.json -k ${{ secrets.NUGET_API_KEY }} --skip-duplicate
