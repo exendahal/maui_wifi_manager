@@ -24,7 +24,7 @@ public partial class NetworkInfo : ContentPage
             await LoadAndRenderCurrentNetworkInfo();
         }
         else
-            await DisplayAlert("No location permission", "Please provide location permission", "OK");
+            await DisplayAlertAsync("No location permission", "Please provide location permission", "OK");
     }
 
     protected override void OnDisappearing()

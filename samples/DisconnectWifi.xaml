@@ -19,7 +19,7 @@
         <Image HeightRequest="160" Source="dotnet_bot.png" />
         <Label
             FontSize="Title"
-            HorizontalOptions="CenterAndExpand"
+            HorizontalOptions="Center"
             Text="Disconnect Wi-Fi"
             TextColor="{StaticResource SecondaryDarkText}"
             TextTransform="Uppercase" />
