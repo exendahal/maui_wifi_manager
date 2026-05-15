@@ -38,7 +38,22 @@ namespace MauiWifiManager
                 }
                 return ret;
             }
-        }      
+        }
+
+        /// <summary>
+        /// Raised when the currently connected Wi-Fi network changes.
+        /// </summary>
+        public static event EventHandler<Abstractions.WifiNetworkChangedEventArgs>? WifiNetworkChanged
+        {
+            add => Current.WifiNetworkChanged += value;
+            remove
+            {
+                if (_Implementation != null && _Implementation.IsValueCreated)
+                {
+                    _Implementation.Value.WifiNetworkChanged -= value;
+                }
+            }
+        }
 
         internal static Exception NotImplementedInReferenceAssembly()
         {

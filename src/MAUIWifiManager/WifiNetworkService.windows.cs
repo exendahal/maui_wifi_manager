@@ -19,6 +19,21 @@ namespace MauiWifiManager
     /// </summary>
     public class WifiNetworkService : IWifiNetworkService
     {
+        private EventHandler<WifiNetworkChangedEventArgs>? _wifiNetworkChanged;
+        private readonly object _monitorLock = new();
+        private NetworkData? _lastKnownNetwork;
+        private bool _isMonitoring;
+
+        public event EventHandler<WifiNetworkChangedEventArgs>? WifiNetworkChanged
+        {
+            add
+            {
+                _wifiNetworkChanged += value;
+                EnsureMonitoringStarted();
+            }
+            remove => _wifiNetworkChanged -= value;
+        }
+
         public WifiNetworkService()
         {
         }
@@ -209,7 +224,7 @@ namespace MauiWifiManager
         /// </summary>
         public void Dispose()
         {
-
+            StopMonitoring();
         }
 
         /// <summary>
@@ -271,6 +286,120 @@ namespace MauiWifiManager
         public async Task<bool> OpenWirelessSetting()
         {
             return await Windows.System.Launcher.LaunchUriAsync(new Uri("ms-settings:network"));
+        }
+
+        private void EnsureMonitoringStarted()
+        {
+            lock (_monitorLock)
+            {
+                if (_isMonitoring)
+                {
+                    return;
+                }
+
+                NetworkChange.NetworkAddressChanged += OnNetworkChanged;
+                NetworkChange.NetworkAvailabilityChanged += OnNetworkAvailabilityChanged;
+                _isMonitoring = true;
+            }
+
+            _ = RefreshSnapshotAsync(raiseEvent: false);
+        }
+
+        private void StopMonitoring()
+        {
+            lock (_monitorLock)
+            {
+                if (!_isMonitoring)
+                {
+                    return;
+                }
+
+                NetworkChange.NetworkAddressChanged -= OnNetworkChanged;
+                NetworkChange.NetworkAvailabilityChanged -= OnNetworkAvailabilityChanged;
+                _isMonitoring = false;
+                _lastKnownNetwork = null;
+            }
+        }
+
+        private void OnNetworkChanged(object? sender, EventArgs e)
+        {
+            _ = RefreshSnapshotAsync(raiseEvent: true);
+        }
+
+        private void OnNetworkAvailabilityChanged(object? sender, NetworkAvailabilityEventArgs e)
+        {
+            _ = RefreshSnapshotAsync(raiseEvent: true);
+        }
+
+        private async Task RefreshSnapshotAsync(bool raiseEvent)
+        {
+            NetworkData? currentNetwork = null;
+
+            try
+            {
+                var info = await GetNetworkInfo();
+                if (info.ErrorCode == WifiErrorCodes.Success && info.Data != null)
+                {
+                    currentNetwork = CloneNetworkData(info.Data);
+                }
+            }
+            catch
+            {
+                currentNetwork = null;
+            }
+
+            NetworkData? oldNetwork;
+            bool changed;
+
+            lock (_monitorLock)
+            {
+                oldNetwork = CloneNetworkData(_lastKnownNetwork);
+                changed = !AreSameNetwork(_lastKnownNetwork, currentNetwork);
+                _lastKnownNetwork = CloneNetworkData(currentNetwork);
+            }
+
+            if (raiseEvent && changed)
+            {
+                _wifiNetworkChanged?.Invoke(this, new WifiNetworkChangedEventArgs(oldNetwork, CloneNetworkData(currentNetwork)));
+            }
+        }
+
+        private static bool AreSameNetwork(NetworkData? first, NetworkData? second)
+        {
+            if (first == null && second == null)
+            {
+                return true;
+            }
+
+            if (first == null || second == null)
+            {
+                return false;
+            }
+
+            return string.Equals(first.Ssid, second.Ssid, StringComparison.Ordinal)
+                && string.Equals(first.Bssid?.ToString(), second.Bssid?.ToString(), StringComparison.Ordinal)
+                && first.IpAddress == second.IpAddress;
+        }
+
+        private static NetworkData? CloneNetworkData(NetworkData? source)
+        {
+            if (source == null)
+            {
+                return null;
+            }
+
+            return new NetworkData
+            {
+                StatusId = source.StatusId,
+                Ssid = source.Ssid,
+                IpAddress = source.IpAddress,
+                GatewayAddress = source.GatewayAddress,
+                DhcpServerAddress = source.DhcpServerAddress,
+                NativeObject = source.NativeObject,
+                Bssid = source.Bssid,
+                SignalStrength = source.SignalStrength,
+                SecurityType = source.SecurityType
+            };
         }
 
         private string GetSecurityType(NetworkAuthenticationType authType)

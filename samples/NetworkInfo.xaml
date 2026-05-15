@@ -206,6 +206,31 @@
                         VerticalOptions="Start" />
                 </Border>
             </Grid>
+
+            <Border
+                Margin="20,0,20,20"
+                Padding="12"
+                Stroke="LightGray"
+                StrokeThickness="1">
+                <VerticalStackLayout Spacing="6">
+                    <Label
+                        FontAttributes="Bold"
+                        FontSize="16"
+                        Text="Wi-Fi Change Event Example" />
+                    <Label
+                        FontSize="14"
+                        Text="Updates when Wi-Fi changes from OS or app actions." />
+                    <Label
+                        x:Name="wifiChangeStatus"
+                        FontSize="14"
+                        Text="Not subscribed" />
+                    <Label
+                        x:Name="wifiChangeLog"
+                        FontSize="14"
+                        LineBreakMode="WordWrap"
+                        Text="Waiting for network changes..." />
+                </VerticalStackLayout>
+            </Border>
         </VerticalStackLayout>
     </ScrollView>
 
