@@ -1,5 +1,17 @@
 ﻿namespace MauiWifiManager.Abstractions
 {
+    public sealed class WifiNetworkChangedEventArgs : EventArgs
+    {
+        public WifiNetworkChangedEventArgs(NetworkData? oldNetwork, NetworkData? newNetwork)
+        {
+            OldNetwork = oldNetwork;
+            NewNetwork = newNetwork;
+        }
+
+        public NetworkData? OldNetwork { get; }
+        public NetworkData? NewNetwork { get; }
+    }
+
     public class NetworkData
     {
         public int StatusId { get; set; }

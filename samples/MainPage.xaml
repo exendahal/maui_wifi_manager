@@ -19,7 +19,7 @@
             <Image HeightRequest="160" Source="dotnet_bot.png" />
             <Label
                 FontSize="Title"
-                HorizontalOptions="CenterAndExpand"
+                HorizontalOptions="Center"
                 Text="MAUI Wi-Fi Manager"
                 TextColor="{StaticResource SecondaryDarkText}"
                 TextTransform="Uppercase" />
@@ -42,167 +42,230 @@
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
-                <Frame
+                <Border
                     Grid.Row="0"
                     Grid.Column="0"
                     Margin="10"
                     Padding="10"
                     BackgroundColor="Green"
-                    CornerRadius="10"
-                    HasShadow="True">
+                    StrokeThickness="0">
+                    <Border.StrokeShape>
+                        <RoundRectangle CornerRadius="10" />
+                    </Border.StrokeShape>
+                    <Border.Shadow>
+                        <Shadow
+                            Brush="Black"
+                            Opacity="0.3"
+                            Radius="6"
+                            Offset="0,2" />
+                    </Border.Shadow>
                     <StackLayout>
                         <Image
                             Aspect="AspectFit"
                             HeightRequest="100"
                             Source="dotnet_bot.png" />
                         <Label
-                            HorizontalOptions="CenterAndExpand"
+                            HorizontalOptions="Center"
                             Text="Scan Page"
                             TextTransform="Uppercase"
-                            VerticalOptions="CenterAndExpand" />
+                            VerticalOptions="Center" />
                     </StackLayout>
-                    <Frame.GestureRecognizers>
+                    <Border.GestureRecognizers>
                         <TapGestureRecognizer Tapped="ScanTapped" />
-                    </Frame.GestureRecognizers>
-                </Frame>
-                <Frame
+                    </Border.GestureRecognizers>
+                </Border>
+                <Border
                     Grid.Row="0"
                     Grid.Column="1"
                     Margin="10"
                     Padding="10"
                     BackgroundColor="Purple"
-                    CornerRadius="10"
-                    HasShadow="True">
+                    StrokeThickness="0">
+                    <Border.StrokeShape>
+                        <RoundRectangle CornerRadius="10" />
+                    </Border.StrokeShape>
+                    <Border.Shadow>
+                        <Shadow
+                            Brush="Black"
+                            Opacity="0.3"
+                            Radius="6"
+                            Offset="0,2" />
+                    </Border.Shadow>
                     <StackLayout>
                         <Image
                             Aspect="AspectFit"
                             HeightRequest="100"
                             Source="dotnet_bot.png" />
                         <Label
-                            HorizontalOptions="CenterAndExpand"
+                            HorizontalOptions="Center"
                             Text="Connect Wi-Fi"
                             TextTransform="Uppercase"
-                            VerticalOptions="CenterAndExpand" />
+                            VerticalOptions="Center" />
                     </StackLayout>
-                    <Frame.GestureRecognizers>
+                    <Border.GestureRecognizers>
                         <TapGestureRecognizer CommandParameter="Item2" Tapped="ConnectWiFiTapped" />
-                    </Frame.GestureRecognizers>
-                </Frame>
-                <Frame
+                    </Border.GestureRecognizers>
+                </Border>
+                <Border
                     Grid.Row="1"
                     Grid.Column="0"
                     Margin="10"
                     Padding="10"
                     BackgroundColor="Purple"
-                    CornerRadius="10"
-                    HasShadow="True">
+                    StrokeThickness="0">
+                    <Border.StrokeShape>
+                        <RoundRectangle CornerRadius="10" />
+                    </Border.StrokeShape>
+                    <Border.Shadow>
+                        <Shadow
+                            Brush="Black"
+                            Opacity="0.3"
+                            Radius="6"
+                            Offset="0,2" />
+                    </Border.Shadow>
                     <StackLayout>
                         <Image
                             Aspect="AspectFit"
                             HeightRequest="100"
                             Source="dotnet_bot.png" />
                         <Label
-                            HorizontalOptions="CenterAndExpand"
+                            HorizontalOptions="Center"
                             Text="Network Info"
                             TextTransform="Uppercase"
-                            VerticalOptions="CenterAndExpand" />
+                            VerticalOptions="Center" />
                     </StackLayout>
-                    <Frame.GestureRecognizers>
+                    <Border.GestureRecognizers>
                         <TapGestureRecognizer CommandParameter="Item2" Tapped="NetworkInfoTapped" />
-                    </Frame.GestureRecognizers>
-                </Frame>
-                <Frame
+                    </Border.GestureRecognizers>
+                </Border>
+                <Border
                     Grid.Row="1"
                     Grid.Column="1"
                     Margin="10"
                     Padding="10"
                     BackgroundColor="Green"
-                    CornerRadius="10"
-                    HasShadow="True">
+                    StrokeThickness="0">
+                    <Border.StrokeShape>
+                        <RoundRectangle CornerRadius="10" />
+                    </Border.StrokeShape>
+                    <Border.Shadow>
+                        <Shadow
+                            Brush="Black"
+                            Opacity="0.3"
+                            Radius="6"
+                            Offset="0,2" />
+                    </Border.Shadow>
                     <StackLayout>
                         <Image
                             Aspect="AspectFit"
                             HeightRequest="100"
                             Source="dotnet_bot.png" />
                         <Label
-                            HorizontalOptions="CenterAndExpand"
+                            HorizontalOptions="Center"
                             Text="Disconnect Wi-Fi"
                             TextTransform="Uppercase"
-                            VerticalOptions="CenterAndExpand" />
+                            VerticalOptions="Center" />
                     </StackLayout>
-                    <Frame.GestureRecognizers>
+                    <Border.GestureRecognizers>
                         <TapGestureRecognizer Tapped="DisconnectSettingTapped" />
-                    </Frame.GestureRecognizers>
-                </Frame>
-                <Frame
+                    </Border.GestureRecognizers>
+                </Border>
+                <Border
                     Grid.Row="2"
                     Grid.Column="0"
                     Margin="10"
                     Padding="10"
                     BackgroundColor="Green"
-                    CornerRadius="10"
-                    HasShadow="True">
+                    StrokeThickness="0">
+                    <Border.StrokeShape>
+                        <RoundRectangle CornerRadius="10" />
+                    </Border.StrokeShape>
+                    <Border.Shadow>
+                        <Shadow
+                            Brush="Black"
+                            Opacity="0.3"
+                            Radius="6"
+                            Offset="0,2" />
+                    </Border.Shadow>
                     <StackLayout>
                         <Image
                             Aspect="AspectFit"
                             HeightRequest="100"
                             Source="dotnet_bot.png" />
                         <Label
-                            HorizontalOptions="CenterAndExpand"
+                            HorizontalOptions="Center"
                             Text="Open Wi-Fi Setting"
                             TextTransform="Uppercase"
-                            VerticalOptions="CenterAndExpand" />
+                            VerticalOptions="Center" />
                     </StackLayout>
-                    <Frame.GestureRecognizers>
+                    <Border.GestureRecognizers>
                         <TapGestureRecognizer Tapped="OpenSettingTapped" />
-                    </Frame.GestureRecognizers>
-                </Frame>
-                <Frame
+                    </Border.GestureRecognizers>
+                </Border>
+                <Border
                     Grid.Row="3"
                     Grid.Column="0"
                     Margin="10"
                     Padding="10"
                     BackgroundColor="Purple"
-                    CornerRadius="10"
-                    HasShadow="True">
+                    StrokeThickness="0">
+                    <Border.StrokeShape>
+                        <RoundRectangle CornerRadius="10" />
+                    </Border.StrokeShape>
+                    <Border.Shadow>
+                        <Shadow
+                            Brush="Black"
+                            Opacity="0.3"
+                            Radius="6"
+                            Offset="0,2" />
+                    </Border.Shadow>
                     <StackLayout>
                         <Image
                             Aspect="AspectFit"
                             HeightRequest="100"
                             Source="dotnet_bot.png" />
                         <Label
-                            HorizontalOptions="CenterAndExpand"
+                            HorizontalOptions="Center"
                             Text="About"
                             TextTransform="Uppercase"
-                            VerticalOptions="CenterAndExpand" />
+                            VerticalOptions="Center" />
                     </StackLayout>
-                    <Frame.GestureRecognizers>
+                    <Border.GestureRecognizers>
                         <TapGestureRecognizer Tapped="InfoTapped" />
-                    </Frame.GestureRecognizers>
-                </Frame>
-                <Frame
+                    </Border.GestureRecognizers>
+                </Border>
+                <Border
                     Grid.Row="2"
                     Grid.Column="1"
                     Margin="10"
                     Padding="10"
                     BackgroundColor="Purple"
-                    CornerRadius="10"
-                    HasShadow="True">
+                    StrokeThickness="0">
+                    <Border.StrokeShape>
+                        <RoundRectangle CornerRadius="10" />
+                    </Border.StrokeShape>
+                    <Border.Shadow>
+                        <Shadow
+                            Brush="Black"
+                            Opacity="0.3"
+                            Radius="6"
+                            Offset="0,2" />
+                    </Border.Shadow>
                     <StackLayout>
                         <Image
                             Aspect="AspectFit"
                             HeightRequest="100"
                             Source="dotnet_bot.png" />
                         <Label
-                            HorizontalOptions="CenterAndExpand"
+                            HorizontalOptions="Center"
                             Text="Open Network Setting"
                             TextTransform="Uppercase"
-                            VerticalOptions="CenterAndExpand" />
+                            VerticalOptions="Center" />
                     </StackLayout>
-                    <Frame.GestureRecognizers>
+                    <Border.GestureRecognizers>
                         <TapGestureRecognizer Tapped="NetworkSettingOpen" />
-                    </Frame.GestureRecognizers>
-                </Frame>
+                    </Border.GestureRecognizers>
+                </Border>
             </Grid>
         </StackLayout>
     </ScrollView>

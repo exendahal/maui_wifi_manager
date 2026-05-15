@@ -1,4 +1,4 @@
-using CommunityToolkit.Maui.Views;
+using CommunityToolkit.Maui.Extensions;
 using MauiWifiManager;
 using MauiWifiManager.Abstractions;
 
@@ -14,16 +14,17 @@ public partial class ScanAndConnect : ContentPage
     {
 
         var popup = new ScanQr();
-        var result = await this.ShowPopupAsync(popup);
-        var responseString = result?.ToString();
+        await this.ShowPopupAsync(popup);
+        var responseString = popup.ScanResult;
         if (!string.IsNullOrWhiteSpace(responseString))
         {
-            string ssid = responseString.Split(':')[0];
-            string password = responseString.Split(':')[1];
+            var wifiParts = responseString.Split(':', 2);
+            string ssid = wifiParts[0];
+            string password = wifiParts.Length > 1 ? wifiParts[1] : string.Empty;
             var response = await CrossWifiManager.Current.ConnectWifi(ssid, password);
             if (response.ErrorCode == WifiErrorCodes.Success)
             {
-                await DisplayAlert("Wi-Fi Info", response?.Data?.NativeObject?.ToString(), "OK");
+                await DisplayAlertAsync("Wi-Fi Info", response?.Data?.NativeObject?.ToString(), "OK");
             }
         }       
     }

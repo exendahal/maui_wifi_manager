@@ -11,6 +11,11 @@ namespace MauiWifiManager
     public interface IWifiNetworkService : IDisposable
     {
         /// <summary>
+        /// Raised when the connected Wi-Fi network changes (including OS-driven changes).
+        /// </summary>
+        event EventHandler<WifiNetworkChangedEventArgs>? WifiNetworkChanged;
+
+        /// <summary>
         /// Connects to a Wi-Fi network with the specified SSID and password.
         /// </summary>
         Task<WifiManagerResponse<NetworkData>> ConnectWifi(string ssid, string password);

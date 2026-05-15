@@ -5,6 +5,8 @@ namespace DemoApp;
 
 public partial class ScanQr : Popup
 {
+    public string? ScanResult { get; private set; }
+
 	public ScanQr()
 	{
 		InitializeComponent();
@@ -16,7 +18,7 @@ public partial class ScanQr : Popup
         };
     }
 
-    private void BarcodesDetected(object sender, BarcodeDetectionEventArgs e)
+    private async void BarcodesDetected(object sender, BarcodeDetectionEventArgs e)
     {
         var first = e.Results.FirstOrDefault();
         if (first != null)
@@ -25,9 +27,9 @@ public partial class ScanQr : Popup
             {
                 var ssid = first.Value.Split(new[] { "S:" }, StringSplitOptions.None)[1].Split(';')[0];
                 var password = first.Value.Split(new[] { "P:" }, StringSplitOptions.None)[1].Split(';')[0];
-                string result = ssid + ":" +password;
+                ScanResult = ssid + ":" + password;
                 barcodeReader.IsDetecting = false;
-                Close(result);
+                await CloseAsync();
             }
         }
     }

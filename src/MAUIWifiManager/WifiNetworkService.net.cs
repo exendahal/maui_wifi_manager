@@ -12,6 +12,8 @@ namespace MauiWifiManager
     /// </summary>
     public class WifiNetworkService : IWifiNetworkService
     {
+        public event EventHandler<WifiNetworkChangedEventArgs>? WifiNetworkChanged;
+
         public WifiNetworkService() { }
 
         public Task<WifiManagerResponse<NetworkData>> ConnectWifi(string ssid, string password)

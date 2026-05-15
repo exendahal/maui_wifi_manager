@@ -22,6 +22,7 @@ The Wi-Fi Manager for .NET MAUI is a simple and powerful library that helps you 
 
 - **Connect to Wi-Fi**: Connect to Wi-Fi networks using SSID and password.
 - **Get Network Info**: View details about the currently connected network.
+- **Observe Wi-Fi Changes**: Subscribe to connected Wi-Fi changes (including OS-driven changes).
 - **Disconnect Wi-Fi**: Disconnect from a specific Wi-Fi network.
 - **Open Wi-Fi Settings**: Provide quick access to device Wi-Fi settings.
 - **Open Wireless Settings**: Provide quick access to device wireless settings.
@@ -113,6 +114,26 @@ To retrieve details of the currently connected Wi-Fi network:
 
 ```csharp
 var response = await CrossWifiManager.Current.GetNetworkInfo();
+```
+
+---
+
+### Listen for Wi-Fi Network Changes
+
+To react when the connected Wi-Fi changes (for example, when the user changes networks from system settings):
+
+```csharp
+CrossWifiManager.WifiNetworkChanged += (_, args) =>
+{
+    var oldSsid = args.OldNetwork?.Ssid;
+    var newSsid = args.NewNetwork?.Ssid;
+
+    // Example: show a warning if user moved off your required SSID.
+    if (!string.Equals(newSsid, "your-SSID", StringComparison.Ordinal))
+    {
+        // Update UI / notify user
+    }
+};
 ```
 
 ---
