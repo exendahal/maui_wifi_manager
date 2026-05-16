@@ -47,7 +47,7 @@ namespace MauiWifiManager
         /// <param name="ssid"></param>
         /// <param name="password"></param>
         /// <returns></returns>
-        public async Task<WifiManagerResponse<NetworkData>> ConnectWifi(string ssid, string password)
+        public async Task<WifiManagerResponse<NetworkData>> ConnectWifi(string ssid, string password, string? bssid = null)
         {
            
             try

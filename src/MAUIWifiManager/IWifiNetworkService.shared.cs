@@ -17,8 +17,11 @@ namespace MauiWifiManager
 
         /// <summary>
         /// Connects to a Wi-Fi network with the specified SSID and password.
+        /// When provided, bssid targets a specific access point for that SSID.
+        /// BSSID-targeted connection is supported on Android and Windows.
+        /// On Apple platforms, the OS API does not support selecting a BSSID for connect.
         /// </summary>
-        Task<WifiManagerResponse<NetworkData>> ConnectWifi(string ssid, string password);
+        Task<WifiManagerResponse<NetworkData>> ConnectWifi(string ssid, string password, string? bssid = null);
 
         /// <summary>
         /// Retrieves details of the currently connected Wi-Fi network.

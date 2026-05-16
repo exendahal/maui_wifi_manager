@@ -16,7 +16,7 @@ namespace MauiWifiManager
 
         public WifiNetworkService() { }
 
-        public Task<WifiManagerResponse<NetworkData>> ConnectWifi(string ssid, string password)
+        public Task<WifiManagerResponse<NetworkData>> ConnectWifi(string ssid, string password, string? bssid = null)
         {
             return Task.FromResult(WifiManagerResponse<NetworkData>.ErrorResponse(WifiErrorCodes.NetworkUnavailable, "Platform Wi-Fi implementation is not available in this build."));
         }

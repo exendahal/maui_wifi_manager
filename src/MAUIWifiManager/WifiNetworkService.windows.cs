@@ -41,7 +41,7 @@ namespace MauiWifiManager
         /// <summary>
         /// Connect Wi-Fi
         /// </summary>
-        public async Task<WifiManagerResponse<NetworkData>> ConnectWifi(string ssid, string password)
+        public async Task<WifiManagerResponse<NetworkData>> ConnectWifi(string ssid, string password, string? bssid = null)
         {
             var response = new WifiManagerResponse<NetworkData>();
             var credential = new PasswordCredential
@@ -74,7 +74,7 @@ namespace MauiWifiManager
                 WiFiAvailableNetwork? wiFiAvailableNetwork = null;
                 foreach (var network in adapter.NetworkReport.AvailableNetworks)
                 {
-                    if (network.Ssid == ssid)
+                    if (network.Ssid == ssid && (string.IsNullOrWhiteSpace(bssid) || string.Equals(network.Bssid, bssid, StringComparison.OrdinalIgnoreCase)))
                     {
                         wiFiAvailableNetwork = network;
                         break;
@@ -116,9 +116,13 @@ namespace MauiWifiManager
                 }
                 else
                 {
-                    Debug.WriteLine("The specified network was not found.");
+                    Debug.WriteLine(string.IsNullOrWhiteSpace(bssid)
+                        ? "The specified network was not found."
+                        : "The specified SSID/BSSID network was not found.");
                     response.ErrorCode = WifiErrorCodes.NoConnection;
-                    response.ErrorMessage = "The specified network was not found.";
+                    response.ErrorMessage = string.IsNullOrWhiteSpace(bssid)
+                        ? "The specified network was not found."
+                        : "The specified SSID/BSSID network was not found.";
                 }
             }
             else

@@ -64,7 +64,7 @@ namespace MauiWifiManager
         /// <summary>
         /// Connect Wi-Fi
         /// </summary>
-        public async Task<WifiManagerResponse<NetworkData>> ConnectWifi(string ssid, string password)
+        public async Task<WifiManagerResponse<NetworkData>> ConnectWifi(string ssid, string password, string? bssid = null)
         {
             var response = new WifiManagerResponse<NetworkData>();
             var networkData = new NetworkData();
@@ -98,6 +98,10 @@ namespace MauiWifiManager
                             Ssid = string.Format("\"{0}\"", ssid),
                             PreSharedKey = string.Format("\"{0}\"", password)
                         };
+                        if (!string.IsNullOrWhiteSpace(bssid))
+                        {
+                            wifiConfig.Bssid = bssid;
+                        }
                         int netId = wifiManager.AddNetwork(wifiConfig);
                         wifiManager.Disconnect();
                         wifiManager.EnableNetwork(netId, true);
@@ -119,12 +123,12 @@ namespace MauiWifiManager
                 else if (OperatingSystem.IsAndroidVersionAtLeast(29) && !OperatingSystem.IsAndroidVersionAtLeast(30))
                 {
                     //Android version is 29(Android 10)
-                    response = await RequestNetwork(wifiManager, ssid, password);
+                    response = await RequestNetwork(wifiManager, ssid, password, bssid);
                 }
                 else
                 {
                     //Android version is greater than 29(Android 10)
-                    response = await AddWifiSuggestion(wifiManager, ssid, password);
+                    response = await AddWifiSuggestion(wifiManager, ssid, password, bssid);
                 }
             }
             catch (Exception ex)
@@ -446,7 +450,7 @@ namespace MauiWifiManager
             return Task.FromResult(response);
         }
 
-        private async Task<WifiManagerResponse<NetworkData>> AddWifiSuggestion(WifiManager wifiManager, string ssid, string psk)
+        private async Task<WifiManagerResponse<NetworkData>> AddWifiSuggestion(WifiManager wifiManager, string ssid, string psk, string? bssid = null)
         {
             var response = new WifiManagerResponse<NetworkData>();
             var networkData = new NetworkData();
@@ -456,14 +460,20 @@ namespace MauiWifiManager
                 try
                 {
                     TaskCompletionSource<NetworkData> tcs = new();
+                    var suggestionBuilder = new WifiNetworkSuggestion.Builder()
+                        .SetSsid(ssid)
+                        .SetWpa2Passphrase(psk)
+                        .SetIsUserInteractionRequired(true);
+
+                    if (!string.IsNullOrWhiteSpace(bssid))
+                    {
+                        suggestionBuilder.SetBssid(MacAddress.FromString(bssid));
+                    }
+
                     var suggestions = new List<IParcelable>
-                                    {
-                                       new WifiNetworkSuggestion.Builder()
-                                        .SetSsid(ssid)
-                                        .SetWpa2Passphrase(psk)
-                                        .SetIsUserInteractionRequired(true)
-                                        .Build()
-                                    };
+                    {
+                        suggestionBuilder.Build()
+                    };
                     // Open the Wi-Fi settings
                     var wifiSettingsResponse = await OpenWifiSetting();
                     if (!wifiSettingsResponse)
@@ -499,7 +509,7 @@ namespace MauiWifiManager
                                         if (wifiInfo.SupplicantState == SupplicantState.Completed)
                                         {
                                             var currentSsid = wifiInfo.SSID?.Trim(_TrimChars);
-                                            if (currentSsid == ssid)
+                                            if (currentSsid == ssid && (string.IsNullOrWhiteSpace(bssid) || string.Equals(wifiInfo.BSSID, bssid, StringComparison.OrdinalIgnoreCase)))
                                             {
                                                 networkData.StatusId = (int)WifiErrorCodes.Success;
                                                 networkData.Ssid = currentSsid;
@@ -560,7 +570,7 @@ namespace MauiWifiManager
                                     if (OperatingSystem.IsAndroidVersionAtLeast(30) && !OperatingSystem.IsAndroidVersionAtLeast(31))
                                     {
                                         var currentSsid = wifiManager.ConnectionInfo?.SSID?.Trim(_TrimChars);
-                                        if (currentSsid == ssid)
+                                        if (currentSsid == ssid && (string.IsNullOrWhiteSpace(bssid) || string.Equals(wifiManager.ConnectionInfo?.BSSID, bssid, StringComparison.OrdinalIgnoreCase)))
                                         {
                                             networkData.StatusId = (int)WifiErrorCodes.Success;
                                             networkData.Ssid = currentSsid;
@@ -619,7 +629,7 @@ namespace MauiWifiManager
             return response;
         }      
 
-        public async Task<WifiManagerResponse<NetworkData>> RequestNetwork(WifiManager wifiManager, string ssid, string password) 
+        public async Task<WifiManagerResponse<NetworkData>> RequestNetwork(WifiManager wifiManager, string ssid, string password, string? bssid = null) 
         {
             var response = new WifiManagerResponse<NetworkData>();
             var networkData = new NetworkData();
@@ -646,7 +656,16 @@ namespace MauiWifiManager
                 if (OperatingSystem.IsAndroidVersionAtLeast(29) && !OperatingSystem.IsAndroidVersionAtLeast(30))
                 {
                     // Creating a connection using this API does not provide an internet connection to the app or to the device.
-                    var specifier = new WifiNetworkSpecifier.Builder().SetSsid(ssid).SetWpa2Passphrase(password).Build();
+                    var specifierBuilder = new WifiNetworkSpecifier.Builder()
+                        .SetSsid(ssid)
+                        .SetWpa2Passphrase(password);
+
+                    if (!string.IsNullOrWhiteSpace(bssid))
+                    {
+                        specifierBuilder.SetBssid(MacAddress.FromString(bssid));
+                    }
+
+                    var specifier = specifierBuilder.Build();
                     var request = new NetworkRequest.Builder()?
                         .AddTransportType(TransportType.Wifi)?
                         .SetNetworkSpecifier(specifier)?
@@ -665,7 +684,7 @@ namespace MauiWifiManager
                         {
                             if (!OperatingSystem.IsAndroidVersionAtLeast(31) && OperatingSystem.IsAndroidVersionAtLeast(23))
                             {
-                                if (networkCapabilities.HasCapability(NetCapability.Validated))
+                                if (networkCapabilities.HasCapability(NetCapability.Validated) && (string.IsNullOrWhiteSpace(bssid) || string.Equals(wifiManager.ConnectionInfo?.BSSID, bssid, StringComparison.OrdinalIgnoreCase)))
                                 {
                                     networkData.StatusId = (int)WifiErrorCodes.Success;
                                     networkData.Ssid = wifiManager.ConnectionInfo?.SSID?.Trim(_TrimChars);

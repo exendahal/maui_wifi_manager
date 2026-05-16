@@ -96,6 +96,12 @@ To connect to a Wi-Fi network:
 var response = await CrossWifiManager.Current.ConnectWifi("your-SSID", "your-password");
 ```
 
+To connect to a specific access point for that SSID (optional `bssid`):
+
+```csharp
+var response = await CrossWifiManager.Current.ConnectWifi("your-SSID", "your-password", "aa:bb:cc:dd:ee:ff");
+```
+
 ---
 
 ### Scan for Available Networks
