@@ -10,6 +10,9 @@ namespace MauiWifiManager
     public class WifiNetworkService : IWifiNetworkService
     {
         public event EventHandler<WifiNetworkChangedEventArgs>? WifiNetworkChanged;
+        public event EventHandler<NetworkData>? DeviceDiscovered;
+
+        public bool IsScanning => false;
 
         public WifiNetworkService() { }
 
@@ -71,6 +74,26 @@ namespace MauiWifiManager
                 return Task.FromCanceled<WifiManagerResponse<List<NetworkData>>>(cancellationToken);
             }
             return Task.FromResult(WifiManagerResponse<List<NetworkData>>.ErrorResponse(WifiErrorCodes.NetworkUnavailable, "Platform Wi-Fi implementation is not available in this build."));
+        }
+
+        public Task<WifiManagerResponse<bool>> StartScanningForDevicesAsync(CancellationToken cancellationToken = default)
+        {
+            if (cancellationToken.IsCancellationRequested)
+            {
+                return Task.FromCanceled<WifiManagerResponse<bool>>(cancellationToken);
+            }
+
+            return Task.FromResult(WifiManagerResponse<bool>.ErrorResponse(WifiErrorCodes.NetworkUnavailable, "Platform Wi-Fi implementation is not available in this build."));
+        }
+
+        public Task<WifiManagerResponse<bool>> StopScanningAsync(CancellationToken cancellationToken = default)
+        {
+            if (cancellationToken.IsCancellationRequested)
+            {
+                return Task.FromCanceled<WifiManagerResponse<bool>>(cancellationToken);
+            }
+
+            return Task.FromResult(WifiManagerResponse<bool>.SuccessResponse(false, "No active scan session."));
         }
 
         public Task<bool> OpenWirelessSetting()

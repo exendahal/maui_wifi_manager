@@ -13,6 +13,16 @@ namespace MauiWifiManager
         event EventHandler<WifiNetworkChangedEventArgs>? WifiNetworkChanged;
 
         /// <summary>
+        /// Raised when a Wi-Fi network is discovered while an active scan session is running.
+        /// </summary>
+        event EventHandler<NetworkData>? DeviceDiscovered;
+
+        /// <summary>
+        /// Gets a value indicating whether a scan session is currently running.
+        /// </summary>
+        bool IsScanning { get; }
+
+        /// <summary>
         /// Connects to a Wi-Fi network with the specified SSID and password.
         /// When provided, bssid targets a specific access point for that SSID.
         /// BSSID-targeted connection is supported on Android and Windows.
@@ -69,6 +79,16 @@ namespace MauiWifiManager
         /// Scans for available Wi-Fi networks (Android and Windows only).
         /// </summary>
         Task<WifiManagerResponse<List<NetworkData>>> ScanWifiNetworksAsync(CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Starts a continuous scan session and emits discovered networks through DeviceDiscovered.
+        /// </summary>
+        Task<WifiManagerResponse<bool>> StartScanningForDevicesAsync(CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Stops the currently running scan session.
+        /// </summary>
+        Task<WifiManagerResponse<bool>> StopScanningAsync(CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Opens the device's wireless settings.
