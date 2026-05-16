@@ -51,6 +51,26 @@ namespace MauiWifiManager
             }
         }
 
+        /// <summary>
+        /// Raised when a network is discovered during an active scan session.
+        /// </summary>
+        public static event EventHandler<Abstractions.NetworkData>? DeviceDiscovered
+        {
+            add => Current.DeviceDiscovered += value;
+            remove
+            {
+                if (_Implementation != null && _Implementation.IsValueCreated)
+                {
+                    _Implementation.Value.DeviceDiscovered -= value;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Gets whether the current implementation is scanning for devices.
+        /// </summary>
+        public static bool IsScanning => Current.IsScanning;
+
         internal static Exception NotImplementedInReferenceAssembly()
         {
             return new NotImplementedException("This functionality is not implemented in the portable version of this assembly.  You should reference the NuGet package from your main application project in order to reference the platform-specific implementation.");
@@ -102,6 +122,16 @@ namespace MauiWifiManager
         public static Task<Abstractions.WifiManagerResponse<List<Abstractions.NetworkData>>> ScanWifiNetworksAsync(CancellationToken cancellationToken = default)
         {
             return Current.ScanWifiNetworksAsync(cancellationToken);
+        }
+
+        public static Task<Abstractions.WifiManagerResponse<bool>> StartScanningForDevicesAsync(CancellationToken cancellationToken = default)
+        {
+            return Current.StartScanningForDevicesAsync(cancellationToken);
+        }
+
+        public static Task<Abstractions.WifiManagerResponse<bool>> StopScanningAsync(CancellationToken cancellationToken = default)
+        {
+            return Current.StopScanningAsync(cancellationToken);
         }
 
         public static Task<bool> OpenWirelessSetting()

@@ -17,19 +17,22 @@ namespace MauiWifiManager
     public class WifiNetworkService : IWifiNetworkService
     {
         public NEHotspotHelper _HotspotHelper;
-        private EventHandler<WifiNetworkChangedEventArgs>? _wifiNetworkChanged;
-        private readonly object _monitorLock = new();
-        private NetworkData? _lastKnownNetwork;
-        private bool _isMonitoring;
+        private EventHandler<WifiNetworkChangedEventArgs>? _WifiNetworkChanged;
+        public event EventHandler<NetworkData>? DeviceDiscovered;
+        private readonly object _MonitorLock = new();
+        private NetworkData? _LastKnownNetwork;
+        private bool _IsMonitoring;
+
+        public bool IsScanning => false;
 
         public event EventHandler<WifiNetworkChangedEventArgs>? WifiNetworkChanged
         {
             add
             {
-                _wifiNetworkChanged += value;
+                _WifiNetworkChanged += value;
                 EnsureMonitoringStarted();
             }
-            remove => _wifiNetworkChanged -= value;
+            remove => _WifiNetworkChanged -= value;
         }
 
         public WifiNetworkService()
@@ -316,6 +319,26 @@ namespace MauiWifiManager
             return Task.FromResult(response);
         }
 
+        public Task<WifiManagerResponse<bool>> StartScanningForDevicesAsync(CancellationToken cancellationToken = default)
+        {
+            if (cancellationToken.IsCancellationRequested)
+            {
+                return Task.FromCanceled<WifiManagerResponse<bool>>(cancellationToken);
+            }
+
+            return Task.FromResult(WifiManagerResponse<bool>.ErrorResponse(WifiErrorCodes.WifiNotEnabled, "Continuous scanning is not supported on iOS."));
+        }
+
+        public Task<WifiManagerResponse<bool>> StopScanningAsync(CancellationToken cancellationToken = default)
+        {
+            if (cancellationToken.IsCancellationRequested)
+            {
+                return Task.FromCanceled<WifiManagerResponse<bool>>(cancellationToken);
+            }
+
+            return Task.FromResult(WifiManagerResponse<bool>.SuccessResponse(false, "No active scan session."));
+        }
+
         public async Task<bool> OpenWirelessSetting()
         {
             return await OpenSettings();
@@ -376,16 +399,16 @@ namespace MauiWifiManager
 
         private void EnsureMonitoringStarted()
         {
-            lock (_monitorLock)
+            lock (_MonitorLock)
             {
-                if (_isMonitoring)
+                if (_IsMonitoring)
                 {
                     return;
                 }
 
                 NetworkChange.NetworkAddressChanged += OnNetworkChanged;
                 NetworkChange.NetworkAvailabilityChanged += OnNetworkAvailabilityChanged;
-                _isMonitoring = true;
+                _IsMonitoring = true;
             }
 
             _ = RefreshSnapshotAsync(raiseEvent: false);
@@ -393,17 +416,17 @@ namespace MauiWifiManager
 
         private void StopMonitoring()
         {
-            lock (_monitorLock)
+            lock (_MonitorLock)
             {
-                if (!_isMonitoring)
+                if (!_IsMonitoring)
                 {
                     return;
                 }
 
                 NetworkChange.NetworkAddressChanged -= OnNetworkChanged;
                 NetworkChange.NetworkAvailabilityChanged -= OnNetworkAvailabilityChanged;
-                _isMonitoring = false;
-                _lastKnownNetwork = null;
+                _IsMonitoring = false;
+                _LastKnownNetwork = null;
             }
         }
 
@@ -437,16 +460,16 @@ namespace MauiWifiManager
             NetworkData? oldNetwork;
             bool changed;
 
-            lock (_monitorLock)
+            lock (_MonitorLock)
             {
-                oldNetwork = CloneNetworkData(_lastKnownNetwork);
-                changed = !AreSameNetwork(_lastKnownNetwork, currentNetwork);
-                _lastKnownNetwork = CloneNetworkData(currentNetwork);
+                oldNetwork = CloneNetworkData(_LastKnownNetwork);
+                changed = !AreSameNetwork(_LastKnownNetwork, currentNetwork);
+                _LastKnownNetwork = CloneNetworkData(currentNetwork);
             }
 
             if (raiseEvent && changed)
             {
-                _wifiNetworkChanged?.Invoke(this, new WifiNetworkChangedEventArgs(oldNetwork, CloneNetworkData(currentNetwork)));
+                _WifiNetworkChanged?.Invoke(this, new WifiNetworkChangedEventArgs(oldNetwork, CloneNetworkData(currentNetwork)));
             }
         }
 

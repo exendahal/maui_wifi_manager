@@ -23,6 +23,7 @@ The Wi-Fi Manager for .NET MAUI is a simple and powerful library that helps you 
 - **Connect to Wi-Fi**: Connect to Wi-Fi networks using SSID and password.
 - **Get Network Info**: View details about the currently connected network.
 - **Observe Wi-Fi Changes**: Subscribe to connected Wi-Fi changes (including OS-driven changes).
+- **Discover Networks in Real-Time**: Listen to discovered Wi-Fi networks during an active scan session.
 - **Disconnect Wi-Fi**: Disconnect from a specific Wi-Fi network.
 - **Open Wi-Fi Settings**: Provide quick access to device Wi-Fi settings.
 - **Open Wireless Settings**: Provide quick access to device wireless settings.
@@ -114,6 +115,39 @@ var response = await CrossWifiManager.Current.ScanWifiNetworks();
 
 ---
 
+### Discover Networks in Real-Time (Device Discovery)
+
+Use continuous scanning when you want to update your UI as networks are discovered:
+
+```csharp
+using MauiWifiManager;
+using MauiWifiManager.Abstractions;
+
+CrossWifiManager.DeviceDiscovered += (_, network) =>
+{
+    // Called for each discovered SSID/BSSID while scanning is active.
+    System.Diagnostics.Debug.WriteLine($"Discovered: {network.Ssid} ({network.Bssid})");
+};
+
+var startResponse = await CrossWifiManager.StartScanningForDevicesAsync();
+if (startResponse.ErrorCode == WifiErrorCodes.Success && CrossWifiManager.IsScanning)
+{
+    // Scanning is active
+}
+
+// Later, stop scanning
+var stopResponse = await CrossWifiManager.StopScanningAsync();
+```
+
+Notes:
+
+- `DeviceDiscovered` is raised only while scanning is active.
+- `IsScanning` tells whether a scan session is currently running.
+- Continuous discovery is supported on Android and Windows.
+- iOS does not support Wi-Fi network scanning APIs.
+
+---
+
 ### Get Current Network Info
 
 To retrieve details of the currently connected Wi-Fi network:
@@ -201,6 +235,7 @@ public class WifiManagerResponse<T>
 | Get Current Network Info         | ✅      | ✅        | ✅      | Supported on all platforms.            |
 | Disconnect Wi-Fi                 | ✅      | ✅        | ✅      | Supported on all platforms.            |
 | Scan for Available Wi-Fi Networks| ✅      | ❌        | ✅      | Not supported on iOS.                  |
+| Device Discovery (Event-based)   | ✅      | ❌        | ✅      | Use `DeviceDiscovered` with Start/Stop scan methods. |
 | Open Wireless Settings           | ✅      | ✅*       | ✅      | *Opens app settings on iOS.            |
 | Open Wi-Fi Settings              | ✅      | ✅*       | ✅      | *Opens app settings on iOS.            |
 
