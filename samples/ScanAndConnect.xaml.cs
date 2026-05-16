@@ -21,7 +21,7 @@ public partial class ScanAndConnect : ContentPage
             var wifiParts = responseString.Split(':', 2);
             string ssid = wifiParts[0];
             string password = wifiParts.Length > 1 ? wifiParts[1] : string.Empty;
-            var response = await CrossWifiManager.Current.ConnectWifi(ssid, password);
+            var response = await CrossWifiManager.Current.ConnectWifiAsync(ssid, password);
             if (response.ErrorCode == WifiErrorCodes.Success)
             {
                 await DisplayAlertAsync("Wi-Fi Info", response?.Data?.NativeObject?.ToString(), "OK");

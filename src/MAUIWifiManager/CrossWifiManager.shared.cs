@@ -1,10 +1,6 @@
-﻿using Microsoft.Maui.Hosting;
-using System;
-
-#if ANDROID
+﻿#if ANDROID
 using Microsoft.Maui.LifecycleEvents;
 #endif
-
 namespace MauiWifiManager
 {
     /// <summary>
@@ -58,6 +54,59 @@ namespace MauiWifiManager
         internal static Exception NotImplementedInReferenceAssembly()
         {
             return new NotImplementedException("This functionality is not implemented in the portable version of this assembly.  You should reference the NuGet package from your main application project in order to reference the platform-specific implementation.");
+        }
+
+        [Obsolete("Use ConnectWifiAsync(string ssid, string password) or ConnectWifiAsync(string ssid, string password, string? bssid, CancellationToken cancellationToken = default) instead.")]
+        public static Task<Abstractions.WifiManagerResponse<Abstractions.NetworkData>> ConnectWifi(string ssid, string password, string? bssid = null)
+        {
+            return Current.ConnectWifi(ssid, password, bssid);
+        }
+
+        public static Task<Abstractions.WifiManagerResponse<Abstractions.NetworkData>> ConnectWifiAsync(string ssid, string password, CancellationToken cancellationToken = default)
+        {
+            return Current.ConnectWifiAsync(ssid, password, cancellationToken);
+        }
+
+        public static Task<Abstractions.WifiManagerResponse<Abstractions.NetworkData>> ConnectWifiAsync(string ssid, string password, string? bssid, CancellationToken cancellationToken = default)
+        {
+            return Current.ConnectWifiAsync(ssid, password, bssid, cancellationToken);
+        }
+
+        [Obsolete("Use GetNetworkInfoAsync(CancellationToken cancellationToken = default) instead.")]
+        public static Task<Abstractions.WifiManagerResponse<Abstractions.NetworkData>> GetNetworkInfo()
+        {
+            return Current.GetNetworkInfo();
+        }
+
+        public static Task<Abstractions.WifiManagerResponse<Abstractions.NetworkData>> GetNetworkInfoAsync(CancellationToken cancellationToken = default)
+        {
+            return Current.GetNetworkInfoAsync(cancellationToken);
+        }
+
+        public static void DisconnectWifi(string ssid)
+        {
+            Current.DisconnectWifi(ssid);
+        }
+
+        public static Task<bool> OpenWifiSetting()
+        {
+            return Current.OpenWifiSetting();
+        }
+
+        [Obsolete("Use ScanWifiNetworksAsync(CancellationToken cancellationToken = default) instead.")]
+        public static Task<Abstractions.WifiManagerResponse<List<Abstractions.NetworkData>>> ScanWifiNetworks()
+        {
+            return Current.ScanWifiNetworks();
+        }
+
+        public static Task<Abstractions.WifiManagerResponse<List<Abstractions.NetworkData>>> ScanWifiNetworksAsync(CancellationToken cancellationToken = default)
+        {
+            return Current.ScanWifiNetworksAsync(cancellationToken);
+        }
+
+        public static Task<bool> OpenWirelessSetting()
+        {
+            return Current.OpenWirelessSetting();
         }
 
         /// <summary>

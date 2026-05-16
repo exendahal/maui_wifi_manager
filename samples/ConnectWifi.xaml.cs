@@ -17,7 +17,7 @@ public partial class ConnectWifi : ContentPage
             return;
         }
 
-        var response = await CrossWifiManager.Current.ConnectWifi(WifiSsid.Text, WifiPassword.Text);
+        var response = await CrossWifiManager.Current.ConnectWifiAsync(WifiSsid.Text, WifiPassword.Text);
         if (response.ErrorCode == WifiErrorCodes.Success)
             await DisplayAlertAsync("Wi-Fi Info", response?.Data?.Ssid?.ToString(),"OK");
         else

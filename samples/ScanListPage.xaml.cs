@@ -28,7 +28,7 @@ public partial class ScanListPage : ContentPage
             var response = await DisplayPromptAsync("Connect " + model.SsidName, "Enter password to connect");
             if (!string.IsNullOrWhiteSpace(response) && response.Length >= 8)
             {
-                var status = await CrossWifiManager.Current.ConnectWifi(model.SsidName, response);
+                var status = await CrossWifiManager.Current.ConnectWifiAsync(model.SsidName, response);
             }
         }
     }
@@ -56,7 +56,7 @@ public partial class ScanListPage : ContentPage
             await Task.Delay(1000);
             loading.IsRunning = true;
             scanCollectionView.IsVisible = false;
-            var response = await CrossWifiManager.Current.ScanWifiNetworks();
+            var response = await CrossWifiManager.Current.ScanWifiNetworksAsync();
             if (response.ErrorCode == WifiErrorCodes.Success)
             {
                 networkDataModel = new();

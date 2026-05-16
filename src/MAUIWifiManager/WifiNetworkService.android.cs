@@ -4,12 +4,8 @@ using Android.Net.Wifi;
 using Android.OS;
 using Android.Runtime;
 using MauiWifiManager.Abstractions;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Net.NetworkInformation;
 using System.Runtime.Versioning;
-using System.Threading.Tasks;
 using static Android.Provider.Settings;
 using Context = Android.Content.Context;
 
@@ -64,8 +60,29 @@ namespace MauiWifiManager
         /// <summary>
         /// Connect Wi-Fi
         /// </summary>
-        public async Task<WifiManagerResponse<NetworkData>> ConnectWifi(string ssid, string password, string? bssid = null)
+        [Obsolete("Use ConnectWifiAsync(string ssid, string password, CancellationToken cancellationToken = default) or ConnectWifiAsync(string ssid, string password, string? bssid, CancellationToken cancellationToken = default) instead.")]
+        public Task<WifiManagerResponse<NetworkData>> ConnectWifi(string ssid, string password, string? bssid = null)
         {
+            return ConnectWifiAsync(ssid, password, bssid, CancellationToken.None);
+        }
+
+        /// <summary>
+        /// Connect Wi-Fi
+        /// </summary>
+        public Task<WifiManagerResponse<NetworkData>> ConnectWifiAsync(string ssid, string password, CancellationToken cancellationToken = default)
+        {
+            return ConnectWifiAsync(ssid, password, null, cancellationToken);
+        }
+
+        /// <summary>
+        /// Connect Wi-Fi
+        /// </summary>
+        public async Task<WifiManagerResponse<NetworkData>> ConnectWifiAsync(string ssid, string password, string? bssid, CancellationToken cancellationToken = default)
+        {
+            if (cancellationToken.IsCancellationRequested)
+            {
+                return CreateCanceledResponse<NetworkData>(nameof(ConnectWifi));
+            }
             var response = new WifiManagerResponse<NetworkData>();
             var networkData = new NetworkData();
 
@@ -123,13 +140,17 @@ namespace MauiWifiManager
                 else if (OperatingSystem.IsAndroidVersionAtLeast(29) && !OperatingSystem.IsAndroidVersionAtLeast(30))
                 {
                     //Android version is 29(Android 10)
-                    response = await RequestNetwork(wifiManager, ssid, password, bssid);
+                    response = await RequestNetwork(wifiManager, ssid, password, bssid, cancellationToken);
                 }
                 else
                 {
                     //Android version is greater than 29(Android 10)
-                    response = await AddWifiSuggestion(wifiManager, ssid, password, bssid);
+                    response = await AddWifiSuggestion(wifiManager, ssid, password, bssid, cancellationToken);
                 }
+            }
+            catch (System.OperationCanceledException)
+            {
+                return CreateCanceledResponse<NetworkData>(nameof(ConnectWifi));
             }
             catch (Exception ex)
             {
@@ -177,8 +198,21 @@ namespace MauiWifiManager
         /// <summary>
         /// Get Wi-Fi Network Info
         /// </summary>
-        public async Task<WifiManagerResponse<NetworkData>> GetNetworkInfo()
+        [Obsolete("Use GetNetworkInfoAsync(CancellationToken cancellationToken = default) instead.")]
+        public Task<WifiManagerResponse<NetworkData>> GetNetworkInfo()
         {
+            return GetNetworkInfoAsync(CancellationToken.None);
+        }
+
+        /// <summary>
+        /// Get Wi-Fi Network Info
+        /// </summary>
+        public async Task<WifiManagerResponse<NetworkData>> GetNetworkInfoAsync(CancellationToken cancellationToken = default)
+        {
+            if (cancellationToken.IsCancellationRequested)
+            {
+                return CreateCanceledResponse<NetworkData>(nameof(GetNetworkInfo));
+            }
             var response = new WifiManagerResponse<NetworkData>();
             var networkData = new NetworkData();
             if (!OperatingSystem.IsAndroidVersionAtLeast(31))
@@ -330,7 +364,14 @@ namespace MauiWifiManager
                     connectivityManager?.RequestNetwork(request, networkCallback);
                     connectivityManager?.RegisterNetworkCallback(request, networkCallback);
 
-                    networkData = await tcs.Task;
+                    try
+                    {
+                        networkData = await tcs.Task.WaitAsync(cancellationToken);
+                    }
+                    catch (System.OperationCanceledException)
+                    {
+                        return CreateCanceledResponse<NetworkData>(nameof(GetNetworkInfo));
+                    }
                     if (networkData != null && networkData.StatusId == 1)
                     {
                         System.Diagnostics.Debug.WriteLine($"Fetched Wi-Fi connection info successfully.");
@@ -390,8 +431,22 @@ namespace MauiWifiManager
         /// <summary>
         /// Scan Wi-Fi Networks
         /// </summary>
+        [Obsolete("Use ScanWifiNetworksAsync(CancellationToken cancellationToken = default) instead.")]
         public Task<WifiManagerResponse<List<NetworkData>>> ScanWifiNetworks()
         {
+            return ScanWifiNetworksAsync(CancellationToken.None);
+        }
+
+        /// <summary>
+        /// Scan Wi-Fi Networks
+        /// </summary>
+        public Task<WifiManagerResponse<List<NetworkData>>> ScanWifiNetworksAsync(CancellationToken cancellationToken = default)
+        {
+            if (cancellationToken.IsCancellationRequested)
+            {
+                return Task.FromResult(CreateCanceledResponse<List<NetworkData>>(nameof(ScanWifiNetworks)));
+            }
+
             var response = new WifiManagerResponse<List<NetworkData>>();
             try
             {
@@ -450,8 +505,12 @@ namespace MauiWifiManager
             return Task.FromResult(response);
         }
 
-        private async Task<WifiManagerResponse<NetworkData>> AddWifiSuggestion(WifiManager wifiManager, string ssid, string psk, string? bssid = null)
+        private async Task<WifiManagerResponse<NetworkData>> AddWifiSuggestion(WifiManager wifiManager, string ssid, string psk, string? bssid = null, CancellationToken cancellationToken = default)
         {
+            if (cancellationToken.IsCancellationRequested)
+            {
+                return CreateCanceledResponse<NetworkData>(nameof(AddWifiSuggestion));
+            }
             var response = new WifiManagerResponse<NetworkData>();
             var networkData = new NetworkData();
 
@@ -598,7 +657,8 @@ namespace MauiWifiManager
 
                     // Set a timeout to prevent hanging
                     var timeoutTask = Task.Delay(TimeSpan.FromSeconds(30));
-                    var completedTask = await Task.WhenAny(tcs.Task, timeoutTask);
+                    var networkTask = tcs.Task.WaitAsync(cancellationToken);
+                    var completedTask = await Task.WhenAny(networkTask, timeoutTask);
                     if (completedTask == timeoutTask)
                     {
                         System.Diagnostics.Debug.WriteLine($"Wi-Fi network suggestion Timeout.");
@@ -609,7 +669,7 @@ namespace MauiWifiManager
 
                     // Ensure to unregister the callback when done
                     connectivityManager?.UnregisterNetworkCallback(networkCallback);
-                    networkData = await tcs.Task;
+                    networkData = await networkTask;
 
                     if (networkData != null && networkData.StatusId == (int)WifiErrorCodes.Success)
                     {
@@ -618,6 +678,10 @@ namespace MauiWifiManager
                         response.ErrorMessage = "Wi-Fi network suggestion added successfully.";
                         response.Data = networkData;
                     }
+                }
+                catch (System.OperationCanceledException)
+                {
+                    return CreateCanceledResponse<NetworkData>(nameof(AddWifiSuggestion));
                 }
                 catch (Exception ex)
                 {
@@ -629,8 +693,12 @@ namespace MauiWifiManager
             return response;
         }      
 
-        public async Task<WifiManagerResponse<NetworkData>> RequestNetwork(WifiManager wifiManager, string ssid, string password, string? bssid = null) 
+        public async Task<WifiManagerResponse<NetworkData>> RequestNetwork(WifiManager wifiManager, string ssid, string password, string? bssid = null, CancellationToken cancellationToken = default) 
         {
+            if (cancellationToken.IsCancellationRequested)
+            {
+                return CreateCanceledResponse<NetworkData>(nameof(RequestNetwork));
+            }
             var response = new WifiManagerResponse<NetworkData>();
             var networkData = new NetworkData();
 
@@ -712,7 +780,7 @@ namespace MauiWifiManager
                         _Requested = true;
                     }
                     // Await the task and set response accordingly
-                    networkData = await tcs.Task;
+                    networkData = await tcs.Task.WaitAsync(cancellationToken);
                     if (networkData != null && networkData.StatusId == 1)
                     {
                         System.Diagnostics.Debug.WriteLine($"Wi-Fi connected successfully.");
@@ -727,6 +795,10 @@ namespace MauiWifiManager
                         response.ErrorMessage = "Wi-Fi connection failed.";
                     }
                 }
+            }
+            catch (System.OperationCanceledException)
+            {
+                return CreateCanceledResponse<NetworkData>(nameof(RequestNetwork));
             }
             catch (Exception ex)
             {
@@ -783,6 +855,13 @@ namespace MauiWifiManager
             return bytes is { Length: 4 } ? GetIpAddressFromBytes(bytes) : 0;
         }
 
+        private static WifiManagerResponse<T> CreateCanceledResponse<T>(string operationName)
+        {
+            return WifiManagerResponse<T>.ErrorResponse(
+                WifiErrorCodes.OperationCanceled,
+                $"{operationName} operation was canceled.");
+        }
+
         private void EnsureMonitoringStarted()
         {
             lock (_monitorLock)
@@ -832,7 +911,7 @@ namespace MauiWifiManager
 
             try
             {
-                var info = await GetNetworkInfo();
+                var info = await GetNetworkInfoAsync();
                 if (info.ErrorCode == WifiErrorCodes.Success && info.Data != null)
                 {
                     currentNetwork = CloneNetworkData(info.Data);

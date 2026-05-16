@@ -2,14 +2,10 @@
 using Foundation;
 using MauiWifiManager.Abstractions;
 using NetworkExtension;
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
-using System.Threading.Tasks;
 using SystemConfiguration;
 using UIKit;
 
@@ -47,8 +43,32 @@ namespace MauiWifiManager
         /// <param name="ssid"></param>
         /// <param name="password"></param>
         /// <returns></returns>
-        public async Task<WifiManagerResponse<NetworkData>> ConnectWifi(string ssid, string password, string? bssid = null)
+        [Obsolete("Use ConnectWifiAsync(string ssid, string password, CancellationToken cancellationToken = default) or ConnectWifiAsync(string ssid, string password, string? bssid, CancellationToken cancellationToken = default) instead.")]
+        public Task<WifiManagerResponse<NetworkData>> ConnectWifi(string ssid, string password, string? bssid = null)
         {
+            return ConnectWifiAsync(ssid, password, bssid, CancellationToken.None);
+        }
+
+        /// <summary>
+        /// Connect to Wifi
+        /// </summary>
+        /// <param name="ssid"></param>
+        /// <param name="password"></param>
+        /// <returns></returns>
+        public Task<WifiManagerResponse<NetworkData>> ConnectWifiAsync(string ssid, string password, CancellationToken cancellationToken = default)
+        {
+            return ConnectWifiAsync(ssid, password, null, cancellationToken);
+        }
+
+        /// <summary>
+        /// Connect to Wifi
+        /// </summary>
+        /// <param name="ssid"></param>
+        /// <param name="password"></param>
+        /// <returns></returns>
+        public async Task<WifiManagerResponse<NetworkData>> ConnectWifiAsync(string ssid, string password, string? bssid, CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
            
             try
             {
@@ -70,20 +90,20 @@ namespace MauiWifiManager
                 });
 
                 // Await the result of the configuration task
-                var error = await tcs.Task;
+                var error = await tcs.Task.WaitAsync(cancellationToken);
 
                 // Handle connection status
                 if (error == null)
                 {
                     // Successfully connected
                     Debug.WriteLine("Successfully connected to the network.");
-                    var networkData = await GetNetworkInfo();
+                    var networkData = await GetNetworkInfoAsync(cancellationToken);
                     return WifiManagerResponse<NetworkData>.SuccessResponse(networkData.Data, $"Successfully connected to the network.");
                 }
                 else if (error.LocalizedDescription == "already associated.")
                 {
                     // Already connected
-                    var networkData = await GetNetworkInfo();
+                    var networkData = await GetNetworkInfoAsync(cancellationToken);
                     return WifiManagerResponse<NetworkData>.SuccessResponse(networkData.Data, $"Already associated with the network.");
                 }
                 else
@@ -154,8 +174,18 @@ namespace MauiWifiManager
         /// <summary>
         /// Get Wi-Fi Network Info
         /// </summary>
-        public async Task<WifiManagerResponse<NetworkData>> GetNetworkInfo()
+        [Obsolete("Use GetNetworkInfoAsync(CancellationToken cancellationToken = default) instead.")]
+        public Task<WifiManagerResponse<NetworkData>> GetNetworkInfo()
         {
+            return GetNetworkInfoAsync(CancellationToken.None);
+        }
+
+        /// <summary>
+        /// Get Wi-Fi Network Info
+        /// </summary>
+        public async Task<WifiManagerResponse<NetworkData>> GetNetworkInfoAsync(CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
             var response = new WifiManagerResponse<NetworkData>();
             var locationManager = new CLLocationManager();
 
@@ -203,7 +233,7 @@ namespace MauiWifiManager
                     response.ErrorMessage = "Location permissions are not granted.";
                     tcs.SetResult(response);
                 }
-                return await tcs.Task;
+                return await tcs.Task.WaitAsync(cancellationToken);
             }           
             else
             {
@@ -262,8 +292,22 @@ namespace MauiWifiManager
         /// <summary>
         /// Scan Wi-Fi Networks
         /// </summary>
+        [Obsolete("Use ScanWifiNetworksAsync(CancellationToken cancellationToken = default) instead.")]
         public Task<WifiManagerResponse<List<NetworkData>>> ScanWifiNetworks()
         {
+            return ScanWifiNetworksAsync(CancellationToken.None);
+        }
+
+        /// <summary>
+        /// Scan Wi-Fi Networks
+        /// </summary>
+        public Task<WifiManagerResponse<List<NetworkData>>> ScanWifiNetworksAsync(CancellationToken cancellationToken = default)
+        {
+            if (cancellationToken.IsCancellationRequested)
+            {
+                return Task.FromCanceled<WifiManagerResponse<List<NetworkData>>>(cancellationToken);
+            }
+
             var response = new WifiManagerResponse<List<NetworkData>>();
             var wifiNetworks = new List<NetworkData>();
             Debug.WriteLine($"ScanWifiNetworks is not supported on iOS.");
@@ -379,7 +423,7 @@ namespace MauiWifiManager
 
             try
             {
-                var info = await GetNetworkInfo();
+                var info = await GetNetworkInfoAsync();
                 if (info.ErrorCode == WifiErrorCodes.Success && info.Data != null)
                 {
                     currentNetwork = CloneNetworkData(info.Data);

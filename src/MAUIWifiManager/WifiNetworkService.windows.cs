@@ -1,16 +1,10 @@
 ﻿using MauiWifiManager.Abstractions;
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
 using System.Net;
 using System.Net.NetworkInformation;
-using System.Threading.Tasks;
 using Windows.Devices.WiFi;
-using Windows.Networking;
 using Windows.Networking.Connectivity;
 using Windows.Security.Credentials;
-using Windows.System;
 
 namespace MauiWifiManager
 {
@@ -41,8 +35,26 @@ namespace MauiWifiManager
         /// <summary>
         /// Connect Wi-Fi
         /// </summary>
-        public async Task<WifiManagerResponse<NetworkData>> ConnectWifi(string ssid, string password, string? bssid = null)
+        [Obsolete("Use ConnectWifiAsync(string ssid, string password, CancellationToken cancellationToken = default) or ConnectWifiAsync(string ssid, string password, string? bssid, CancellationToken cancellationToken = default) instead.")]
+        public Task<WifiManagerResponse<NetworkData>> ConnectWifi(string ssid, string password, string? bssid = null)
         {
+            return ConnectWifiAsync(ssid, password, bssid, CancellationToken.None);
+        }
+
+        /// <summary>
+        /// Connect Wi-Fi
+        /// </summary>
+        public Task<WifiManagerResponse<NetworkData>> ConnectWifiAsync(string ssid, string password, CancellationToken cancellationToken = default)
+        {
+            return ConnectWifiAsync(ssid, password, null, cancellationToken);
+        }
+
+        /// <summary>
+        /// Connect Wi-Fi
+        /// </summary>
+        public async Task<WifiManagerResponse<NetworkData>> ConnectWifiAsync(string ssid, string password, string? bssid, CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
             var response = new WifiManagerResponse<NetworkData>();
             var credential = new PasswordCredential
             {
@@ -70,7 +82,7 @@ namespace MauiWifiManager
             adapter = await WiFiAdapter.FromIdAsync(result[0].Id);
             if (adapter != null)
             {
-                await adapter.ScanAsync();
+                await adapter.ScanAsync().AsTask(cancellationToken);
                 WiFiAvailableNetwork? wiFiAvailableNetwork = null;
                 foreach (var network in adapter.NetworkReport.AvailableNetworks)
                 {
@@ -82,13 +94,13 @@ namespace MauiWifiManager
                 }
                 if (wiFiAvailableNetwork != null)
                 {
-                    var status = await adapter.ConnectAsync(wiFiAvailableNetwork, WiFiReconnectionKind.Automatic, credential);
+                    var status = await adapter.ConnectAsync(wiFiAvailableNetwork, WiFiReconnectionKind.Automatic, credential).AsTask(cancellationToken);
                     if (status.ConnectionStatus == WiFiConnectionStatus.Success)
                     {
                         Debug.WriteLine("Connected successfully to the network.");
                         Windows.Networking.Connectivity.ConnectionProfile InternetConnectionProfile = NetworkInformation.GetInternetConnectionProfile();
                         var hostname = NetworkInformation.GetHostNames().FirstOrDefault(hn => hn.IPInformation?.NetworkAdapter != null && hn.IPInformation.NetworkAdapter.NetworkAdapterId == InternetConnectionProfile?.NetworkAdapter.NetworkAdapterId);
-                        var networkData = await GetNetworkInfo();
+                        var networkData = await GetNetworkInfoAsync(cancellationToken);
                         if (networkData.ErrorCode == WifiErrorCodes.Success)
                         {
                             response.ErrorCode = WifiErrorCodes.Success;
@@ -151,8 +163,22 @@ namespace MauiWifiManager
         /// <summary>
         /// Get Network Info
         /// </summary>
+        [Obsolete("Use GetNetworkInfoAsync(CancellationToken cancellationToken = default) instead.")]
         public Task<WifiManagerResponse<NetworkData>> GetNetworkInfo()
         {
+            return GetNetworkInfoAsync(CancellationToken.None);
+        }
+
+        /// <summary>
+        /// Get Network Info
+        /// </summary>
+        public Task<WifiManagerResponse<NetworkData>> GetNetworkInfoAsync(CancellationToken cancellationToken = default)
+        {
+            if (cancellationToken.IsCancellationRequested)
+            {
+                return Task.FromCanceled<WifiManagerResponse<NetworkData>>(cancellationToken);
+            }
+
             var response = new WifiManagerResponse<NetworkData>();
             var networkData = new NetworkData();
 
@@ -234,8 +260,18 @@ namespace MauiWifiManager
         /// <summary>
         /// Scan Wi-Fi Networks
         /// </summary>
-        public async Task<WifiManagerResponse<List<NetworkData>>> ScanWifiNetworks()
+        [Obsolete("Use ScanWifiNetworksAsync(CancellationToken cancellationToken = default) instead.")]
+        public Task<WifiManagerResponse<List<NetworkData>>> ScanWifiNetworks()
         {
+            return ScanWifiNetworksAsync(CancellationToken.None);
+        }
+
+        /// <summary>
+        /// Scan Wi-Fi Networks
+        /// </summary>
+        public async Task<WifiManagerResponse<List<NetworkData>>> ScanWifiNetworksAsync(CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
             var response = new WifiManagerResponse<List<NetworkData>>();
             try
             {
@@ -249,7 +285,7 @@ namespace MauiWifiManager
                     {
                         var wifiAdapter = result[0];
                         Debug.WriteLine($"Wi-Fi Scan started.");
-                        await wifiAdapter.ScanAsync();
+                        await wifiAdapter.ScanAsync().AsTask(cancellationToken);
                         var availableNetworks = wifiAdapter.NetworkReport.AvailableNetworks;
                         foreach (var network in availableNetworks)
                         {
@@ -341,7 +377,7 @@ namespace MauiWifiManager
 
             try
             {
-                var info = await GetNetworkInfo();
+                var info = await GetNetworkInfoAsync();
                 if (info.ErrorCode == WifiErrorCodes.Success && info.Data != null)
                 {
                     currentNetwork = CloneNetworkData(info.Data);
