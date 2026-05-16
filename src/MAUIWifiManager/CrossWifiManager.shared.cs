@@ -1,7 +1,4 @@
-﻿using Microsoft.Maui.Hosting;
-using System;
-
-#if ANDROID
+﻿#if ANDROID
 using Microsoft.Maui.LifecycleEvents;
 #endif
 

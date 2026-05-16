@@ -65,6 +65,7 @@
         NetworkUnavailable = 5,
         OperationTimeout = 6,
         InvalidCredential = 7,
-        UnknownError = 8
+        UnknownError = 8,
+        OperationCanceled = 9
     }
 }

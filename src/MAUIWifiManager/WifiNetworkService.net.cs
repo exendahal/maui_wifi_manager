@@ -1,6 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Threading.Tasks;
 using MauiWifiManager.Abstractions;
 
 namespace MauiWifiManager
@@ -16,13 +13,38 @@ namespace MauiWifiManager
 
         public WifiNetworkService() { }
 
+        [Obsolete("Use ConnectWifiAsync(string ssid, string password, CancellationToken cancellationToken = default) or ConnectWifiAsync(string ssid, string password, string? bssid, CancellationToken cancellationToken = default) instead.")]
         public Task<WifiManagerResponse<NetworkData>> ConnectWifi(string ssid, string password, string? bssid = null)
         {
+            return ConnectWifiAsync(ssid, password, bssid, CancellationToken.None);
+        }
+
+        public Task<WifiManagerResponse<NetworkData>> ConnectWifiAsync(string ssid, string password, CancellationToken cancellationToken = default)
+        {
+            return ConnectWifiAsync(ssid, password, null, cancellationToken);
+        }
+
+        public Task<WifiManagerResponse<NetworkData>> ConnectWifiAsync(string ssid, string password, string? bssid, CancellationToken cancellationToken = default)
+        {
+            if (cancellationToken.IsCancellationRequested)
+            {
+                return Task.FromCanceled<WifiManagerResponse<NetworkData>>(cancellationToken);
+            }
             return Task.FromResult(WifiManagerResponse<NetworkData>.ErrorResponse(WifiErrorCodes.NetworkUnavailable, "Platform Wi-Fi implementation is not available in this build."));
         }
 
+        [Obsolete("Use GetNetworkInfoAsync(CancellationToken cancellationToken = default) instead.")]
         public Task<WifiManagerResponse<NetworkData>> GetNetworkInfo()
         {
+            return GetNetworkInfoAsync(CancellationToken.None);
+        }
+
+        public Task<WifiManagerResponse<NetworkData>> GetNetworkInfoAsync(CancellationToken cancellationToken = default)
+        {
+            if (cancellationToken.IsCancellationRequested)
+            {
+                return Task.FromCanceled<WifiManagerResponse<NetworkData>>(cancellationToken);
+            }
             return Task.FromResult(WifiManagerResponse<NetworkData>.ErrorResponse(WifiErrorCodes.NetworkUnavailable, "Platform Wi-Fi implementation is not available in this build."));
         }
 
@@ -36,8 +58,18 @@ namespace MauiWifiManager
             return Task.FromResult(false);
         }
 
+        [Obsolete("Use ScanWifiNetworksAsync(CancellationToken cancellationToken = default) instead.")]
         public Task<WifiManagerResponse<List<NetworkData>>> ScanWifiNetworks()
         {
+            return ScanWifiNetworksAsync(CancellationToken.None);
+        }
+
+        public Task<WifiManagerResponse<List<NetworkData>>> ScanWifiNetworksAsync(CancellationToken cancellationToken = default)
+        {
+            if (cancellationToken.IsCancellationRequested)
+            {
+                return Task.FromCanceled<WifiManagerResponse<List<NetworkData>>>(cancellationToken);
+            }
             return Task.FromResult(WifiManagerResponse<List<NetworkData>>.ErrorResponse(WifiErrorCodes.NetworkUnavailable, "Platform Wi-Fi implementation is not available in this build."));
         }
 

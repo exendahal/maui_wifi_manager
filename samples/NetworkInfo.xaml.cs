@@ -35,7 +35,7 @@ public partial class NetworkInfo : ContentPage
 
     private async Task LoadAndRenderCurrentNetworkInfo()
     {
-        var response = await CrossWifiManager.Current.GetNetworkInfo();
+        var response = await CrossWifiManager.Current.GetNetworkInfoAsync();
         if (response != null)
         {
             if (response.ErrorCode == WifiErrorCodes.Success)
