@@ -22,8 +22,8 @@ The Wi-Fi Manager for .NET MAUI is a simple and powerful library that helps you 
 
 - **Connect to Wi-Fi**: Connect to Wi-Fi networks using SSID and password.
 - **Get Network Info**: View details about the currently connected network.
-- **Observe Wi-Fi Changes**: Subscribe to connected Wi-Fi changes (including OS-driven changes).
-- **Discover Networks in Real-Time**: Listen to discovered Wi-Fi networks during an active scan session.
+- **Observe Wi-Fi Changes**: Subscribe to connected Wi-Fi changes.
+- **Discover Networks**: Listen to discovered Wi-Fi networks.
 - **Disconnect Wi-Fi**: Disconnect from a specific Wi-Fi network.
 - **Open Wi-Fi Settings**: Provide quick access to device Wi-Fi settings.
 - **Open Wireless Settings**: Provide quick access to device wireless settings.
@@ -115,7 +115,7 @@ var response = await CrossWifiManager.Current.ScanWifiNetworks();
 
 ---
 
-### Discover Networks in Real-Time (Device Discovery)
+### Discover Networks (Device Discovery)
 
 Use continuous scanning when you want to update your UI as networks are discovered:
 
