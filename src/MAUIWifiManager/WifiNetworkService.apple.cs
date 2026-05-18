@@ -196,8 +196,8 @@ namespace MauiWifiManager
             if (OperatingSystem.IsIOSVersionAtLeast(8))
                 locationManager.RequestWhenInUseAuthorization();
 
-            // Handle iOS 14+ using NEHotspotNetwork
-            if (OperatingSystem.IsIOSVersionAtLeast(14))
+            // Handle iOS/Mac Catalyst 14+ using NEHotspotNetwork
+            if (IsAppleVersionAtLeast(14))
             {
                 var tcs = new TaskCompletionSource<WifiManagerResponse<NetworkData>>();
                 if (locationManager.AuthorizationStatus == CLAuthorizationStatus.Authorized ||
@@ -216,7 +216,7 @@ namespace MauiWifiManager
                                 Ssid = hotspotNetwork.Ssid,
                                 Bssid = hotspotNetwork.Bssid,
                                 SignalStrength = hotspotNetwork.SignalStrength,
-                                SecurityType = OperatingSystem.IsIOSVersionAtLeast(15) ? hotspotNetwork.SecurityType : null,
+                                SecurityType = IsAppleVersionAtLeast(15) ? hotspotNetwork.SecurityType : null,
                                 NativeObject = hotspotNetwork
                             };
                          }
@@ -313,9 +313,9 @@ namespace MauiWifiManager
 
             var response = new WifiManagerResponse<List<NetworkData>>();
             var wifiNetworks = new List<NetworkData>();
-            Debug.WriteLine($"ScanWifiNetworks is not supported on iOS.");
+            Debug.WriteLine($"ScanWifiNetworks is not supported on iOS/Mac Catalyst.");
             response.ErrorCode = WifiErrorCodes.WifiNotEnabled;
-            response.ErrorMessage = "ScanWifiNetworks is not supported on iOS.";
+            response.ErrorMessage = "ScanWifiNetworks is not supported on iOS/Mac Catalyst.";
             return Task.FromResult(response);
         }
 
@@ -326,7 +326,7 @@ namespace MauiWifiManager
                 return Task.FromCanceled<WifiManagerResponse<bool>>(cancellationToken);
             }
 
-            return Task.FromResult(WifiManagerResponse<bool>.ErrorResponse(WifiErrorCodes.WifiNotEnabled, "Continuous scanning is not supported on iOS."));
+            return Task.FromResult(WifiManagerResponse<bool>.ErrorResponse(WifiErrorCodes.WifiNotEnabled, "Continuous scanning is not supported on iOS/Mac Catalyst."));
         }
 
         public Task<WifiManagerResponse<bool>> StopScanningAsync(CancellationToken cancellationToken = default)
@@ -379,10 +379,17 @@ namespace MauiWifiManager
             }
             else
             {
-                Debug.WriteLine("OpenWirelessSetting is not supported on this version of iOS.");
+                Debug.WriteLine("OpenWirelessSetting is not supported on this Apple platform version.");
                 return false;
             }
         }
+
+        private static bool IsAppleVersionAtLeast(int majorVersion)
+        {
+            return OperatingSystem.IsIOSVersionAtLeast(majorVersion)
+                || OperatingSystem.IsMacCatalystVersionAtLeast(majorVersion);
+        }
+
         private int IpAddressToInt(IPAddress? ip)
         {
             if (ip == null) return 0;
