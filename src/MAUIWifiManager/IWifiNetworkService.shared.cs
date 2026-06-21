@@ -1,7 +1,4 @@
 ﻿using MauiWifiManager.Abstractions;
-using System;
-using System.Collections.Generic;
-using System.Threading.Tasks;
 
 namespace MauiWifiManager
 {
@@ -11,14 +8,61 @@ namespace MauiWifiManager
     public interface IWifiNetworkService : IDisposable
     {
         /// <summary>
-        /// Connects to a Wi-Fi network with the specified SSID and password.
+        /// Raised when the connected Wi-Fi network changes (including OS-driven changes).
         /// </summary>
-        Task<WifiManagerResponse<NetworkData>> ConnectWifi(string ssid, string password);
+        event EventHandler<WifiNetworkChangedEventArgs>? WifiNetworkChanged;
+
+        /// <summary>
+        /// Raised when a Wi-Fi network is discovered while an active scan session is running.
+        /// </summary>
+        event EventHandler<NetworkData>? DeviceDiscovered;
+
+        /// <summary>
+        /// Gets a value indicating whether a scan session is currently running.
+        /// </summary>
+        bool IsScanning { get; }
+
+        /// <summary>
+        /// Connects to a Wi-Fi network with the specified SSID and password.
+        /// When provided, bssid targets a specific access point for that SSID.
+        /// BSSID-targeted connection is supported on Android and Windows.
+        /// On Apple platforms, the OS API does not support selecting a BSSID for connect.
+        /// </summary>
+        [Obsolete("Use ConnectWifiAsync(string ssid, string password, CancellationToken cancellationToken = default) or ConnectWifiAsync(string ssid, string password, string? bssid, CancellationToken cancellationToken = default) instead.")]
+        Task<WifiManagerResponse<NetworkData>> ConnectWifi(string ssid, string password, string? bssid = null);
+
+        /// <summary>
+        /// Connects to a Wi-Fi network with the specified SSID and password.
+        /// When provided, bssid targets a specific access point for that SSID.
+        /// BSSID-targeted connection is supported on Android and Windows.
+        /// On Apple platforms, the OS API does not support selecting a BSSID for connect.
+        /// </summary>
+        Task<WifiManagerResponse<NetworkData>> ConnectWifiAsync(string ssid, string password, CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Connects to a Wi-Fi network with the specified SSID and password.
+        /// When provided, bssid targets a specific access point for that SSID.
+        /// BSSID-targeted connection is supported on Android and Windows.
+        /// On Apple platforms, the OS API does not support selecting a BSSID for connect.
+        /// </summary>
+        Task<WifiManagerResponse<NetworkData>> ConnectWifiAsync(string ssid, string password, string? bssid, CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Connects to a Wi-Fi network using the provided connection options.
+        /// Supports hidden networks (all platforms) and WPA3-SAE (Android API 29+, iOS 15+, Windows).
+        /// </summary>
+        Task<WifiManagerResponse<NetworkData>> ConnectWifiAsync(string ssid, string password, WifiConnectionOptions options, CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Retrieves details of the currently connected Wi-Fi network.
         /// </summary>
+        [Obsolete("Use GetNetworkInfoAsync(CancellationToken cancellationToken = default) instead.")]
         Task<WifiManagerResponse<NetworkData>> GetNetworkInfo();
+
+        /// <summary>
+        /// Retrieves details of the currently connected Wi-Fi network.
+        /// </summary>
+        Task<WifiManagerResponse<NetworkData>> GetNetworkInfoAsync(CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Disconnects from the specified Wi-Fi network.
@@ -34,12 +78,42 @@ namespace MauiWifiManager
         /// <summary>
         /// Scans for available Wi-Fi networks (Android and Windows only).
         /// </summary>
+        [Obsolete("Use ScanWifiNetworksAsync(CancellationToken cancellationToken = default) instead.")]
         Task<WifiManagerResponse<List<NetworkData>>> ScanWifiNetworks();
+
+        /// <summary>
+        /// Scans for available Wi-Fi networks (Android and Windows only).
+        /// </summary>
+        Task<WifiManagerResponse<List<NetworkData>>> ScanWifiNetworksAsync(CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Starts a continuous scan session and emits discovered networks through DeviceDiscovered.
+        /// </summary>
+        Task<WifiManagerResponse<bool>> StartScanningForDevicesAsync(CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Stops the currently running scan session.
+        /// </summary>
+        Task<WifiManagerResponse<bool>> StopScanningAsync(CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Opens the device's wireless settings.
         /// On iOS, this opens the app's settings instead of wireless settings.
         /// </summary>
         Task<bool> OpenWirelessSetting();
-    }    
+
+        /// <summary>
+        /// Returns true when the device has a validated internet connection over Wi-Fi.
+        /// On Android uses NetworkCapabilities; on Windows uses NetworkConnectivityLevel;
+        /// on iOS/Mac Catalyst performs a DNS reachability check.
+        /// </summary>
+        Task<WifiManagerResponse<bool>> IsInternetAvailableAsync(CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Returns true when a captive portal is detected on the current Wi-Fi network.
+        /// On Android uses NET_CAPABILITY_CAPTIVE_PORTAL; on Windows uses ConstrainedInternetAccess;
+        /// on iOS performs an HTTP probe to Apple's captive portal detection endpoint.
+        /// </summary>
+        Task<WifiManagerResponse<bool>> IsCaptivePortalDetectedAsync(CancellationToken cancellationToken = default);
+    }
 }

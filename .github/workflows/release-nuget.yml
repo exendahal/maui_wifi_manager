@@ -4,6 +4,8 @@ on:
   push:
     tags:
       - "[0-9]+.[0-9]+.[0-9]+"
+      - "[0-9]+.[0-9]+.[0-9]+-beta"
+      - "[0-9]+.[0-9]+.[0-9]+-beta[0-9]+"
       - "[0-9]+.[0-9]+.[0-9]+-preview[0-9]+"
 
 jobs:
@@ -21,24 +23,28 @@ jobs:
       - name: Install MAUI workloads
         run: dotnet workload install maui
 
-      - name: Verify commit exists in origin/main
+      - name: Verify commit exists in origin/main or origin/develop
         run: |
           git fetch --no-tags --prune origin +refs/heads/*:refs/remotes/origin/*
-          git branch --remote --contains | grep origin/main
+          $branches = git branch --remote --contains
+          if (-not ($branches | Select-String -Pattern 'origin/main|origin/develop')) {
+            Write-Error "Tagged commit is not contained in origin/main or origin/develop"
+            exit 1
+          }
 
       - name: Get version information from tag
         id: get_version
         run: |
-          echo "version=${{ github.ref_name }}" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "version=${{ github.ref_name }}" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
 
       - name: Restore dependencies
         run: dotnet restore samples\DemoApp.csproj
 
       - name: Build
-        run: dotnet build src\MAUIWifiManager\MauiWifiManager.csproj -c Release /p:Version=${{ env.version }}
+        run: dotnet build src\MAUIWifiManager\MauiWifiManager.csproj -c Release /p:Version=${{ steps.get_version.outputs.version }}
 
       - name: Pack
-        run: dotnet pack src\MAUIWifiManager\MauiWifiManager.csproj -c Release /p:Version=${{ env.version }} --no-build --output .
+        run: dotnet pack src\MAUIWifiManager\MauiWifiManager.csproj -c Release /p:Version=${{ steps.get_version.outputs.version }} --no-build --output .
 
       - name: Push
         run: dotnet nuget push "*.nupkg" -s https://api.nuget.org/v3/index.json -k ${{ secrets.NUGET_API_KEY }} --skip-duplicate

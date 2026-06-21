@@ -20,193 +20,232 @@
             <Image HeightRequest="160" Source="dotnet_bot.png" />
             <Label
                 FontSize="Title"
-                HorizontalOptions="CenterAndExpand"
+                HorizontalOptions="Center"
                 Text="Active Wi-Fi Info"
                 TextColor="{StaticResource SecondaryDarkText}"
                 TextTransform="Uppercase" />
+
             <Grid
                 Padding="32,20"
                 ColumnSpacing="0"
                 RowSpacing="0">
                 <Grid.RowDefinitions>
-                    <RowDefinition Height="*" />
-                    <RowDefinition Height="*" />
-                    <RowDefinition Height="*" />
-                    <RowDefinition Height="*" />
-                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="2*" />
                 </Grid.ColumnDefinitions>
-                <Border
-                    Grid.Row="0"
-                    Grid.Column="0"
-                    Margin="-1"
-                    Padding="8,4"
-                    Background="Transparent"
-                    HorizontalOptions="FillAndExpand"
-                    Stroke="LightGray"
-                    StrokeShape="RoundRectangle 0,0,0,0"
-                    StrokeThickness="1">
-                    <Label
-                        FontSize="18"
-                        HorizontalOptions="FillAndExpand"
-                        Text="SSID"
-                        VerticalOptions="Start" />
+
+                <!-- Row 0: SSID -->
+                <Border Grid.Row="0" Grid.Column="0" Margin="-1" Padding="8,4"
+                        Background="Transparent" HorizontalOptions="Fill"
+                        Stroke="LightGray" StrokeShape="RoundRectangle 0,0,0,0" StrokeThickness="1">
+                    <Label FontSize="16" HorizontalOptions="Fill" Text="SSID" VerticalOptions="Start" />
                 </Border>
-                <Border
-                    Grid.Row="0"
-                    Grid.Column="1"
-                    Margin="-1"
-                    Padding="8,4"
-                    Background="Transparent"
-                    HorizontalOptions="FillAndExpand"
-                    Stroke="LightGray"
-                    StrokeShape="RoundRectangle 0,0,0,0"
-                    StrokeThickness="1">
-                    <Label
-                        x:Name="wifiSsid"
-                        FontSize="18"
-                        HorizontalOptions="FillAndExpand"
-                        VerticalOptions="Start" />
+                <Border Grid.Row="0" Grid.Column="1" Margin="-1" Padding="8,4"
+                        Background="Transparent" HorizontalOptions="Fill"
+                        Stroke="LightGray" StrokeShape="RoundRectangle 0,0,0,0" StrokeThickness="1">
+                    <Label x:Name="wifiSsid" FontSize="16" HorizontalOptions="Fill" VerticalOptions="Start" />
                 </Border>
-                <Border
-                    Grid.Row="1"
-                    Grid.Column="0"
-                    Margin="-1"
-                    Padding="8,4"
-                    Background="Transparent"
-                    HorizontalOptions="FillAndExpand"
-                    Stroke="LightGray"
-                    StrokeShape="RoundRectangle 0,0,0,0"
-                    StrokeThickness="1">
-                    <Label
-                        FontSize="18"
-                        HorizontalOptions="FillAndExpand"
-                        Text="BSSID"
-                        VerticalOptions="Start" />
+
+                <!-- Row 1: BSSID -->
+                <Border Grid.Row="1" Grid.Column="0" Margin="-1" Padding="8,4"
+                        Background="Transparent" HorizontalOptions="Fill"
+                        Stroke="LightGray" StrokeShape="RoundRectangle 0,0,0,0" StrokeThickness="1">
+                    <Label FontSize="16" HorizontalOptions="Fill" Text="BSSID" VerticalOptions="Start" />
                 </Border>
-                <Border
-                    Grid.Row="1"
-                    Grid.Column="1"
-                    Margin="-1"
-                    Padding="8,4"
-                    Background="Transparent"
-                    HorizontalOptions="FillAndExpand"
-                    Stroke="LightGray"
-                    StrokeShape="RoundRectangle 0,0,0,0"
-                    StrokeThickness="1">
-                    <Label
-                        x:Name="wifiBssid"
-                        FontSize="18"
-                        HorizontalOptions="Start"
-                        VerticalOptions="Start" />
+                <Border Grid.Row="1" Grid.Column="1" Margin="-1" Padding="8,4"
+                        Background="Transparent" HorizontalOptions="Fill"
+                        Stroke="LightGray" StrokeShape="RoundRectangle 0,0,0,0" StrokeThickness="1">
+                    <Label x:Name="wifiBssid" FontSize="16" HorizontalOptions="Fill" VerticalOptions="Start" />
                 </Border>
-                <Border
-                    Grid.Row="2"
-                    Grid.Column="0"
-                    Margin="-1"
-                    Padding="8,4"
-                    Background="Transparent"
-                    HorizontalOptions="FillAndExpand"
-                    Stroke="LightGray"
-                    StrokeShape="RoundRectangle 0,0,0,0"
-                    StrokeThickness="1">
-                    <Label
-                        FontSize="18"
-                        HorizontalOptions="FillAndExpand"
-                        Text="IP Address"
-                        VerticalOptions="Start" />
+
+                <!-- Row 2: IP Address -->
+                <Border Grid.Row="2" Grid.Column="0" Margin="-1" Padding="8,4"
+                        Background="Transparent" HorizontalOptions="Fill"
+                        Stroke="LightGray" StrokeShape="RoundRectangle 0,0,0,0" StrokeThickness="1">
+                    <Label FontSize="16" HorizontalOptions="Fill" Text="IP Address" VerticalOptions="Start" />
                 </Border>
-                <Border
-                    Grid.Row="2"
-                    Grid.Column="1"
-                    Margin="-1"
-                    Padding="8,4"
-                    Background="Transparent"
-                    HorizontalOptions="FillAndExpand"
-                    Stroke="LightGray"
-                    StrokeShape="RoundRectangle 0,0,0,0"
-                    StrokeThickness="1">
-                    <Label
-                        x:Name="ipAddressTxt"
-                        FontSize="18"
-                        HorizontalOptions="FillAndExpand"
-                        VerticalOptions="Start" />
+                <Border Grid.Row="2" Grid.Column="1" Margin="-1" Padding="8,4"
+                        Background="Transparent" HorizontalOptions="Fill"
+                        Stroke="LightGray" StrokeShape="RoundRectangle 0,0,0,0" StrokeThickness="1">
+                    <Label x:Name="ipAddressTxt" FontSize="16" HorizontalOptions="Fill" LineBreakMode="WordWrap" VerticalOptions="Start" />
                 </Border>
-                <Border
-                    Grid.Row="3"
-                    Grid.Column="0"
-                    Margin="-1"
-                    Padding="8,4"
-                    Background="Transparent"
-                    HorizontalOptions="FillAndExpand"
-                    Stroke="LightGray"
-                    StrokeShape="RoundRectangle 0,0,0,0"
-                    StrokeThickness="1">
-                    <Label
-                        Grid.Row="4"
-                        Grid.Column="0"
-                        FontSize="18"
-                        HorizontalOptions="FillAndExpand"
-                        Text="Security"
-                        VerticalOptions="Start" />
+
+                <!-- Row 3: IPv6 Address -->
+                <Border Grid.Row="3" Grid.Column="0" Margin="-1" Padding="8,4"
+                        Background="Transparent" HorizontalOptions="Fill"
+                        Stroke="LightGray" StrokeShape="RoundRectangle 0,0,0,0" StrokeThickness="1">
+                    <Label FontSize="16" HorizontalOptions="Fill" Text="IPv6 Address" VerticalOptions="Start" />
                 </Border>
-                <Border
-                    Grid.Row="3"
-                    Grid.Column="1"
-                    Margin="-1"
-                    Padding="8,4"
-                    Background="Transparent"
-                    HorizontalOptions="FillAndExpand"
-                    Stroke="LightGray"
-                    StrokeShape="RoundRectangle 0,0,0,0"
-                    StrokeThickness="1">
-                    <Label
-                        x:Name="securityTxt"
-                        FontSize="18"
-                        HorizontalOptions="FillAndExpand"
-                        LineBreakMode="WordWrap"
-                        VerticalOptions="Start" />
+                <Border Grid.Row="3" Grid.Column="1" Margin="-1" Padding="8,4"
+                        Background="Transparent" HorizontalOptions="Fill"
+                        Stroke="LightGray" StrokeShape="RoundRectangle 0,0,0,0" StrokeThickness="1">
+                    <Label x:Name="ipv6AddressTxt" FontSize="16" HorizontalOptions="Fill" LineBreakMode="WordWrap" VerticalOptions="Start" />
                 </Border>
-                <Border
-                    Grid.Row="4"
-                    Grid.Column="0"
-                    Margin="-1"
-                    Padding="8,4"
-                    Background="Transparent"
-                    HorizontalOptions="FillAndExpand"
-                    Stroke="LightGray"
-                    StrokeShape="RoundRectangle 0,0,0,0"
-                    StrokeThickness="1">
-                    <Label
-                        Grid.Row="4"
-                        Grid.Column="0"
-                        FontSize="18"
-                        HorizontalOptions="FillAndExpand"
-                        Text="Native Object"
-                        VerticalOptions="Start" />
+
+                <!-- Row 4: Subnet Mask -->
+                <Border Grid.Row="4" Grid.Column="0" Margin="-1" Padding="8,4"
+                        Background="Transparent" HorizontalOptions="Fill"
+                        Stroke="LightGray" StrokeShape="RoundRectangle 0,0,0,0" StrokeThickness="1">
+                    <Label FontSize="16" HorizontalOptions="Fill" Text="Subnet Mask" VerticalOptions="Start" />
                 </Border>
-                <Border
-                    Grid.Row="4"
-                    Grid.Column="1"
-                    Margin="-1"
-                    Padding="8,4"
-                    Background="Transparent"
-                    HorizontalOptions="FillAndExpand"
-                    Stroke="LightGray"
-                    StrokeShape="RoundRectangle 0,0,0,0"
-                    StrokeThickness="1">
-                    <Label
-                        x:Name="nativeObject"
-                        FontSize="18"
-                        HorizontalOptions="FillAndExpand"
-                        LineBreakMode="WordWrap"
-                        VerticalOptions="Start" />
+                <Border Grid.Row="4" Grid.Column="1" Margin="-1" Padding="8,4"
+                        Background="Transparent" HorizontalOptions="Fill"
+                        Stroke="LightGray" StrokeShape="RoundRectangle 0,0,0,0" StrokeThickness="1">
+                    <Label x:Name="subnetMaskTxt" FontSize="16" HorizontalOptions="Fill" VerticalOptions="Start" />
+                </Border>
+
+                <!-- Row 5: DNS Servers -->
+                <Border Grid.Row="5" Grid.Column="0" Margin="-1" Padding="8,4"
+                        Background="Transparent" HorizontalOptions="Fill"
+                        Stroke="LightGray" StrokeShape="RoundRectangle 0,0,0,0" StrokeThickness="1">
+                    <Label FontSize="16" HorizontalOptions="Fill" Text="DNS Servers" VerticalOptions="Start" />
+                </Border>
+                <Border Grid.Row="5" Grid.Column="1" Margin="-1" Padding="8,4"
+                        Background="Transparent" HorizontalOptions="Fill"
+                        Stroke="LightGray" StrokeShape="RoundRectangle 0,0,0,0" StrokeThickness="1">
+                    <Label x:Name="dnsServersTxt" FontSize="16" HorizontalOptions="Fill" LineBreakMode="WordWrap" VerticalOptions="Start" />
+                </Border>
+
+                <!-- Row 6: Security -->
+                <Border Grid.Row="6" Grid.Column="0" Margin="-1" Padding="8,4"
+                        Background="Transparent" HorizontalOptions="Fill"
+                        Stroke="LightGray" StrokeShape="RoundRectangle 0,0,0,0" StrokeThickness="1">
+                    <Label FontSize="16" HorizontalOptions="Fill" Text="Security" VerticalOptions="Start" />
+                </Border>
+                <Border Grid.Row="6" Grid.Column="1" Margin="-1" Padding="8,4"
+                        Background="Transparent" HorizontalOptions="Fill"
+                        Stroke="LightGray" StrokeShape="RoundRectangle 0,0,0,0" StrokeThickness="1">
+                    <Label x:Name="securityTxt" FontSize="16" HorizontalOptions="Fill" LineBreakMode="WordWrap" VerticalOptions="Start" />
+                </Border>
+
+                <!-- Row 7: RSSI (Android only) -->
+                <Border Grid.Row="7" Grid.Column="0" Margin="-1" Padding="8,4"
+                        Background="Transparent" HorizontalOptions="Fill"
+                        Stroke="LightGray" StrokeShape="RoundRectangle 0,0,0,0" StrokeThickness="1">
+                    <Label FontSize="16" HorizontalOptions="Fill" Text="RSSI (dBm)" VerticalOptions="Start" />
+                </Border>
+                <Border Grid.Row="7" Grid.Column="1" Margin="-1" Padding="8,4"
+                        Background="Transparent" HorizontalOptions="Fill"
+                        Stroke="LightGray" StrokeShape="RoundRectangle 0,0,0,0" StrokeThickness="1">
+                    <Label x:Name="rssiTxt" FontSize="16" HorizontalOptions="Fill" VerticalOptions="Start" />
+                </Border>
+
+                <!-- Row 8: Frequency Band -->
+                <Border Grid.Row="8" Grid.Column="0" Margin="-1" Padding="8,4"
+                        Background="Transparent" HorizontalOptions="Fill"
+                        Stroke="LightGray" StrokeShape="RoundRectangle 0,0,0,0" StrokeThickness="1">
+                    <Label FontSize="16" HorizontalOptions="Fill" Text="Freq. Band" VerticalOptions="Start" />
+                </Border>
+                <Border Grid.Row="8" Grid.Column="1" Margin="-1" Padding="8,4"
+                        Background="Transparent" HorizontalOptions="Fill"
+                        Stroke="LightGray" StrokeShape="RoundRectangle 0,0,0,0" StrokeThickness="1">
+                    <Label x:Name="frequencyBandTxt" FontSize="16" HorizontalOptions="Fill" VerticalOptions="Start" />
+                </Border>
+
+                <!-- Row 9: Channel -->
+                <Border Grid.Row="9" Grid.Column="0" Margin="-1" Padding="8,4"
+                        Background="Transparent" HorizontalOptions="Fill"
+                        Stroke="LightGray" StrokeShape="RoundRectangle 0,0,0,0" StrokeThickness="1">
+                    <Label FontSize="16" HorizontalOptions="Fill" Text="Channel" VerticalOptions="Start" />
+                </Border>
+                <Border Grid.Row="9" Grid.Column="1" Margin="-1" Padding="8,4"
+                        Background="Transparent" HorizontalOptions="Fill"
+                        Stroke="LightGray" StrokeShape="RoundRectangle 0,0,0,0" StrokeThickness="1">
+                    <Label x:Name="channelTxt" FontSize="16" HorizontalOptions="Fill" VerticalOptions="Start" />
+                </Border>
+
+                <!-- Row 10: Link Speed (Android only) -->
+                <Border Grid.Row="10" Grid.Column="0" Margin="-1" Padding="8,4"
+                        Background="Transparent" HorizontalOptions="Fill"
+                        Stroke="LightGray" StrokeShape="RoundRectangle 0,0,0,0" StrokeThickness="1">
+                    <Label FontSize="16" HorizontalOptions="Fill" Text="Link Speed" VerticalOptions="Start" />
+                </Border>
+                <Border Grid.Row="10" Grid.Column="1" Margin="-1" Padding="8,4"
+                        Background="Transparent" HorizontalOptions="Fill"
+                        Stroke="LightGray" StrokeShape="RoundRectangle 0,0,0,0" StrokeThickness="1">
+                    <Label x:Name="linkSpeedTxt" FontSize="16" HorizontalOptions="Fill" VerticalOptions="Start" />
+                </Border>
+
+                <!-- Row 11: Native Object -->
+                <Border Grid.Row="11" Grid.Column="0" Margin="-1" Padding="8,4"
+                        Background="Transparent" HorizontalOptions="Fill"
+                        Stroke="LightGray" StrokeShape="RoundRectangle 0,0,0,0" StrokeThickness="1">
+                    <Label FontSize="16" HorizontalOptions="Fill" Text="Native Object" VerticalOptions="Start" />
+                </Border>
+                <Border Grid.Row="11" Grid.Column="1" Margin="-1" Padding="8,4"
+                        Background="Transparent" HorizontalOptions="Fill"
+                        Stroke="LightGray" StrokeShape="RoundRectangle 0,0,0,0" StrokeThickness="1">
+                    <Label x:Name="nativeObject" FontSize="16" HorizontalOptions="Fill" LineBreakMode="WordWrap" VerticalOptions="Start" />
                 </Border>
             </Grid>
+
+            <!-- Internet &amp; Captive Portal Section -->
+            <Border
+                Margin="20,0,20,10"
+                Padding="12"
+                Stroke="LightGray"
+                StrokeThickness="1">
+                <VerticalStackLayout Spacing="8">
+                    <Label FontAttributes="Bold" FontSize="16" Text="Internet &amp; Captive Portal" />
+                    <Button
+                        x:Name="CheckInternetBtn"
+                        BackgroundColor="{StaticResource SecondaryDarkText}"
+                        Clicked="CheckInternetBtnClicked"
+                        FontSize="12"
+                        Text="Check Internet Availability"
+                        TextColor="White"
+                        TextTransform="Uppercase" />
+                    <Label x:Name="internetStatusTxt" FontSize="14" Text="—" />
+                    <Button
+                        x:Name="CheckCaptiveBtn"
+                        BackgroundColor="{StaticResource SecondaryDarkText}"
+                        Clicked="CheckCaptiveBtnClicked"
+                        FontSize="12"
+                        Text="Detect Captive Portal"
+                        TextColor="White"
+                        TextTransform="Uppercase" />
+                    <Label x:Name="captivePortalTxt" FontSize="14" Text="—" />
+                </VerticalStackLayout>
+            </Border>
+
+            <Border
+                Margin="20,0,20,20"
+                Padding="12"
+                Stroke="LightGray"
+                StrokeThickness="1">
+                <VerticalStackLayout Spacing="6">
+                    <Label
+                        FontAttributes="Bold"
+                        FontSize="16"
+                        Text="Wi-Fi Change Event Example" />
+                    <Label
+                        FontSize="14"
+                        Text="Updates when Wi-Fi changes from OS or app actions." />
+                    <Label
+                        x:Name="wifiChangeStatus"
+                        FontSize="14"
+                        Text="Not subscribed" />
+                    <Label
+                        x:Name="wifiChangeLog"
+                        FontSize="14"
+                        LineBreakMode="WordWrap"
+                        Text="Waiting for network changes..." />
+                </VerticalStackLayout>
+            </Border>
         </VerticalStackLayout>
     </ScrollView>
-
 </ContentPage>

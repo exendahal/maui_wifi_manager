@@ -1,4 +1,5 @@
-﻿using DemoApp.Services.Interfaces;
+﻿using CoreLocation;
+using DemoApp.Services.Interfaces;
 
 namespace DemoApp.Platforms
 {
@@ -6,7 +7,19 @@ namespace DemoApp.Platforms
     {
         public Task<bool> GpsStatus()
         {
-            return Task.FromResult(true);
+            if (CLLocationManager.LocationServicesEnabled)
+            {
+                if (CLLocationManager.Status == CLAuthorizationStatus.Authorized
+                    || CLLocationManager.Status == CLAuthorizationStatus.AuthorizedAlways
+                    || CLLocationManager.Status == CLAuthorizationStatus.AuthorizedWhenInUse)
+                {
+                    return Task.FromResult(true);
+                }
+
+                return Task.FromResult(false);
+            }
+
+            return Task.FromResult(false);
         }
     }
 }
