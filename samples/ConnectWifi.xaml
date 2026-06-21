@@ -35,6 +35,7 @@
                     x:Name="WifiSsid"
                     Placeholder="Wi-Fi SSID"
                     Text="Minions_5" />
+
                 <Label
                     Margin="0,12,0,4"
                     FontSize="12"
@@ -46,6 +47,37 @@
                     Placeholder="Wi-Fi Password"
                     Text="CLB2727979" />
 
+                <Label
+                    Margin="0,12,0,4"
+                    FontSize="12"
+                    Text="Security Type"
+                    TextColor="{StaticResource SecondaryDarkText}"
+                    TextTransform="Uppercase" />
+                <Picker x:Name="SecurityTypePicker" Title="Select security type">
+                    <Picker.Items>
+                        <x:String>WPA2-PSK</x:String>
+                        <x:String>WPA3-SAE</x:String>
+                        <x:String>WPA-PSK</x:String>
+                        <x:String>Open (No Password)</x:String>
+                        <x:String>WEP</x:String>
+                    </Picker.Items>
+                </Picker>
+
+                <Grid Margin="0,12,0,0" ColumnDefinitions="*,Auto" VerticalOptions="Center">
+                    <Label
+                        Grid.Column="0"
+                        FontSize="12"
+                        Text="Hidden Network (SSID not broadcast)"
+                        TextColor="{StaticResource SecondaryDarkText}"
+                        TextTransform="Uppercase"
+                        VerticalOptions="Center" />
+                    <Switch
+                        x:Name="IsHiddenSwitch"
+                        Grid.Column="1"
+                        IsToggled="False"
+                        VerticalOptions="Center" />
+                </Grid>
+
                 <Button
                     x:Name="ConnectBtn"
                     Grid.Column="0"
@@ -53,11 +85,10 @@
                     BackgroundColor="{StaticResource SecondaryDarkText}"
                     Clicked="ConnectBtnClicked"
                     FontSize="12"
-                    Text="Connect Wi-FI"
+                    Text="Connect Wi-Fi"
                     TextColor="White"
                     TextTransform="Uppercase" />
             </StackLayout>
-
         </StackLayout>
     </ScrollView>
 </ContentPage>
