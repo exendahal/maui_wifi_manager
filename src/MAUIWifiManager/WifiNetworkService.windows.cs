@@ -1,16 +1,14 @@
-﻿using MauiWifiManager.Abstractions;
+using MauiWifiManager.Abstractions;
 using System.Diagnostics;
 using System.Net;
 using System.Net.NetworkInformation;
+using System.Net.Sockets;
 using Windows.Devices.WiFi;
 using Windows.Networking.Connectivity;
 using Windows.Security.Credentials;
 
 namespace MauiWifiManager
 {
-    /// <summary>
-    /// Interface for Wi-FiNetworkService
-    /// </summary>
     public class WifiNetworkService : IWifiNetworkService
     {
         private EventHandler<WifiNetworkChangedEventArgs>? _WifiNetworkChanged;
@@ -41,39 +39,30 @@ namespace MauiWifiManager
             remove => _DeviceDiscovered -= value;
         }
 
-        public WifiNetworkService()
-        {
-        }
+        public WifiNetworkService() { }
 
-        /// <summary>
-        /// Connect Wi-Fi
-        /// </summary>
         [Obsolete("Use ConnectWifiAsync(string ssid, string password, CancellationToken cancellationToken = default) or ConnectWifiAsync(string ssid, string password, string? bssid, CancellationToken cancellationToken = default) instead.")]
         public Task<WifiManagerResponse<NetworkData>> ConnectWifi(string ssid, string password, string? bssid = null)
         {
             return ConnectWifiAsync(ssid, password, bssid, CancellationToken.None);
         }
 
-        /// <summary>
-        /// Connect Wi-Fi
-        /// </summary>
         public Task<WifiManagerResponse<NetworkData>> ConnectWifiAsync(string ssid, string password, CancellationToken cancellationToken = default)
         {
-            return ConnectWifiAsync(ssid, password, null, cancellationToken);
+            return ConnectWifiAsync(ssid, password, new WifiConnectionOptions(), cancellationToken);
         }
 
-        /// <summary>
-        /// Connect Wi-Fi
-        /// </summary>
-        public async Task<WifiManagerResponse<NetworkData>> ConnectWifiAsync(string ssid, string password, string? bssid, CancellationToken cancellationToken = default)
+        public Task<WifiManagerResponse<NetworkData>> ConnectWifiAsync(string ssid, string password, string? bssid, CancellationToken cancellationToken = default)
+        {
+            return ConnectWifiAsync(ssid, password, new WifiConnectionOptions { Bssid = bssid }, cancellationToken);
+        }
+
+        public async Task<WifiManagerResponse<NetworkData>> ConnectWifiAsync(string ssid, string password, WifiConnectionOptions options, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
             var response = new WifiManagerResponse<NetworkData>();
-            var credential = new PasswordCredential
-            {
-                Password = password
-            };
-            WiFiAdapter adapter;
+
+            var credential = new PasswordCredential { Password = password };
             var access = await WiFiAdapter.RequestAccessAsync();
             if (access != WiFiAccessStatus.Allowed)
             {
@@ -82,9 +71,8 @@ namespace MauiWifiManager
                 response.ErrorMessage = "No Wi-Fi Access Status.";
                 return response;
             }
-            
-            var result = await Windows.Devices.Enumeration.DeviceInformation.FindAllAsync(WiFiAdapter.GetDeviceSelector());
 
+            var result = await Windows.Devices.Enumeration.DeviceInformation.FindAllAsync(WiFiAdapter.GetDeviceSelector());
             if (result.Count < 1)
             {
                 response.ErrorCode = WifiErrorCodes.UnsupportedHardware;
@@ -92,154 +80,183 @@ namespace MauiWifiManager
                 return response;
             }
 
-            adapter = await WiFiAdapter.FromIdAsync(result[0].Id);
-            if (adapter != null)
+            var adapter = await WiFiAdapter.FromIdAsync(result[0].Id);
+            if (adapter == null)
             {
-                await adapter.ScanAsync().AsTask(cancellationToken);
-                WiFiAvailableNetwork? wiFiAvailableNetwork = null;
+                response.ErrorCode = WifiErrorCodes.UnsupportedHardware;
+                response.ErrorMessage = "Failed to get Wi-Fi adapter.";
+                return response;
+            }
+
+            await adapter.ScanAsync().AsTask(cancellationToken);
+
+            // Find network by SSID (and optionally BSSID)
+            WiFiAvailableNetwork? target = null;
+            foreach (var network in adapter.NetworkReport.AvailableNetworks)
+            {
+                if (network.Ssid == ssid &&
+                    (string.IsNullOrWhiteSpace(options.Bssid) || string.Equals(network.Bssid, options.Bssid, StringComparison.OrdinalIgnoreCase)))
+                {
+                    target = network;
+                    break;
+                }
+            }
+
+            // For hidden networks, fall back to empty-SSID entries matched by BSSID
+            if (target == null && options.IsHidden)
+            {
                 foreach (var network in adapter.NetworkReport.AvailableNetworks)
                 {
-                    if (network.Ssid == ssid && (string.IsNullOrWhiteSpace(bssid) || string.Equals(network.Bssid, bssid, StringComparison.OrdinalIgnoreCase)))
+                    if (string.IsNullOrEmpty(network.Ssid) &&
+                        (!string.IsNullOrWhiteSpace(options.Bssid)
+                            ? string.Equals(network.Bssid, options.Bssid, StringComparison.OrdinalIgnoreCase)
+                            : true))
                     {
-                        wiFiAvailableNetwork = network;
+                        target = network;
                         break;
                     }
                 }
-                if (wiFiAvailableNetwork != null)
+            }
+
+            if (target == null)
+            {
+                Debug.WriteLine(options.IsHidden
+                    ? "Hidden network not found in scan results. Connect via Wi-Fi settings."
+                    : "The specified network was not found.");
+                response.ErrorCode = WifiErrorCodes.NoConnection;
+                response.ErrorMessage = options.IsHidden
+                    ? "Hidden network not found in scan results."
+                    : (string.IsNullOrWhiteSpace(options.Bssid)
+                        ? "The specified network was not found."
+                        : "The specified SSID/BSSID network was not found.");
+                return response;
+            }
+
+            // Use 4-param overload when connecting to a hidden network so Windows passes SSID explicitly
+            WiFiConnectionResult status;
+            if (options.IsHidden || string.IsNullOrEmpty(target.Ssid))
+                status = await adapter.ConnectAsync(target, WiFiReconnectionKind.Automatic, credential, ssid).AsTask(cancellationToken);
+            else
+                status = await adapter.ConnectAsync(target, WiFiReconnectionKind.Automatic, credential).AsTask(cancellationToken);
+
+            if (status.ConnectionStatus == WiFiConnectionStatus.Success)
+            {
+                Debug.WriteLine("Connected successfully to the network.");
+                var networkData = await GetNetworkInfoAsync(cancellationToken);
+                if (networkData.ErrorCode == WifiErrorCodes.Success)
                 {
-                    var status = await adapter.ConnectAsync(wiFiAvailableNetwork, WiFiReconnectionKind.Automatic, credential).AsTask(cancellationToken);
-                    if (status.ConnectionStatus == WiFiConnectionStatus.Success)
-                    {
-                        Debug.WriteLine("Connected successfully to the network.");
-                        Windows.Networking.Connectivity.ConnectionProfile InternetConnectionProfile = NetworkInformation.GetInternetConnectionProfile();
-                        var hostname = NetworkInformation.GetHostNames().FirstOrDefault(hn => hn.IPInformation?.NetworkAdapter != null && hn.IPInformation.NetworkAdapter.NetworkAdapterId == InternetConnectionProfile?.NetworkAdapter.NetworkAdapterId);
-                        var networkData = await GetNetworkInfoAsync(cancellationToken);
-                        if (networkData.ErrorCode == WifiErrorCodes.Success)
-                        {
-                            response.ErrorCode = WifiErrorCodes.Success;
-                            response.Data = networkData.Data;
-                        }
-                        else
-                        {
-                            Debug.WriteLine("Failed to get network info.");
-                            response.ErrorCode = WifiErrorCodes.UnknownError;
-                            response.ErrorMessage = "Failed to get network info.";
-                        }
-                        
-                    }
-                    else
-                    {
-                        response.ErrorCode = status.ConnectionStatus switch
-                        {
-                            WiFiConnectionStatus.InvalidCredential => WifiErrorCodes.InvalidCredential,
-                            WiFiConnectionStatus.Timeout => WifiErrorCodes.OperationTimeout,
-                            _ => WifiErrorCodes.UnknownError
-                        };
-                        Debug.WriteLine($"Connection failed: {status.ConnectionStatus}");
-                        response.ErrorMessage = $"Connection failed: {status.ConnectionStatus}";
-                    }
+                    response.ErrorCode = WifiErrorCodes.Success;
+                    response.Data = networkData.Data;
                 }
                 else
                 {
-                    Debug.WriteLine(string.IsNullOrWhiteSpace(bssid)
-                        ? "The specified network was not found."
-                        : "The specified SSID/BSSID network was not found.");
-                    response.ErrorCode = WifiErrorCodes.NoConnection;
-                    response.ErrorMessage = string.IsNullOrWhiteSpace(bssid)
-                        ? "The specified network was not found."
-                        : "The specified SSID/BSSID network was not found.";
+                    response.ErrorCode = WifiErrorCodes.UnknownError;
+                    response.ErrorMessage = "Connected but failed to retrieve network info.";
                 }
             }
             else
             {
-                Debug.WriteLine("Failed to get Wi-Fi adapter.");
-                response.ErrorCode = WifiErrorCodes.UnsupportedHardware;
-                response.ErrorMessage = "Failed to get Wi-Fi adapter.";
+                response.ErrorCode = status.ConnectionStatus switch
+                {
+                    WiFiConnectionStatus.InvalidCredential => WifiErrorCodes.InvalidCredential,
+                    WiFiConnectionStatus.Timeout => WifiErrorCodes.OperationTimeout,
+                    _ => WifiErrorCodes.UnknownError
+                };
+                Debug.WriteLine($"Connection failed: {status.ConnectionStatus}");
+                response.ErrorMessage = $"Connection failed: {status.ConnectionStatus}";
             }
+
             return response;
         }
 
-        /// <summary>
-        /// Disconnect Wi-Fi
-        /// </summary>
         public async void DisconnectWifi(string ssid)
         {
-            WiFiAdapter adapter;
             var result = await Windows.Devices.Enumeration.DeviceInformation.FindAllAsync(WiFiAdapter.GetDeviceSelector());
             if (result.Count >= 1)
             {
-                adapter = await WiFiAdapter.FromIdAsync(result[0].Id);
+                var adapter = await WiFiAdapter.FromIdAsync(result[0].Id);
                 adapter.Disconnect();
             }
         }
 
-        /// <summary>
-        /// Get Network Info
-        /// </summary>
         [Obsolete("Use GetNetworkInfoAsync(CancellationToken cancellationToken = default) instead.")]
         public Task<WifiManagerResponse<NetworkData>> GetNetworkInfo()
         {
             return GetNetworkInfoAsync(CancellationToken.None);
         }
 
-        /// <summary>
-        /// Get Network Info
-        /// </summary>
         public Task<WifiManagerResponse<NetworkData>> GetNetworkInfoAsync(CancellationToken cancellationToken = default)
         {
             if (cancellationToken.IsCancellationRequested)
-            {
                 return Task.FromCanceled<WifiManagerResponse<NetworkData>>(cancellationToken);
-            }
 
             var response = new WifiManagerResponse<NetworkData>();
             var networkData = new NetworkData();
 
             try
             {
-                Windows.Networking.Connectivity.ConnectionProfile? profile = NetworkInformation.GetConnectionProfiles().FirstOrDefault(x => x.IsWlanConnectionProfile && x.GetNetworkConnectivityLevel() > NetworkConnectivityLevel.None);
+                Windows.Networking.Connectivity.ConnectionProfile? profile = NetworkInformation
+                    .GetConnectionProfiles()
+                    .FirstOrDefault(x => x.IsWlanConnectionProfile && x.GetNetworkConnectivityLevel() > NetworkConnectivityLevel.None);
+
                 if (profile == null)
                 {
                     response.ErrorCode = WifiErrorCodes.NoConnection;
                     response.ErrorMessage = "No active Wi-Fi network connection found.";
                     return Task.FromResult(response);
                 }
+
                 networkData.StatusId = (int)profile.GetNetworkConnectivityLevel();
                 networkData.Ssid = profile.WlanConnectionProfileDetails.GetConnectedSsid();
-                
                 networkData.Bssid = profile.NetworkAdapter.NetworkAdapterId;
                 networkData.NativeObject = profile;
                 networkData.SignalStrength = profile.GetSignalBars();
-                if (profile.NetworkSecuritySettings != null)
-                {
-                    networkData.SecurityType = GetSecurityType(profile.NetworkSecuritySettings.NetworkAuthenticationType);
-                }
 
-                var networkInterface = NetworkInterface.GetAllNetworkInterfaces().FirstOrDefault(n => n.NetworkInterfaceType == NetworkInterfaceType.Wireless80211 && n.OperationalStatus == OperationalStatus.Up);
+                if (profile.NetworkSecuritySettings != null)
+                    networkData.SecurityType = GetSecurityType(profile.NetworkSecuritySettings.NetworkAuthenticationType);
+
+                var networkInterface = NetworkInterface.GetAllNetworkInterfaces()
+                    .FirstOrDefault(n => n.NetworkInterfaceType == NetworkInterfaceType.Wireless80211
+                                      && n.OperationalStatus == OperationalStatus.Up);
+
                 if (networkInterface != null)
                 {
-                    var ipaddress = networkInterface.GetIPProperties();
-                    var ip = ipaddress.UnicastAddresses.FirstOrDefault(n => n.Address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork);
-                    if (ip != null)
+                    var ipProps = networkInterface.GetIPProperties();
+
+                    var ipv4 = ipProps.UnicastAddresses
+                        .FirstOrDefault(n => n.Address.AddressFamily == AddressFamily.InterNetwork);
+                    if (ipv4 != null)
                     {
-                        networkData.IpAddress = BitConverter.ToInt32(ip.Address.GetAddressBytes(), 0);
-                    }
-                    else
-                    {
-                        networkData.IpAddress = 0;
+                        networkData.IpAddress = BitConverter.ToInt32(ipv4.Address.GetAddressBytes(), 0);
+                        if (ipv4.IPv4Mask != null)
+                            networkData.SubnetMask = ipv4.IPv4Mask.ToString();
                     }
 
-                    var gatewayInfo = ipaddress.GatewayAddresses.FirstOrDefault(n => n.Address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork);
-                    if (gatewayInfo != null)
-                    {
-                        networkData.GatewayAddress = IpAddressToInt(gatewayInfo.Address);
-                    }
+                    var gateway = ipProps.GatewayAddresses
+                        .FirstOrDefault(n => n.Address.AddressFamily == AddressFamily.InterNetwork);
+                    if (gateway != null)
+                        networkData.GatewayAddress = IpAddressToInt(gateway.Address);
 
-                    var internetworkAddress = ipaddress.DhcpServerAddresses.FirstOrDefault(n => n.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork);
-                    if (internetworkAddress != null)
-                    {
-                        networkData.DhcpServerAddress = IpAddressToInt(internetworkAddress);
-                    }
+                    var dhcp = ipProps.DhcpServerAddresses
+                        .FirstOrDefault(n => n.AddressFamily == AddressFamily.InterNetwork);
+                    if (dhcp != null)
+                        networkData.DhcpServerAddress = IpAddressToInt(dhcp);
+
+                    // IPv6
+                    var ipv6 = ipProps.UnicastAddresses
+                        .Where(u => u.Address.AddressFamily == AddressFamily.InterNetworkV6
+                                 && !u.Address.IsIPv6LinkLocal
+                                 && !IPAddress.IsLoopback(u.Address))
+                        .Select(u => u.Address.ToString())
+                        .FirstOrDefault();
+                    networkData.IPv6Address = ipv6;
+
+                    // DNS
+                    var dns = ipProps.DnsAddresses
+                        .Where(a => !IPAddress.IsLoopback(a))
+                        .Select(a => a.ToString())
+                        .ToList();
+                    if (dns.Count > 0) networkData.DnsAddresses = dns;
                 }
 
                 response.ErrorCode = WifiErrorCodes.Success;
@@ -254,43 +271,30 @@ namespace MauiWifiManager
             return Task.FromResult(response);
         }
 
-        /// <summary>
-        /// Open Wi-Fi Setting
-        /// </summary>
         public async Task<bool> OpenWifiSetting()
         {
             return await Windows.System.Launcher.LaunchUriAsync(new Uri("ms-settings:network-wifi"));
         }
 
-        /// <summary>
-        /// Dispose
-        /// </summary>
         public void Dispose()
         {
             _ = StopScanningAsync();
             StopMonitoring();
         }
 
-        /// <summary>
-        /// Scan Wi-Fi Networks
-        /// </summary>
         [Obsolete("Use ScanWifiNetworksAsync(CancellationToken cancellationToken = default) instead.")]
         public Task<WifiManagerResponse<List<NetworkData>>> ScanWifiNetworks()
         {
             return ScanWifiNetworksAsync(CancellationToken.None);
         }
 
-        /// <summary>
-        /// Scan Wi-Fi Networks
-        /// </summary>
         public async Task<WifiManagerResponse<List<NetworkData>>> ScanWifiNetworksAsync(CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
             var response = new WifiManagerResponse<List<NetworkData>>();
             try
             {
-                List<NetworkData> wifiNetworks = new List<NetworkData>();
-
+                List<NetworkData> wifiNetworks = new();
                 var accessStatus = await WiFiAdapter.RequestAccessAsync();
                 if (accessStatus == WiFiAccessStatus.Allowed)
                 {
@@ -298,35 +302,37 @@ namespace MauiWifiManager
                     if (result.Count > 0)
                     {
                         var wifiAdapter = result[0];
-                        Debug.WriteLine($"Wi-Fi Scan started.");
+                        Debug.WriteLine("Wi-Fi Scan started.");
                         await wifiAdapter.ScanAsync().AsTask(cancellationToken);
-                        var availableNetworks = wifiAdapter.NetworkReport.AvailableNetworks;
-                        foreach (var network in availableNetworks)
+
+                        foreach (var network in wifiAdapter.NetworkReport.AvailableNetworks)
                         {
+                            int freqMHz = (int)(network.ChannelCenterFrequencyInKilohertz / 1000);
                             wifiNetworks.Add(new NetworkData
                             {
                                 Ssid = network.Ssid,
                                 Bssid = network.Bssid,
                                 SignalStrength = network.SignalBars,
-                                SecurityType = network.PhyKind
+                                SecurityType = network.PhyKind,
+                                FrequencyBand = freqMHz > 0 ? GetBandFromFrequencyMHz(freqMHz) : WifiFrequencyBand.Unknown,
+                                ChannelNumber = freqMHz > 0 ? GetChannelFromFrequencyMHz(freqMHz) : null,
+                                NativeObject = network
                             });
                         }
                     }
-                    Debug.WriteLine($"Wi-Fi Scan complete.");
+                    Debug.WriteLine("Wi-Fi Scan complete.");
                     response.ErrorCode = WifiErrorCodes.Success;
-                    response.ErrorMessage = $"Wi-Fi Scan complete.";
+                    response.ErrorMessage = "Wi-Fi Scan complete.";
                     response.Data = wifiNetworks;
                 }
                 else
                 {
-                    Debug.WriteLine($"Request Access Async failed.");
                     response.ErrorCode = WifiErrorCodes.UnknownError;
-                    response.ErrorMessage = $"Request Access Async failed.";
+                    response.ErrorMessage = "Request Access Async failed.";
                 }
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"Error while scanning Wi-Fi: {ex.Message}");
                 response.ErrorCode = WifiErrorCodes.UnknownError;
                 response.ErrorMessage = $"Error while scanning Wi-Fi: {ex.Message}";
             }
@@ -336,16 +342,12 @@ namespace MauiWifiManager
         public Task<WifiManagerResponse<bool>> StartScanningForDevicesAsync(CancellationToken cancellationToken = default)
         {
             if (cancellationToken.IsCancellationRequested)
-            {
                 return Task.FromResult(WifiManagerResponse<bool>.ErrorResponse(WifiErrorCodes.OperationCanceled, "StartScanningForDevicesAsync operation was canceled."));
-            }
 
             lock (_ScanLock)
             {
                 if (IsScanning)
-                {
                     return Task.FromResult(WifiManagerResponse<bool>.SuccessResponse(true, "Scan session is already running."));
-                }
 
                 _DiscoveredNetworkKeys.Clear();
                 _ScanSessionCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -362,13 +364,10 @@ namespace MauiWifiManager
 
             CancellationTokenSource? cts;
             Task? scanTask;
-
             lock (_ScanLock)
             {
                 if (!IsScanning)
-                {
                     return WifiManagerResponse<bool>.SuccessResponse(false, "No active scan session.");
-                }
 
                 cts = _ScanSessionCts;
                 scanTask = _ScanSessionTask;
@@ -380,45 +379,70 @@ namespace MauiWifiManager
             try
             {
                 cts?.Cancel();
-                if (scanTask != null)
-                {
-                    await scanTask;
-                }
+                if (scanTask != null) await scanTask;
             }
-            catch (OperationCanceledException)
-            {
-            }
-            finally
-            {
-                cts?.Dispose();
-            }
+            catch (OperationCanceledException) { }
+            finally { cts?.Dispose(); }
 
             return WifiManagerResponse<bool>.SuccessResponse(true, "Wi-Fi scan session stopped.");
         }
 
-
-        /// <summary>
-        /// Open Network and Internet Setting
-        /// </summary>
         public async Task<bool> OpenWirelessSetting()
         {
             return await Windows.System.Launcher.LaunchUriAsync(new Uri("ms-settings:network"));
+        }
+
+        public Task<WifiManagerResponse<bool>> IsInternetAvailableAsync(CancellationToken cancellationToken = default)
+        {
+            if (cancellationToken.IsCancellationRequested)
+                return Task.FromResult(WifiManagerResponse<bool>.ErrorResponse(WifiErrorCodes.OperationCanceled, "Operation was canceled."));
+
+            try
+            {
+                var profile = NetworkInformation.GetInternetConnectionProfile();
+                var level = profile?.GetNetworkConnectivityLevel();
+                bool hasInternet = level == NetworkConnectivityLevel.InternetAccess;
+                return Task.FromResult(WifiManagerResponse<bool>.SuccessResponse(
+                    hasInternet,
+                    hasInternet ? "Internet is available." : "No internet access."));
+            }
+            catch (Exception ex)
+            {
+                return Task.FromResult(WifiManagerResponse<bool>.ErrorResponse(WifiErrorCodes.UnknownError, ex.Message));
+            }
+        }
+
+        public Task<WifiManagerResponse<bool>> IsCaptivePortalDetectedAsync(CancellationToken cancellationToken = default)
+        {
+            if (cancellationToken.IsCancellationRequested)
+                return Task.FromResult(WifiManagerResponse<bool>.ErrorResponse(WifiErrorCodes.OperationCanceled, "Operation was canceled."));
+
+            try
+            {
+                var profile = NetworkInformation.GetInternetConnectionProfile();
+                var level = profile?.GetNetworkConnectivityLevel();
+                // ConstrainedInternetAccess typically means captive portal
+                bool isCaptive = level == NetworkConnectivityLevel.ConstrainedInternetAccess
+                              || level == NetworkConnectivityLevel.LocalAccess;
+                return Task.FromResult(WifiManagerResponse<bool>.SuccessResponse(
+                    isCaptive,
+                    isCaptive ? "Captive portal detected." : "No captive portal."));
+            }
+            catch (Exception ex)
+            {
+                return Task.FromResult(WifiManagerResponse<bool>.ErrorResponse(WifiErrorCodes.UnknownError, ex.Message));
+            }
         }
 
         private void EnsureMonitoringStarted()
         {
             lock (_MonitorLock)
             {
-                if (_IsMonitoring)
-                {
-                    return;
-                }
-
+                if (_IsMonitoring) return;
                 NetworkChange.NetworkAddressChanged += OnNetworkChanged;
                 NetworkChange.NetworkAvailabilityChanged += OnNetworkAvailabilityChanged;
                 _IsMonitoring = true;
             }
-
             _ = RefreshSnapshotAsync(raiseEvent: false);
         }
 
@@ -426,11 +450,7 @@ namespace MauiWifiManager
         {
             lock (_MonitorLock)
             {
-                if (!_IsMonitoring)
-                {
-                    return;
-                }
-
+                if (!_IsMonitoring) return;
                 NetworkChange.NetworkAddressChanged -= OnNetworkChanged;
                 NetworkChange.NetworkAvailabilityChanged -= OnNetworkAvailabilityChanged;
                 _IsMonitoring = false;
@@ -438,36 +458,22 @@ namespace MauiWifiManager
             }
         }
 
-        private void OnNetworkChanged(object? sender, EventArgs e)
-        {
-            _ = RefreshSnapshotAsync(raiseEvent: true);
-        }
-
-        private void OnNetworkAvailabilityChanged(object? sender, NetworkAvailabilityEventArgs e)
-        {
-            _ = RefreshSnapshotAsync(raiseEvent: true);
-        }
+        private void OnNetworkChanged(object? sender, EventArgs e) => _ = RefreshSnapshotAsync(raiseEvent: true);
+        private void OnNetworkAvailabilityChanged(object? sender, NetworkAvailabilityEventArgs e) => _ = RefreshSnapshotAsync(raiseEvent: true);
 
         private async Task RefreshSnapshotAsync(bool raiseEvent)
         {
             NetworkData? currentNetwork = null;
-
             try
             {
                 var info = await GetNetworkInfoAsync();
                 if (info.ErrorCode == WifiErrorCodes.Success && info.Data != null)
-                {
                     currentNetwork = CloneNetworkData(info.Data);
-                }
             }
-            catch
-            {
-                currentNetwork = null;
-            }
+            catch { currentNetwork = null; }
 
             NetworkData? oldNetwork;
             bool changed;
-
             lock (_MonitorLock)
             {
                 oldNetwork = CloneNetworkData(_LastKnownNetwork);
@@ -476,23 +482,13 @@ namespace MauiWifiManager
             }
 
             if (raiseEvent && changed)
-            {
                 _WifiNetworkChanged?.Invoke(this, new WifiNetworkChangedEventArgs(oldNetwork, CloneNetworkData(currentNetwork)));
-            }
         }
 
         private static bool AreSameNetwork(NetworkData? first, NetworkData? second)
         {
-            if (first == null && second == null)
-            {
-                return true;
-            }
-
-            if (first == null || second == null)
-            {
-                return false;
-            }
-
+            if (first == null && second == null) return true;
+            if (first == null || second == null) return false;
             return string.Equals(first.Ssid, second.Ssid, StringComparison.Ordinal)
                 && string.Equals(first.Bssid?.ToString(), second.Bssid?.ToString(), StringComparison.Ordinal)
                 && first.IpAddress == second.IpAddress;
@@ -500,11 +496,7 @@ namespace MauiWifiManager
 
         private static NetworkData? CloneNetworkData(NetworkData? source)
         {
-            if (source == null)
-            {
-                return null;
-            }
-
+            if (source == null) return null;
             return new NetworkData
             {
                 StatusId = source.StatusId,
@@ -515,7 +507,14 @@ namespace MauiWifiManager
                 NativeObject = source.NativeObject,
                 Bssid = source.Bssid,
                 SignalStrength = source.SignalStrength,
-                SecurityType = source.SecurityType
+                SecurityType = source.SecurityType,
+                IPv6Address = source.IPv6Address,
+                DnsAddresses = source.DnsAddresses != null ? new List<string>(source.DnsAddresses) : null,
+                SubnetMask = source.SubnetMask,
+                RssiDbm = source.RssiDbm,
+                FrequencyBand = source.FrequencyBand,
+                ChannelNumber = source.ChannelNumber,
+                LinkSpeedMbps = source.LinkSpeedMbps,
             };
         }
 
@@ -531,24 +530,16 @@ namespace MauiWifiManager
                         foreach (var network in scanResponse.Data)
                         {
                             var key = BuildNetworkKey(network);
-                            if (string.IsNullOrWhiteSpace(key))
-                            {
-                                continue;
-                            }
+                            if (string.IsNullOrWhiteSpace(key)) continue;
 
                             if (_DiscoveredNetworkKeys.Add(key))
-                            {
                                 _DeviceDiscovered?.Invoke(this, CloneNetworkData(network)!);
-                            }
                         }
                     }
-
                     await Task.Delay(TimeSpan.FromSeconds(2), cancellationToken);
                 }
             }
-            catch (OperationCanceledException)
-            {
-            }
+            catch (OperationCanceledException) { }
             finally
             {
                 lock (_ScanLock)
@@ -566,43 +557,45 @@ namespace MauiWifiManager
         {
             var ssid = network.Ssid?.Trim() ?? string.Empty;
             var bssid = network.Bssid?.ToString()?.Trim() ?? string.Empty;
-
-            if (string.IsNullOrWhiteSpace(ssid) && string.IsNullOrWhiteSpace(bssid))
-            {
-                return string.Empty;
-            }
-
+            if (string.IsNullOrWhiteSpace(ssid) && string.IsNullOrWhiteSpace(bssid)) return string.Empty;
             return string.Concat(ssid, "|", bssid);
+        }
+
+        private static WifiFrequencyBand GetBandFromFrequencyMHz(int frequencyMhz)
+        {
+            if (frequencyMhz >= 2400 && frequencyMhz < 2500) return WifiFrequencyBand.Band2_4GHz;
+            if (frequencyMhz >= 4900 && frequencyMhz < 5925) return WifiFrequencyBand.Band5GHz;
+            if (frequencyMhz >= 5925 && frequencyMhz < 7125) return WifiFrequencyBand.Band6GHz;
+            return WifiFrequencyBand.Unknown;
+        }
+
+        private static int? GetChannelFromFrequencyMHz(int frequencyMhz)
+        {
+            if (frequencyMhz == 2484) return 14;
+            if (frequencyMhz >= 2412 && frequencyMhz <= 2484) return (frequencyMhz - 2412) / 5 + 1;
+            if (frequencyMhz >= 5180 && frequencyMhz <= 5885) return (frequencyMhz - 5000) / 5;
+            if (frequencyMhz >= 5955 && frequencyMhz <= 7115) return (frequencyMhz - 5955) / 5 + 1;
+            return null;
         }
 
         private string GetSecurityType(NetworkAuthenticationType authType)
         {
-            switch (authType)
+            return authType switch
             {
-                case NetworkAuthenticationType.RsnaPsk:
-                    return "WPA2-PSK";  // WPA2 Personal (Pre-Shared Key)
-                case NetworkAuthenticationType.Rsna:
-                    return "WPA2-Enterprise";  // WPA2 Enterprise
-                case NetworkAuthenticationType.WpaPsk:
-                    return "WPA-PSK";  // WPA Personal (Pre-Shared Key)
-                case NetworkAuthenticationType.Wpa:
-                    return "WPA-Enterprise";  // WPA Enterprise
-                case NetworkAuthenticationType.Open80211:
-                    return "Open (No Security)";  // Open Network
-                case NetworkAuthenticationType.None:
-                default:
-                    return "Unknown or WPA3 (Possibly)"; // Handling missing WPA3 types
-            }
+                NetworkAuthenticationType.RsnaPsk => "WPA2-PSK",
+                NetworkAuthenticationType.Rsna => "WPA2-Enterprise",
+                NetworkAuthenticationType.WpaPsk => "WPA-PSK",
+                NetworkAuthenticationType.Wpa => "WPA-Enterprise",
+                NetworkAuthenticationType.Open80211 => "Open (No Security)",
+                _ => "Unknown or WPA3"
+            };
         }
 
-        private int IpAddressToInt(IPAddress? ip)
+        private static int IpAddressToInt(IPAddress? ip)
         {
             if (ip == null) return 0;
-
             var bytes = ip.GetAddressBytes();
             if (bytes.Length != 4) return 0;
-
-            // Convert big-endian network order → little-endian int
             return (bytes[0] & 0xFF) |
                    ((bytes[1] & 0xFF) << 8) |
                    ((bytes[2] & 0xFF) << 16) |

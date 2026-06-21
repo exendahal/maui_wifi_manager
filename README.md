@@ -1,6 +1,6 @@
 # Wi-Fi Manager for .NET MAUI
 
-The Wi-Fi Manager for .NET MAUI is a simple and powerful library that helps you manage Wi-Fi networks in your cross-platform apps. With this library, you can easily connect to Wi-Fi networks, retrieve network information, and provide quick access to Wi-Fi and wireless settings.
+The Wi-Fi Manager for .NET MAUI is a simple and powerful library that helps you manage Wi-Fi networks in your cross-platform apps. With this library, you can connect to Wi-Fi networks, retrieve network information, detect captive portals, check internet availability, and provide quick access to Wi-Fi and wireless settings.
 
 [![WifiManager.Maui](https://img.shields.io/nuget/v/WifiManager.Maui)](https://www.nuget.org/packages/WifiManager.Maui/)
 
@@ -20,10 +20,12 @@ The Wi-Fi Manager for .NET MAUI is a simple and powerful library that helps you 
 
 ## Key Features
 
-- **Connect to Wi-Fi**: Connect to Wi-Fi networks using SSID and password.
-- **Get Network Info**: View details about the currently connected network.
-- **Observe Wi-Fi Changes**: Subscribe to connected Wi-Fi changes.
-- **Discover Networks**: Listen to discovered Wi-Fi networks.
+- **Connect to Wi-Fi**: Connect using SSID and password, with support for hidden networks and WPA3-SAE.
+- **Get Network Info**: View details about the currently connected network, including IPv6, DNS, subnet mask, signal strength, frequency band, channel, and link speed.
+- **Check Internet Availability**: Verify whether the current Wi-Fi connection has confirmed internet access.
+- **Detect Captive Portals**: Detect whether the connection is behind a login/consent portal (hotel, airport, coffee shop, etc.).
+- **Observe Wi-Fi Changes**: Subscribe to connected Wi-Fi network change events.
+- **Discover Networks**: Listen for Wi-Fi networks as they are discovered during a scan session.
 - **Disconnect Wi-Fi**: Disconnect from a specific Wi-Fi network.
 - **Open Wi-Fi Settings**: Provide quick access to device Wi-Fi settings.
 - **Open Wireless Settings**: Provide quick access to device wireless settings.
@@ -36,7 +38,7 @@ The Wi-Fi Manager for .NET MAUI is a simple and powerful library that helps you 
 
 Before using the library, make sure to initialize it properly:
 
-In your MauiProgram.cs, add the UseMauiWifiManager() extension method:
+In your MauiProgram.cs, add the `UseMauiWifiManager()` extension method:
 
 ```csharp
 public static class MauiProgram
@@ -91,31 +93,65 @@ In `Info.plist`, request location permissions:
 
 ### Connect to Wi-Fi
 
-To connect to a Wi-Fi network:
+Basic connection using SSID and password:
 
 ```csharp
-var response = await CrossWifiManager.Current.ConnectWifi("your-SSID", "your-password");
+var response = await CrossWifiManager.Current.ConnectWifiAsync("your-SSID", "your-password");
 ```
 
-To connect to a specific access point for that SSID (optional `bssid`):
+Target a specific access point by BSSID (Android and Windows only):
 
 ```csharp
-var response = await CrossWifiManager.Current.ConnectWifi("your-SSID", "your-password", "aa:bb:cc:dd:ee:ff");
+var response = await CrossWifiManager.Current.ConnectWifiAsync(
+    "your-SSID", "your-password", "aa:bb:cc:dd:ee:ff");
 ```
+
+---
+
+### Connect to a Hidden Network or Use WPA3
+
+Use `WifiConnectionOptions` to connect to a hidden SSID or specify the security type:
+
+```csharp
+using MauiWifiManager.Abstractions;
+
+var options = new WifiConnectionOptions
+{
+    IsHidden = true,                        // SSID is not broadcast
+    SecurityType = WifiSecurityType.Wpa3Sae // Use WPA3-SAE
+};
+
+var response = await CrossWifiManager.Current.ConnectWifiAsync(
+    "your-SSID", "your-password", options);
+```
+
+Available `WifiSecurityType` values:
+
+| Value        | Description                        |
+|--------------|------------------------------------|
+| `Wpa2Psk`    | WPA2-PSK (default)                 |
+| `Wpa3Sae`    | WPA3-SAE (Android API 29+, iOS 15+, Windows) |
+| `WpaPsk`     | WPA-PSK (TKIP)                     |
+| `Open`       | No password required               |
+| `Wep`        | WEP (legacy)                       |
+
+**Platform notes:**
+- Hidden network support: Android API 29+, iOS 13+, Windows.
+- WPA3-SAE support: Android API 29+, iOS 15+, Windows.
 
 ---
 
 ### Scan for Available Networks
 
-To get a list of available Wi-Fi networks (Android & Windows only):
+To get a one-shot list of available Wi-Fi networks (Android and Windows only):
 
 ```csharp
-var response = await CrossWifiManager.Current.ScanWifiNetworks();
+var response = await CrossWifiManager.Current.ScanWifiNetworksAsync();
 ```
 
 ---
 
-### Discover Networks (Device Discovery)
+### Discover Networks (Continuous Scan)
 
 Use continuous scanning when you want to update your UI as networks are discovered:
 
@@ -125,7 +161,6 @@ using MauiWifiManager.Abstractions;
 
 CrossWifiManager.DeviceDiscovered += (_, network) =>
 {
-    // Called for each discovered SSID/BSSID while scanning is active.
     System.Diagnostics.Debug.WriteLine($"Discovered: {network.Ssid} ({network.Bssid})");
 };
 
@@ -140,7 +175,6 @@ var stopResponse = await CrossWifiManager.StopScanningAsync();
 ```
 
 Notes:
-
 - `DeviceDiscovered` is raised only while scanning is active.
 - `IsScanning` tells whether a scan session is currently running.
 - Continuous discovery is supported on Android and Windows.
@@ -150,17 +184,106 @@ Notes:
 
 ### Get Current Network Info
 
-To retrieve details of the currently connected Wi-Fi network:
+Retrieve details of the currently connected Wi-Fi network:
 
 ```csharp
-var response = await CrossWifiManager.Current.GetNetworkInfo();
+var response = await CrossWifiManager.Current.GetNetworkInfoAsync();
+if (response.ErrorCode == WifiErrorCodes.Success && response.Data != null)
+{
+    var data = response.Data;
+    Console.WriteLine($"SSID:         {data.Ssid}");
+    Console.WriteLine($"BSSID:        {data.Bssid}");
+    Console.WriteLine($"IPv6:         {data.IPv6Address}");
+    Console.WriteLine($"Subnet Mask:  {data.SubnetMask}");
+    Console.WriteLine($"DNS Servers:  {string.Join(", ", data.DnsAddresses ?? [])}");
+    Console.WriteLine($"RSSI:         {data.RssiDbm} dBm");        // Android only
+    Console.WriteLine($"Band:         {data.FrequencyBand}");       // Android + Windows scan
+    Console.WriteLine($"Channel:      {data.ChannelNumber}");       // Android + Windows scan
+    Console.WriteLine($"Link Speed:   {data.LinkSpeedMbps} Mbps");  // Android only
+}
 ```
+
+#### `NetworkData` properties
+
+| Property           | Type                 | Platforms              | Description                                      |
+|--------------------|----------------------|------------------------|--------------------------------------------------|
+| `Ssid`             | `string?`            | All                    | Network SSID                                     |
+| `Bssid`            | `object?`            | All                    | Access point MAC address                         |
+| `IpAddress`        | `int`                | All                    | IPv4 address (32-bit host byte order)            |
+| `GatewayAddress`   | `int`                | All                    | Default gateway (32-bit host byte order)         |
+| `DhcpServerAddress`| `int`                | Android, Windows       | DHCP server address                              |
+| `IPv6Address`      | `string?`            | All                    | IPv6 address of the connected interface          |
+| `SubnetMask`       | `string?`            | All                    | IPv4 subnet mask (e.g. `255.255.255.0`)          |
+| `DnsAddresses`     | `List<string>?`      | All                    | DNS server addresses                             |
+| `RssiDbm`          | `int?`               | Android                | Raw signal strength in dBm                       |
+| `FrequencyBand`    | `WifiFrequencyBand`  | Android, Windows scan  | 2.4 GHz / 5 GHz / 6 GHz                         |
+| `ChannelNumber`    | `int?`               | Android, Windows scan  | Wi-Fi channel number                             |
+| `LinkSpeedMbps`    | `int?`               | Android                | TX link speed in Mbps                            |
+| `SignalStrength`   | `object?`            | All                    | Platform-specific signal indicator               |
+| `SecurityType`     | `object?`            | All                    | Security type string from the platform           |
+| `NativeObject`     | `object?`            | All                    | Platform-specific native network object          |
+
+---
+
+### Check Internet Availability
+
+Verify that the current Wi-Fi connection has confirmed internet access:
+
+```csharp
+var response = await CrossWifiManager.IsInternetAvailableAsync();
+if (response.ErrorCode == WifiErrorCodes.Success)
+{
+    bool hasInternet = response.Data;
+}
+```
+
+**Platform implementation:**
+- **Android** — checks `NET_CAPABILITY_INTERNET` and `NET_CAPABILITY_VALIDATED` via `NetworkCapabilities`.
+- **Windows** — checks `NetworkConnectivityLevel.InternetAccess` via `NetworkInformation`.
+- **iOS / Mac Catalyst** — performs a DNS resolution check against `www.apple.com` with a 5-second timeout.
+
+---
+
+### Detect Captive Portal
+
+Detect whether the current Wi-Fi connection is behind a login/consent portal (hotel, airport, coffee shop, etc.):
+
+```csharp
+var response = await CrossWifiManager.IsCaptivePortalDetectedAsync();
+if (response.ErrorCode == WifiErrorCodes.Success && response.Data)
+{
+    // Prompt the user to open a browser and complete the portal login
+}
+```
+
+A captive portal means the device has Wi-Fi connectivity but internet is blocked until the user authenticates through a web page. You can combine both checks to give users a precise message:
+
+```csharp
+var internet = await CrossWifiManager.IsInternetAvailableAsync();
+if (internet.Data)
+{
+    // Full internet access
+}
+else
+{
+    var captive = await CrossWifiManager.IsCaptivePortalDetectedAsync();
+    if (captive.Data)
+        // "Connected to Wi-Fi, but a login page is required."
+    else
+        // "No internet connection."
+}
+```
+
+**Platform implementation:**
+- **Android** — checks `NET_CAPABILITY_CAPTIVE_PORTAL` via `NetworkCapabilities`.
+- **Windows** — checks `NetworkConnectivityLevel.ConstrainedInternetAccess` or `LocalAccess`.
+- **iOS / Mac Catalyst** — performs an HTTP probe to `captive.apple.com/hotspot-detect.html` and checks the response body/status.
 
 ---
 
 ### Listen for Wi-Fi Network Changes
 
-To react when the connected Wi-Fi changes (for example, when the user changes networks from system settings):
+React when the connected Wi-Fi network changes (e.g. the user switches networks from system settings):
 
 ```csharp
 CrossWifiManager.WifiNetworkChanged += (_, args) =>
@@ -168,7 +291,6 @@ CrossWifiManager.WifiNetworkChanged += (_, args) =>
     var oldSsid = args.OldNetwork?.Ssid;
     var newSsid = args.NewNetwork?.Ssid;
 
-    // Example: show a warning if user moved off your required SSID.
     if (!string.Equals(newSsid, "your-SSID", StringComparison.Ordinal))
     {
         // Update UI / notify user
@@ -180,17 +302,13 @@ CrossWifiManager.WifiNetworkChanged += (_, args) =>
 
 ### Disconnect Wi-Fi
 
-To disconnect from a Wi-Fi network:
-
 ```csharp
-await CrossWifiManager.Current.DisconnectWifi("your-SSID");
+CrossWifiManager.Current.DisconnectWifi("your-SSID");
 ```
 
 ---
 
 ### Open Wireless Settings
-
-To open the device's wireless settings:
 
 ```csharp
 await CrossWifiManager.Current.OpenWirelessSetting();
@@ -202,13 +320,33 @@ await CrossWifiManager.Current.OpenWirelessSetting();
 
 ### Open Wi-Fi Settings
 
-To provide quick access to Wi-Fi settings:
-
 ```csharp
 await CrossWifiManager.Current.OpenWifiSetting();
 ```
 
 **Note**: On iOS, this opens the app's settings instead of Wi-Fi settings.
+
+---
+
+## Feature Support by Platform
+
+| Feature                              | Android     | iOS         | Windows     | Notes                                                     |
+|--------------------------------------|-------------|-------------|-------------|-----------------------------------------------------------|
+| Connect to Wi-Fi                     | ✅          | ✅          | ✅          |                                                           |
+| Connect — Hidden Network             | ✅ API 29+  | ✅ iOS 13+  | ✅          |                                                           |
+| Connect — WPA3-SAE                   | ✅ API 29+  | ✅ iOS 15+  | ✅          |                                                           |
+| Get Current Network Info             | ✅          | ✅          | ✅          |                                                           |
+| IPv6 / Subnet Mask / DNS             | ✅          | ✅          | ✅          |                                                           |
+| RSSI (dBm) / Link Speed              | ✅          | ❌          | ❌          | Android only via `WifiInfo`                               |
+| Frequency Band / Channel             | ✅          | ❌          | ✅ scan     | From scan results on Windows; from `WifiInfo` on Android  |
+| Check Internet Availability          | ✅          | ✅          | ✅          | iOS uses DNS probe                                        |
+| Detect Captive Portal                | ✅          | ✅          | ✅          | iOS uses HTTP probe                                       |
+| Scan for Available Networks          | ✅          | ❌          | ✅          | Not supported on iOS                                      |
+| Device Discovery (Event-based)       | ✅          | ❌          | ✅          | Use `DeviceDiscovered` with Start/Stop scan methods       |
+| Observe Wi-Fi Changes                | ✅          | ✅          | ✅          |                                                           |
+| Disconnect Wi-Fi                     | ✅          | ✅          | ✅          |                                                           |
+| Open Wi-Fi Settings                  | ✅          | ✅*         | ✅          | *Opens app settings on iOS                               |
+| Open Wireless Settings               | ✅          | ✅*         | ✅          | *Opens app settings on iOS                               |
 
 ---
 
@@ -227,18 +365,6 @@ public class WifiManagerResponse<T>
 }
 ```
 
-## Feature Support by Platform
-
-| Feature                          | Android | iOS       | Windows | Notes                                   |
-|----------------------------------|---------|-----------|---------|-----------------------------------------|
-| Connect to Wi-Fi                 | ✅      | ✅        | ✅      | Supported on all platforms.            |
-| Get Current Network Info         | ✅      | ✅        | ✅      | Supported on all platforms.            |
-| Disconnect Wi-Fi                 | ✅      | ✅        | ✅      | Supported on all platforms.            |
-| Scan for Available Wi-Fi Networks| ✅      | ❌        | ✅      | Not supported on iOS.                  |
-| Device Discovery (Event-based)   | ✅      | ❌        | ✅      | Use `DeviceDiscovered` with Start/Stop scan methods. |
-| Open Wireless Settings           | ✅      | ✅*       | ✅      | *Opens app settings on iOS.            |
-| Open Wi-Fi Settings              | ✅      | ✅*       | ✅      | *Opens app settings on iOS.            |
-
 ---
 
 ## Feedback & Issues
@@ -249,7 +375,7 @@ If you encounter any issues or have suggestions, please open an issue on the pro
 
 ## Contributing Guidelines
 
- contributions to this project are always welcomed. To ensure a smooth collaboration, please follow these guidelines:
+Contributions to this project are always welcomed. To ensure a smooth collaboration, please follow these guidelines:
 
 ### **Branching Strategy**
 

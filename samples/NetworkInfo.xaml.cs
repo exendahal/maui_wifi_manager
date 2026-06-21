@@ -9,10 +9,10 @@ public partial class NetworkInfo : ContentPage
 {
     private bool _isSubscribedToWifiEvents;
 
-	public NetworkInfo()
-	{
-		InitializeComponent();
-	}
+    public NetworkInfo()
+    {
+        InitializeComponent();
+    }
 
     protected override async void OnAppearing()
     {
@@ -36,36 +36,63 @@ public partial class NetworkInfo : ContentPage
     private async Task LoadAndRenderCurrentNetworkInfo()
     {
         var response = await CrossWifiManager.Current.GetNetworkInfoAsync();
-        if (response != null)
+        if (response?.ErrorCode == WifiErrorCodes.Success && response.Data != null)
+            RenderNetworkData(response.Data);
+    }
+
+    private void RenderNetworkData(NetworkData data)
+    {
+        IPAddress ipAddress = new(BitConverter.GetBytes(data.IpAddress));
+        IPAddress gateway = new(BitConverter.GetBytes(data.GatewayAddress));
+        IPAddress serverAddress = new(BitConverter.GetBytes(data.DhcpServerAddress));
+
+        wifiSsid.Text = data.Ssid;
+        wifiBssid.Text = data.Bssid?.ToString();
+        ipAddressTxt.Text = $"IP: {ipAddress}\nGateway: {gateway}\nDHCP: {serverAddress}";
+        ipv6AddressTxt.Text = data.IPv6Address ?? "—";
+        subnetMaskTxt.Text = data.SubnetMask ?? "—";
+        dnsServersTxt.Text = data.DnsAddresses?.Count > 0
+            ? string.Join(", ", data.DnsAddresses)
+            : "—";
+        securityTxt.Text = data.SecurityType?.ToString();
+        rssiTxt.Text = data.RssiDbm.HasValue ? $"{data.RssiDbm} dBm" : "—";
+        frequencyBandTxt.Text = data.FrequencyBand.ToString();
+        channelTxt.Text = data.ChannelNumber.HasValue ? data.ChannelNumber.ToString() : "—";
+        linkSpeedTxt.Text = data.LinkSpeedMbps.HasValue ? $"{data.LinkSpeedMbps} Mbps" : "—";
+
+        if (data.NativeObject != null)
         {
-            if (response.ErrorCode == WifiErrorCodes.Success)
-            {
-                if (response.Data != null)
-                {
-                    IPAddress ipAddress = new(BitConverter.GetBytes(response.Data.IpAddress));
-                    IPAddress gateway = new(BitConverter.GetBytes(response.Data.GatewayAddress));
-                    IPAddress serverAddress = new(BitConverter.GetBytes(response.Data.DhcpServerAddress));
-                    wifiSsid.Text = response.Data.Ssid;
-                    wifiBssid.Text = response.Data.Bssid?.ToString();
-                    ipAddressTxt.Text = $"IP:{ipAddress.ToString()}\nGateway:{gateway.ToString()}\nDHCP Server:{serverAddress.ToString()}";
-                    securityTxt.Text = response.Data.SecurityType?.ToString();
-                    if (response.Data.NativeObject != null)
-                    {
-                        Debug.WriteLine(response.Data.NativeObject);
-                        nativeObject.Text = FormatNativeObject(response.Data.NativeObject);
-                    }
-                }
-            }
+            Debug.WriteLine(data.NativeObject);
+            nativeObject.Text = FormatNativeObject(data.NativeObject);
         }
+    }
+
+    private async void CheckInternetBtnClicked(object sender, EventArgs e)
+    {
+        CheckInternetBtn.IsEnabled = false;
+        internetStatusTxt.Text = "Checking...";
+        var response = await CrossWifiManager.IsInternetAvailableAsync();
+        internetStatusTxt.Text = response.ErrorCode == WifiErrorCodes.Success
+            ? (response.Data ? "Internet available" : "No internet connection")
+            : $"Error: {response.ErrorMessage}";
+        CheckInternetBtn.IsEnabled = true;
+    }
+
+    private async void CheckCaptiveBtnClicked(object sender, EventArgs e)
+    {
+        CheckCaptiveBtn.IsEnabled = false;
+        captivePortalTxt.Text = "Checking...";
+        var response = await CrossWifiManager.IsCaptivePortalDetectedAsync();
+        captivePortalTxt.Text = response.ErrorCode == WifiErrorCodes.Success
+            ? (response.Data ? "Captive portal detected" : "No captive portal")
+            : $"Error: {response.ErrorMessage}";
+        CheckCaptiveBtn.IsEnabled = true;
     }
 
     private void SubscribeToWifiChanges()
     {
         if (_isSubscribedToWifiEvents)
-        {
             return;
-        }
-
         CrossWifiManager.WifiNetworkChanged += OnWifiNetworkChanged;
         _isSubscribedToWifiEvents = true;
         wifiChangeStatus.Text = "Subscribed: listening for Wi-Fi changes";
@@ -74,10 +101,7 @@ public partial class NetworkInfo : ContentPage
     private void UnsubscribeFromWifiChanges()
     {
         if (!_isSubscribedToWifiEvents)
-        {
             return;
-        }
-
         CrossWifiManager.WifiNetworkChanged -= OnWifiNetworkChanged;
         _isSubscribedToWifiEvents = false;
         wifiChangeStatus.Text = "Not subscribed";
@@ -93,21 +117,21 @@ public partial class NetworkInfo : ContentPage
 
             if (e.NewNetwork != null)
             {
-                wifiSsid.Text = e.NewNetwork.Ssid;
-                wifiBssid.Text = e.NewNetwork.Bssid?.ToString();
-                IPAddress ipAddress = new(BitConverter.GetBytes(e.NewNetwork.IpAddress));
-                IPAddress gateway = new(BitConverter.GetBytes(e.NewNetwork.GatewayAddress));
-                IPAddress serverAddress = new(BitConverter.GetBytes(e.NewNetwork.DhcpServerAddress));
-                ipAddressTxt.Text = $"IP:{ipAddress}\nGateway:{gateway}\nDHCP Server:{serverAddress}";
-                securityTxt.Text = e.NewNetwork.SecurityType?.ToString();
-                nativeObject.Text = e.NewNetwork.NativeObject != null ? FormatNativeObject(e.NewNetwork.NativeObject) : string.Empty;
+                RenderNetworkData(e.NewNetwork);
             }
             else
             {
                 wifiSsid.Text = "";
                 wifiBssid.Text = "";
                 ipAddressTxt.Text = string.Empty;
+                ipv6AddressTxt.Text = "—";
+                subnetMaskTxt.Text = "—";
+                dnsServersTxt.Text = "—";
                 securityTxt.Text = string.Empty;
+                rssiTxt.Text = "—";
+                frequencyBandTxt.Text = "—";
+                channelTxt.Text = "—";
+                linkSpeedTxt.Text = "—";
                 nativeObject.Text = string.Empty;
             }
         });
@@ -116,9 +140,7 @@ public partial class NetworkInfo : ContentPage
     private static string FormatNetworkSnapshot(string title, MauiWifiManager.Abstractions.NetworkData? network)
     {
         if (network == null)
-        {
             return $"{title}: (none)";
-        }
 
         var ipAddress = new IPAddress(BitConverter.GetBytes(network.IpAddress));
         var gateway = new IPAddress(BitConverter.GetBytes(network.GatewayAddress));
@@ -130,10 +152,16 @@ public partial class NetworkInfo : ContentPage
             + $"BSSID: {network.Bssid}\n"
             + $"SignalStrength: {network.SignalStrength}\n"
             + $"SecurityType: {network.SecurityType}\n"
-            + $"IpAddress: {ipAddress}\n"
-            + $"GatewayAddress: {gateway}\n"
-            + $"DhcpServerAddress: {serverAddress}\n"
-            + $"NativeObjectType: {network.NativeObject?.GetType().Name}";
+            + $"IP: {ipAddress}\n"
+            + $"Gateway: {gateway}\n"
+            + $"DHCP: {serverAddress}\n"
+            + $"IPv6: {network.IPv6Address ?? "—"}\n"
+            + $"Subnet: {network.SubnetMask ?? "—"}\n"
+            + $"DNS: {(network.DnsAddresses?.Count > 0 ? string.Join(", ", network.DnsAddresses) : "—")}\n"
+            + $"RSSI: {(network.RssiDbm.HasValue ? $"{network.RssiDbm} dBm" : "—")}\n"
+            + $"Band: {network.FrequencyBand}\n"
+            + $"Channel: {(network.ChannelNumber.HasValue ? network.ChannelNumber.ToString() : "—")}\n"
+            + $"LinkSpeed: {(network.LinkSpeedMbps.HasValue ? $"{network.LinkSpeedMbps} Mbps" : "—")}";
     }
 
     private string FormatNativeObject(object nativeObject)
@@ -145,7 +173,6 @@ public partial class NetworkInfo : ContentPage
 
         sb.AppendLine($"Object Type: {type.Name}");
 
-        // Get all properties dynamically
         foreach (var prop in type.GetProperties())
         {
             try
@@ -161,5 +188,4 @@ public partial class NetworkInfo : ContentPage
 
         return sb.ToString();
     }
-
 }

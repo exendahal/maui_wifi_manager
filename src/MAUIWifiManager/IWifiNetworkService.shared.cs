@@ -48,6 +48,12 @@ namespace MauiWifiManager
         Task<WifiManagerResponse<NetworkData>> ConnectWifiAsync(string ssid, string password, string? bssid, CancellationToken cancellationToken = default);
 
         /// <summary>
+        /// Connects to a Wi-Fi network using the provided connection options.
+        /// Supports hidden networks (all platforms) and WPA3-SAE (Android API 29+, iOS 15+, Windows).
+        /// </summary>
+        Task<WifiManagerResponse<NetworkData>> ConnectWifiAsync(string ssid, string password, WifiConnectionOptions options, CancellationToken cancellationToken = default);
+
+        /// <summary>
         /// Retrieves details of the currently connected Wi-Fi network.
         /// </summary>
         [Obsolete("Use GetNetworkInfoAsync(CancellationToken cancellationToken = default) instead.")]
@@ -95,5 +101,19 @@ namespace MauiWifiManager
         /// On iOS, this opens the app's settings instead of wireless settings.
         /// </summary>
         Task<bool> OpenWirelessSetting();
-    }    
+
+        /// <summary>
+        /// Returns true when the device has a validated internet connection over Wi-Fi.
+        /// On Android uses NetworkCapabilities; on Windows uses NetworkConnectivityLevel;
+        /// on iOS/Mac Catalyst performs a DNS reachability check.
+        /// </summary>
+        Task<WifiManagerResponse<bool>> IsInternetAvailableAsync(CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Returns true when a captive portal is detected on the current Wi-Fi network.
+        /// On Android uses NET_CAPABILITY_CAPTIVE_PORTAL; on Windows uses ConstrainedInternetAccess;
+        /// on iOS performs an HTTP probe to Apple's captive portal detection endpoint.
+        /// </summary>
+        Task<WifiManagerResponse<bool>> IsCaptivePortalDetectedAsync(CancellationToken cancellationToken = default);
+    }
 }
