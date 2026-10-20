@@ -2,93 +2,111 @@
 <ContentPage
     x:Class="DemoApp.ConnectWifi"
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
-    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml">
-    <Shell.TitleView>
-        <Grid>
-            <Label
-                Grid.Column="1"
-                FontSize="Title"
-                HorizontalTextAlignment="Start"
-                Text="MAUI Wi-Fi Manager"
-                TextColor="{StaticResource SecondaryDarkText}"
-                TextTransform="Uppercase"
-                VerticalTextAlignment="Center" />
-        </Grid>
-    </Shell.TitleView>
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    Title="Connect">
     <ScrollView>
-        <StackLayout>
-            <Image HeightRequest="160" Source="dotnet_bot.png" />
-            <Label
-                FontSize="Title"
-                HorizontalOptions="Center"
-                Text="Connect Wi-Fi"
-                TextColor="{StaticResource SecondaryDarkText}"
-                TextTransform="Uppercase" />
-            <StackLayout Padding="40,20">
-                <Label
-                    Margin="0,12,0,4"
-                    FontSize="12"
-                    Text="Enter Wi-Fi SSID"
-                    TextColor="{StaticResource SecondaryDarkText}"
-                    TextTransform="Uppercase" />
-                <Entry
-                    x:Name="WifiSsid"
-                    Placeholder="Wi-Fi SSID"
-                    Text="Minions_5" />
+        <VerticalStackLayout Padding="20,16,20,32">
+            <Label Style="{StaticResource PageTitle}" Text="Connect" />
+            <Label Style="{StaticResource Muted}" Text="Join a network by name, or fill the form from a Wi-Fi QR code." />
 
-                <Label
-                    Margin="0,12,0,4"
-                    FontSize="12"
-                    Text="Enter Wi-Fi Password"
-                    TextColor="{StaticResource SecondaryDarkText}"
-                    TextTransform="Uppercase" />
-                <Entry
-                    x:Name="WifiPassword"
-                    Placeholder="Wi-Fi Password"
-                    Text="CLB2727979" />
+            <Label Style="{StaticResource SectionHeader}" Text="Network" />
+            <Border Style="{StaticResource Card}">
+                <VerticalStackLayout>
+                    <Grid ColumnDefinitions="96,*" Style="{StaticResource FieldRow}">
+                        <Label Style="{StaticResource FieldLabel}" Text="Name" />
+                        <Entry
+                            x:Name="ssidEntry"
+                            Grid.Column="1"
+                            Placeholder="SSID"
+                            ReturnType="Next" />
+                    </Grid>
+                    <BoxView Style="{StaticResource Divider}" />
 
-                <Label
-                    Margin="0,12,0,4"
-                    FontSize="12"
-                    Text="Security Type"
-                    TextColor="{StaticResource SecondaryDarkText}"
-                    TextTransform="Uppercase" />
-                <Picker x:Name="SecurityTypePicker" Title="Select security type">
-                    <Picker.Items>
-                        <x:String>WPA2-PSK</x:String>
-                        <x:String>WPA3-SAE</x:String>
-                        <x:String>WPA-PSK</x:String>
-                        <x:String>Open (No Password)</x:String>
-                        <x:String>WEP</x:String>
-                    </Picker.Items>
-                </Picker>
+                    <Grid ColumnDefinitions="96,*" Style="{StaticResource FieldRow}">
+                        <Label Style="{StaticResource FieldLabel}" Text="Security" />
+                        <Picker
+                            x:Name="securityPicker"
+                            Title="Security"
+                            Grid.Column="1"
+                            SelectedIndexChanged="SecurityChanged">
+                            <Picker.Items>
+                                <x:String>WPA2 Personal</x:String>
+                                <x:String>WPA3 Personal</x:String>
+                                <x:String>WPA Personal</x:String>
+                                <x:String>WEP</x:String>
+                                <x:String>None (open)</x:String>
+                            </Picker.Items>
+                        </Picker>
+                    </Grid>
 
-                <Grid Margin="0,12,0,0" ColumnDefinitions="*,Auto" VerticalOptions="Center">
-                    <Label
-                        Grid.Column="0"
-                        FontSize="12"
-                        Text="Hidden Network (SSID not broadcast)"
-                        TextColor="{StaticResource SecondaryDarkText}"
-                        TextTransform="Uppercase"
-                        VerticalOptions="Center" />
-                    <Switch
-                        x:Name="IsHiddenSwitch"
-                        Grid.Column="1"
-                        IsToggled="False"
-                        VerticalOptions="Center" />
-                </Grid>
+                    <VerticalStackLayout x:Name="passwordRow">
+                        <BoxView Style="{StaticResource Divider}" />
+                        <Grid ColumnDefinitions="96,*,Auto" Style="{StaticResource FieldRow}">
+                            <Label Style="{StaticResource FieldLabel}" Text="Password" />
+                            <Entry
+                                x:Name="passwordEntry"
+                                Grid.Column="1"
+                                IsPassword="True"
+                                Placeholder="Required" />
+                            <Button
+                                x:Name="showPasswordBtn"
+                                Grid.Column="2"
+                                Clicked="TogglePasswordClicked"
+                                Style="{StaticResource TextButton}"
+                                Text="Show" />
+                        </Grid>
+                    </VerticalStackLayout>
+                </VerticalStackLayout>
+            </Border>
 
-                <Button
-                    x:Name="ConnectBtn"
-                    Grid.Column="0"
-                    Margin="0,32"
-                    BackgroundColor="{StaticResource SecondaryDarkText}"
-                    Clicked="ConnectBtnClicked"
-                    FontSize="12"
-                    Text="Connect Wi-Fi"
-                    TextColor="White"
-                    TextTransform="Uppercase" />
-            </StackLayout>
-        </StackLayout>
+            <Label Style="{StaticResource SectionHeader}" Text="Advanced" />
+            <Border Style="{StaticResource Card}">
+                <VerticalStackLayout>
+                    <Grid ColumnDefinitions="*,Auto" Style="{StaticResource FieldRow}">
+                        <VerticalStackLayout Spacing="2" VerticalOptions="Center">
+                            <Label Text="Hidden network" />
+                            <Label Style="{StaticResource Muted}" Text="The access point does not broadcast its name." />
+                        </VerticalStackLayout>
+                        <Switch
+                            x:Name="hiddenSwitch"
+                            Grid.Column="1"
+                            VerticalOptions="Center" />
+                    </Grid>
+                    <BoxView Style="{StaticResource Divider}" />
+                    <Grid ColumnDefinitions="96,*" Style="{StaticResource FieldRow}">
+                        <Label Style="{StaticResource FieldLabel}" Text="BSSID" />
+                        <Entry
+                            x:Name="bssidEntry"
+                            Grid.Column="1"
+                            Placeholder="Any access point" />
+                    </Grid>
+                </VerticalStackLayout>
+            </Border>
+
+            <Button
+                x:Name="connectBtn"
+                Margin="0,24,0,0"
+                Clicked="ConnectClicked"
+                Text="Connect" />
+
+            <Border
+                x:Name="resultNotice"
+                Margin="0,12,0,0"
+                IsVisible="False"
+                Style="{StaticResource Notice}">
+                <Label x:Name="resultTxt" />
+            </Border>
+
+            <Label Style="{StaticResource SectionHeader}" Text="Wi-Fi QR code" />
+            <Border Padding="16" Style="{StaticResource Card}">
+                <VerticalStackLayout Spacing="12">
+                    <Label Style="{StaticResource Muted}" Text="Routers and phones can share a network as a QR code. Scanning one fills in the name, password and security above." />
+                    <Button
+                        Clicked="ScanQrClicked"
+                        Style="{StaticResource SecondaryButton}"
+                        Text="Scan QR code" />
+                </VerticalStackLayout>
+            </Border>
+        </VerticalStackLayout>
     </ScrollView>
 </ContentPage>

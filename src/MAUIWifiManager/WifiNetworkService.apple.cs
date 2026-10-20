@@ -16,6 +16,7 @@ namespace MauiWifiManager
         public NEHotspotHelper _HotspotHelper;
         private EventHandler<WifiNetworkChangedEventArgs>? _WifiNetworkChanged;
         public event EventHandler<NetworkData>? DeviceDiscovered;
+        public event EventHandler<NetworkData>? DeviceLost;
         private readonly object _MonitorLock = new();
         private NetworkData? _LastKnownNetwork;
         private bool _IsMonitoring;

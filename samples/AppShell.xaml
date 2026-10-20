@@ -4,6 +4,26 @@
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
     xmlns:local="clr-namespace:DemoApp"
-    Title="MAUI Wi-FI Manager">
-    <ShellContent ContentTemplate="{DataTemplate local:MainPage}" />
+    xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
+    Title="Wi-Fi Manager">
+    <Shell.Behaviors>
+        <toolkit:StatusBarBehavior StatusBarColor="{AppThemeBinding Light={StaticResource BackgroundLight}, Dark={StaticResource BackgroundDark}}" StatusBarStyle="{AppThemeBinding Light=DarkContent, Dark=LightContent}" />
+    </Shell.Behaviors>
+    <TabBar>
+        <ShellContent
+            Title="Networks"
+            ContentTemplate="{DataTemplate local:ScanListPage}"
+            Icon="tab_networks.png"
+            Route="networks" />
+        <ShellContent
+            Title="Connection"
+            ContentTemplate="{DataTemplate local:NetworkInfo}"
+            Icon="tab_connection.png"
+            Route="connection" />
+        <ShellContent
+            Title="Connect"
+            ContentTemplate="{DataTemplate local:ConnectWifi}"
+            Icon="tab_connect.png"
+            Route="connect" />
+    </TabBar>
 </Shell>

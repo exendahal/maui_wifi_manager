@@ -164,7 +164,14 @@ CrossWifiManager.DeviceDiscovered += (_, network) =>
     System.Diagnostics.Debug.WriteLine($"Discovered: {network.Ssid} ({network.Bssid})");
 };
 
-var startResponse = await CrossWifiManager.StartScanningForDevicesAsync();
+CrossWifiManager.DeviceLost += (_, network) =>
+{
+    System.Diagnostics.Debug.WriteLine($"Lost: {network.Ssid} ({network.Bssid})");
+};
+
+// Scanning stops when the token is canceled. Without a cancelable token it stops after 30 seconds.
+using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(2));
+var startResponse = await CrossWifiManager.StartScanningForDevicesAsync(cts.Token);
 if (startResponse.ErrorCode == WifiErrorCodes.Success && CrossWifiManager.IsScanning)
 {
     // Scanning is active
@@ -175,7 +182,8 @@ var stopResponse = await CrossWifiManager.StopScanningAsync();
 ```
 
 Notes:
-- `DeviceDiscovered` is raised only while scanning is active.
+- `DeviceDiscovered` and `DeviceLost` are raised only while scanning is active. `DeviceLost` fires when a network goes out of range or Wi-Fi is turned off.
+- Android throttles Wi-Fi scans (4 per 2 minutes in foreground, about 1 per 30 minutes in background). To stay within that quota a scan session requests a fresh scan only every 30 seconds and reads cached results (which also include scans made by the system) every 2 seconds in between, so new or removed networks may take up to ~30 seconds to show. This is an OS limit and cannot be bypassed by the library; for testing it can be turned off via Developer options → "Wi-Fi scan throttling".
 - `IsScanning` tells whether a scan session is currently running.
 - Continuous discovery is supported on Android and Windows.
 - iOS does not support Wi-Fi network scanning APIs.

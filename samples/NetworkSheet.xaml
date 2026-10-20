@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<toolkit:Popup
+    x:Class="DemoApp.NetworkSheet"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
+    x:TypeArguments="x:Boolean"
+    Margin="12"
+    Padding="0"
+    BackgroundColor="{AppThemeBinding Light={StaticResource SurfaceLight}, Dark={StaticResource SurfaceDark}}"
+    HorizontalOptions="Fill"
+    VerticalOptions="End">
+    <VerticalStackLayout Padding="20,22,20,12">
+        <VerticalStackLayout Spacing="2">
+            <Label
+                x:Name="titleTxt"
+                FontFamily="OpenSansSemibold"
+                FontSize="20"
+                LineBreakMode="TailTruncation" />
+            <Label x:Name="summaryTxt" Style="{StaticResource Muted}" />
+        </VerticalStackLayout>
+
+        <Border
+            Margin="0,16,0,0"
+            Padding="16,0"
+            Style="{StaticResource Notice}">
+            <VerticalStackLayout x:Name="detailsList" />
+        </Border>
+
+        <Label
+            x:Name="hiddenHintTxt"
+            Margin="4,12,4,0"
+            IsVisible="False"
+            Style="{StaticResource Muted}"
+            Text="This network hides its name. You will need to type the SSID to connect." />
+
+        <Button
+            Margin="0,20,0,0"
+            Clicked="ConnectClicked"
+            Text="Connect" />
+        <Button
+            Margin="0,4,0,0"
+            Clicked="CloseClicked"
+            HorizontalOptions="Fill"
+            Style="{StaticResource TextButton}"
+            Text="Close" />
+    </VerticalStackLayout>
+</toolkit:Popup>

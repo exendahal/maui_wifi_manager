@@ -18,6 +18,11 @@ namespace MauiWifiManager
         event EventHandler<NetworkData>? DeviceDiscovered;
 
         /// <summary>
+        /// Raised when a previously discovered Wi-Fi network is no longer visible (or Wi-Fi was turned off) during an active scan session.
+        /// </summary>
+        event EventHandler<NetworkData>? DeviceLost;
+
+        /// <summary>
         /// Gets a value indicating whether a scan session is currently running.
         /// </summary>
         bool IsScanning { get; }
@@ -87,7 +92,9 @@ namespace MauiWifiManager
         Task<WifiManagerResponse<List<NetworkData>>> ScanWifiNetworksAsync(CancellationToken cancellationToken = default);
 
         /// <summary>
-        /// Starts a continuous scan session and emits discovered networks through DeviceDiscovered.
+        /// Starts a continuous scan session and emits discovered networks through DeviceDiscovered
+        /// and networks that went out of range through DeviceLost.
+        /// The session stops when cancellationToken is canceled; when no cancelable token is passed it stops after 30 seconds.
         /// </summary>
         Task<WifiManagerResponse<bool>> StartScanningForDevicesAsync(CancellationToken cancellationToken = default);
 

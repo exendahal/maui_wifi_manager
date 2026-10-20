@@ -13,13 +13,15 @@ namespace MauiWifiManager
     {
         private EventHandler<WifiNetworkChangedEventArgs>? _WifiNetworkChanged;
         private EventHandler<NetworkData>? _DeviceDiscovered;
+        private EventHandler<NetworkData>? _DeviceLost;
         private readonly object _MonitorLock = new();
         private readonly object _ScanLock = new();
         private NetworkData? _LastKnownNetwork;
         private CancellationTokenSource? _ScanSessionCts;
         private Task? _ScanSessionTask;
-        private readonly HashSet<string> _DiscoveredNetworkKeys = new(StringComparer.OrdinalIgnoreCase);
         private bool _IsMonitoring;
+
+        private static readonly TimeSpan DefaultScanSessionDuration = TimeSpan.FromSeconds(30);
 
         public bool IsScanning { get; private set; }
 
@@ -37,6 +39,12 @@ namespace MauiWifiManager
         {
             add => _DeviceDiscovered += value;
             remove => _DeviceDiscovered -= value;
+        }
+
+        public event EventHandler<NetworkData>? DeviceLost
+        {
+            add => _DeviceLost += value;
+            remove => _DeviceLost -= value;
         }
 
         public WifiNetworkService() { }
@@ -349,8 +357,9 @@ namespace MauiWifiManager
                 if (IsScanning)
                     return Task.FromResult(WifiManagerResponse<bool>.SuccessResponse(true, "Scan session is already running."));
 
-                _DiscoveredNetworkKeys.Clear();
                 _ScanSessionCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                if (!cancellationToken.CanBeCanceled)
+                    _ScanSessionCts.CancelAfter(DefaultScanSessionDuration);
                 IsScanning = true;
                 _ScanSessionTask = RunScanSessionAsync(_ScanSessionCts.Token);
             }
@@ -520,21 +529,35 @@ namespace MauiWifiManager
 
         private async Task RunScanSessionAsync(CancellationToken cancellationToken)
         {
+            var known = new Dictionary<string, NetworkData>(StringComparer.OrdinalIgnoreCase);
             try
             {
                 while (!cancellationToken.IsCancellationRequested)
                 {
                     var scanResponse = await ScanWifiNetworksAsync(cancellationToken);
-                    if (scanResponse.ErrorCode == WifiErrorCodes.Success && scanResponse.Data != null)
+                    // Wi-Fi turned off means every network is gone; other errors keep the current list.
+                    var networks = scanResponse.ErrorCode == WifiErrorCodes.Success ? scanResponse.Data
+                        : scanResponse.ErrorCode == WifiErrorCodes.WifiNotEnabled ? new List<NetworkData>()
+                        : null;
+                    if (networks != null)
                     {
-                        foreach (var network in scanResponse.Data)
+                        var current = new Dictionary<string, NetworkData>(StringComparer.OrdinalIgnoreCase);
+                        foreach (var network in networks)
                         {
                             var key = BuildNetworkKey(network);
-                            if (string.IsNullOrWhiteSpace(key)) continue;
-
-                            if (_DiscoveredNetworkKeys.Add(key))
-                                _DeviceDiscovered?.Invoke(this, CloneNetworkData(network)!);
+                            if (!string.IsNullOrWhiteSpace(key))
+                                current[key] = network;
                         }
+
+                        foreach (var (key, network) in known)
+                            if (!current.ContainsKey(key))
+                                _DeviceLost?.Invoke(this, network);
+
+                        foreach (var (key, network) in current)
+                            if (!known.ContainsKey(key))
+                                _DeviceDiscovered?.Invoke(this, CloneNetworkData(network)!);
+
+                        known = current;
                     }
                     await Task.Delay(TimeSpan.FromSeconds(2), cancellationToken);
                 }
@@ -544,11 +567,14 @@ namespace MauiWifiManager
             {
                 lock (_ScanLock)
                 {
-                    IsScanning = false;
-                    _ScanSessionCts?.Dispose();
-                    _ScanSessionCts = null;
-                    _ScanSessionTask = null;
-                    _DiscoveredNetworkKeys.Clear();
+                    // StopScanningAsync may already have cleared this session and a new one may be running.
+                    if (_ScanSessionCts != null && _ScanSessionCts.Token == cancellationToken)
+                    {
+                        IsScanning = false;
+                        _ScanSessionCts.Dispose();
+                        _ScanSessionCts = null;
+                        _ScanSessionTask = null;
+                    }
                 }
             }
         }

@@ -67,6 +67,21 @@ namespace MauiWifiManager
         }
 
         /// <summary>
+        /// Raised when a previously discovered network is no longer visible during an active scan session.
+        /// </summary>
+        public static event EventHandler<Abstractions.NetworkData>? DeviceLost
+        {
+            add => Current.DeviceLost += value;
+            remove
+            {
+                if (_Implementation != null && _Implementation.IsValueCreated)
+                {
+                    _Implementation.Value.DeviceLost -= value;
+                }
+            }
+        }
+
+        /// <summary>
         /// Gets whether the current implementation is scanning for devices.
         /// </summary>
         public static bool IsScanning => Current.IsScanning;
