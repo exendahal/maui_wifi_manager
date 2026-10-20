@@ -6,7 +6,7 @@
     Title="Connection">
     <RefreshView x:Name="refreshView" Refreshing="OnRefreshing">
         <ScrollView>
-            <VerticalStackLayout Padding="20,16,20,32">
+            <VerticalStackLayout Padding="{OnPlatform Default='20,16,20,32', WinUI='40,28,40,40'}">
                 <Label Style="{StaticResource PageTitle}" Text="Connection" />
 
                 <Border
@@ -17,8 +17,8 @@
                         <VerticalStackLayout Spacing="4">
                             <Label
                                 x:Name="ssidTxt"
-                                FontFamily="OpenSansSemibold"
-                                FontSize="22"
+                                FontFamily="{StaticResource DisplayFont}"
+                                FontSize="{OnPlatform Default=22, WinUI=20}"
                                 LineBreakMode="TailTruncation"
                                 Text="Loading…" />
                             <Label x:Name="summaryTxt" Style="{StaticResource Muted}" />
@@ -32,7 +32,7 @@
                             VerticalOptions="Start">
                             <Label
                                 x:Name="statusPillTxt"
-                                FontFamily="OpenSansSemibold"
+                                FontFamily="{StaticResource SemiboldFont}"
                                 FontSize="12" />
                         </Border>
                     </Grid>

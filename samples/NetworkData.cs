@@ -42,6 +42,12 @@ namespace DemoApp
     {
         public const string None = "—";
 
+        /// <summary>RSSI in dBm where the platform reports it (Android), otherwise Windows signal bars (0–5).</summary>
+        public static string Signal(NetworkData data) =>
+            data.RssiDbm is int dbm ? $"{dbm} dBm"
+            : data.SignalStrength is byte bars ? $"{bars} of 5 bars"
+            : data.SignalStrength?.ToString() ?? None;
+
         public static string Ip(int address) =>
             address == 0 ? None : new IPAddress(BitConverter.GetBytes(address)).ToString();
 
@@ -95,7 +101,9 @@ namespace DemoApp
         {
             var app = Application.Current!;
             var key = name + (app.RequestedTheme == AppTheme.Dark ? "Dark" : "Light");
-            return app.Resources.TryGetValue(key, out var value) && value is Color color ? color : Colors.Gray;
+            if (!app.Resources.TryGetValue(key, out var value))
+                return Colors.Gray;
+            return value is OnPlatform<Color> perPlatform ? (Color)perPlatform : value as Color ?? Colors.Gray;
         }
     }
 
@@ -129,7 +137,7 @@ namespace DemoApp
         /// <summary>Rounded, borderless popup over a dimmed page, matching the card style.</summary>
         public static CommunityToolkit.Maui.PopupOptions Options => new()
         {
-            Shape = new Microsoft.Maui.Controls.Shapes.RoundRectangle { CornerRadius = 20, StrokeThickness = 0 },
+            Shape = new Microsoft.Maui.Controls.Shapes.RoundRectangle { CornerRadius = DeviceInfo.Current.Platform == DevicePlatform.WinUI ? 8 : 20, StrokeThickness = 0 },
             Shadow = null,
             PageOverlayColor = Color.FromRgba(0, 0, 0, 0.55)
         };

@@ -99,6 +99,9 @@ public partial class ScanListPage : ContentPage
         UpdateStatus();
     }
 
+    // Setting IsRefreshing raises Refreshing, so the button and the pull gesture share one code path.
+    private void RefreshClicked(object sender, EventArgs e) => refreshView.IsRefreshing = true;
+
     /// <summary>Pull to refresh runs a single ScanWifiNetworksAsync call and replaces the list with its result.</summary>
     private async void OnRefreshing(object? sender, EventArgs e)
     {
@@ -162,10 +165,12 @@ public partial class ScanListPage : ContentPage
         _NetworksByKey.Clear();
     }
 
-    private async void NetworkTapped(object? sender, TappedEventArgs e)
+    // List selection (rather than a tap gesture) keeps rows reachable by keyboard, UI Automation and screen readers.
+    private async void NetworkSelected(object? sender, SelectionChangedEventArgs e)
     {
-        if ((sender as BindableObject)?.BindingContext is not NetworkDataModel model)
+        if (e.CurrentSelection.FirstOrDefault() is not NetworkDataModel model)
             return;
+        networkList.SelectedItem = null;
 
         _IsShowingPopup = true;
         var result = await this.ShowPopupAsync<bool>(new NetworkSheet(model), AppPopup.Options);

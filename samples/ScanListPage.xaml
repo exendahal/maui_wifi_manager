@@ -5,7 +5,7 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
     xmlns:local="clr-namespace:DemoApp"
     Title="Networks">
-    <Grid Padding="20,16,20,0" RowDefinitions="Auto,Auto,*">
+    <Grid Padding="{OnPlatform Default='20,16,20,0', WinUI='40,28,40,0'}" RowDefinitions="Auto,Auto,*">
         <Grid ColumnDefinitions="*,Auto">
             <VerticalStackLayout Spacing="2">
                 <Label Style="{StaticResource PageTitle}" Text="Networks" />
@@ -21,12 +21,21 @@
                         VerticalOptions="Center" />
                 </HorizontalStackLayout>
             </VerticalStackLayout>
-            <Button
-                x:Name="scanBtn"
+            <HorizontalStackLayout
                 Grid.Column="1"
-                Clicked="ScanClicked"
-                Style="{StaticResource TextButton}"
-                VerticalOptions="Start" />
+                Spacing="8"
+                VerticalOptions="{OnPlatform Default=Start, WinUI=Center}">
+                <!-- Pull to refresh is a touch gesture, so Windows gets an explicit button for the one-off scan. -->
+                <Button
+                    Clicked="RefreshClicked"
+                    IsVisible="{OnPlatform Default=False, WinUI=True}"
+                    Style="{StaticResource SecondaryButton}"
+                    Text="Refresh" />
+                <Button
+                    x:Name="scanBtn"
+                    Clicked="ScanClicked"
+                    Style="{OnPlatform Default={StaticResource TextButton}, WinUI={StaticResource BaseButton}}" />
+            </HorizontalStackLayout>
         </Grid>
 
         <Border
@@ -42,7 +51,10 @@
             Grid.Row="2"
             Margin="0,12,0,0"
             Refreshing="OnRefreshing">
-            <CollectionView x:Name="networkList" SelectionMode="None">
+            <CollectionView
+                x:Name="networkList"
+                SelectionChanged="NetworkSelected"
+                SelectionMode="Single">
                 <CollectionView.EmptyView>
                     <VerticalStackLayout
                         Padding="24,64"
@@ -61,7 +73,7 @@
                     </VerticalStackLayout>
                 </CollectionView.EmptyView>
                 <CollectionView.ItemsLayout>
-                    <LinearItemsLayout ItemSpacing="8" Orientation="Vertical" />
+                    <LinearItemsLayout ItemSpacing="{OnPlatform Default=8, WinUI=4}" Orientation="Vertical" />
                 </CollectionView.ItemsLayout>
                 <CollectionView.Footer>
                     <BoxView HeightRequest="16" Color="Transparent" />
@@ -69,9 +81,6 @@
                 <CollectionView.ItemTemplate>
                     <DataTemplate x:DataType="local:NetworkDataModel">
                         <Border Padding="16,12" Style="{StaticResource Card}">
-                            <Border.GestureRecognizers>
-                                <TapGestureRecognizer Tapped="NetworkTapped" />
-                            </Border.GestureRecognizers>
                             <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="14">
                                 <HorizontalStackLayout
                                     HeightRequest="18"

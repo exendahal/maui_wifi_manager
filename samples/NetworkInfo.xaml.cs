@@ -92,7 +92,7 @@ public partial class NetworkInfo : ContentPage
         var rows = new (string Label, string Value, bool Mono)[]
         {
             ("BSSID", Or(data?.Bssid?.ToString()), true),
-            ("Signal", data?.RssiDbm is int dbm ? $"{dbm} dBm" : Or(data?.SignalStrength?.ToString()), false),
+            ("Signal", data != null ? NetworkFormat.Signal(data) : NetworkFormat.None, false),
             ("Link speed", data?.LinkSpeedMbps is int mbps ? $"{mbps} Mbps" : NetworkFormat.None, false),
             ("Band", data != null ? Or(NetworkFormat.Band(data.FrequencyBand)) : NetworkFormat.None, false),
             ("Channel", Or(data?.ChannelNumber?.ToString()), false),

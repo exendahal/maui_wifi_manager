@@ -4,10 +4,21 @@
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml">
 
+    <!-- Windows follows Windows 11 (Fluent) metrics: Segoe UI Variable, 14px body, 4px control and 8px card corners. -->
+
+    <OnPlatform x:Key="RegularFont" x:TypeArguments="x:String" Default="OpenSansRegular">
+        <On Platform="WinUI" Value="Segoe UI Variable Text" />
+    </OnPlatform>
+    <OnPlatform x:Key="SemiboldFont" x:TypeArguments="x:String" Default="OpenSansSemibold">
+        <On Platform="WinUI" Value="Segoe UI Variable Text Semibold" />
+    </OnPlatform>
+    <OnPlatform x:Key="DisplayFont" x:TypeArguments="x:String" Default="OpenSansSemibold">
+        <On Platform="WinUI" Value="Segoe UI Variable Display Semibold" />
+    </OnPlatform>
     <OnPlatform x:Key="MonoFont" x:TypeArguments="x:String">
         <On Platform="Android" Value="monospace" />
         <On Platform="iOS, MacCatalyst" Value="Menlo" />
-        <On Platform="WinUI" Value="Consolas" />
+        <On Platform="WinUI" Value="Cascadia Mono, Consolas" />
     </OnPlatform>
 
     <!-- Implicit styles -->
@@ -30,20 +41,21 @@
     </Style>
 
     <Style x:Key="BaseLabel" TargetType="Label">
-        <Setter Property="FontFamily" Value="OpenSansRegular" />
-        <Setter Property="FontSize" Value="15" />
+        <Setter Property="FontFamily" Value="{StaticResource RegularFont}" />
+        <Setter Property="FontSize" Value="{OnPlatform Default=15, WinUI=14}" />
         <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource TextLight}, Dark={StaticResource TextDark}}" />
     </Style>
 
     <Style x:Key="BaseButton" TargetType="Button">
-        <Setter Property="FontFamily" Value="OpenSansSemibold" />
-        <Setter Property="FontSize" Value="15" />
-        <Setter Property="CornerRadius" Value="10" />
-        <Setter Property="HeightRequest" Value="48" />
-        <Setter Property="Padding" Value="18,0" />
+        <Setter Property="FontFamily" Value="{OnPlatform Default={StaticResource SemiboldFont}, WinUI={StaticResource RegularFont}}" />
+        <Setter Property="FontSize" Value="{OnPlatform Default=15, WinUI=14}" />
+        <Setter Property="CornerRadius" Value="{OnPlatform Default=10, WinUI=4}" />
+        <Setter Property="HeightRequest" Value="{OnPlatform Default=48, WinUI=32}" />
+        <Setter Property="MinimumWidthRequest" Value="{OnPlatform Default=0, WinUI=120}" />
+        <Setter Property="Padding" Value="{OnPlatform Default='18,0', WinUI='12,0'}" />
         <Setter Property="BorderWidth" Value="0" />
         <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource AccentLight}, Dark={StaticResource AccentDark}}" />
-        <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource OnAccent}, Dark={StaticResource BackgroundDark}}" />
+        <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource OnAccentLight}, Dark={StaticResource OnAccentDark}}" />
         <Setter Property="VisualStateManager.VisualStateGroups">
             <VisualStateGroupList>
                 <VisualStateGroup x:Name="CommonStates">
@@ -62,26 +74,25 @@
     <Style BasedOn="{StaticResource BaseButton}" TargetType="Button" />
 
     <Style TargetType="Entry">
-        <Setter Property="FontFamily" Value="OpenSansRegular" />
-        <Setter Property="FontSize" Value="16" />
+        <Setter Property="FontFamily" Value="{StaticResource RegularFont}" />
+        <Setter Property="FontSize" Value="{OnPlatform Default=16, WinUI=14}" />
         <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource TextLight}, Dark={StaticResource TextDark}}" />
         <Setter Property="PlaceholderColor" Value="{AppThemeBinding Light={StaticResource TextMutedLight}, Dark={StaticResource TextMutedDark}}" />
         <Setter Property="BackgroundColor" Value="Transparent" />
-        <Setter Property="MinimumHeightRequest" Value="44" />
+        <Setter Property="MinimumHeightRequest" Value="{OnPlatform Default=44, WinUI=32}" />
     </Style>
 
     <Style TargetType="Picker">
-        <Setter Property="FontFamily" Value="OpenSansRegular" />
-        <Setter Property="FontSize" Value="16" />
+        <Setter Property="FontFamily" Value="{StaticResource RegularFont}" />
+        <Setter Property="FontSize" Value="{OnPlatform Default=16, WinUI=14}" />
         <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource TextLight}, Dark={StaticResource TextDark}}" />
         <Setter Property="TitleColor" Value="{AppThemeBinding Light={StaticResource TextMutedLight}, Dark={StaticResource TextMutedDark}}" />
         <Setter Property="BackgroundColor" Value="Transparent" />
-        <Setter Property="MinimumHeightRequest" Value="44" />
+        <Setter Property="MinimumHeightRequest" Value="{OnPlatform Default=44, WinUI=32}" />
     </Style>
 
     <Style TargetType="Switch">
         <Setter Property="OnColor" Value="{AppThemeBinding Light={StaticResource AccentLight}, Dark={StaticResource AccentDark}}" />
-        <Setter Property="ThumbColor" Value="{StaticResource OnAccent}" />
     </Style>
 
     <Style TargetType="ActivityIndicator">
@@ -95,36 +106,34 @@
     <!-- Text -->
 
     <Style x:Key="PageTitle" BasedOn="{StaticResource BaseLabel}" TargetType="Label">
-        <Setter Property="FontFamily" Value="OpenSansSemibold" />
+        <Setter Property="FontFamily" Value="{StaticResource DisplayFont}" />
         <Setter Property="FontSize" Value="28" />
     </Style>
 
     <Style x:Key="SectionHeader" BasedOn="{StaticResource BaseLabel}" TargetType="Label">
-        <Setter Property="FontFamily" Value="OpenSansSemibold" />
-        <Setter Property="FontSize" Value="13" />
-        <Setter Property="Margin" Value="4,24,0,8" />
+        <Setter Property="FontFamily" Value="{StaticResource SemiboldFont}" />
+        <Setter Property="FontSize" Value="{OnPlatform Default=13, WinUI=14}" />
+        <Setter Property="Margin" Value="{OnPlatform Default='4,24,0,8', WinUI='1,28,0,8'}" />
         <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource TextMutedLight}, Dark={StaticResource TextMutedDark}}" />
     </Style>
 
     <Style x:Key="Muted" BasedOn="{StaticResource BaseLabel}" TargetType="Label">
-        <Setter Property="FontSize" Value="13" />
+        <Setter Property="FontSize" Value="{OnPlatform Default=13, WinUI=12}" />
         <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource TextMutedLight}, Dark={StaticResource TextMutedDark}}" />
     </Style>
 
     <Style x:Key="RowTitle" BasedOn="{StaticResource BaseLabel}" TargetType="Label">
-        <Setter Property="FontFamily" Value="OpenSansSemibold" />
-        <Setter Property="FontSize" Value="16" />
+        <Setter Property="FontFamily" Value="{StaticResource SemiboldFont}" />
+        <Setter Property="FontSize" Value="{OnPlatform Default=16, WinUI=14}" />
         <Setter Property="LineBreakMode" Value="TailTruncation" />
     </Style>
 
     <Style x:Key="FieldLabel" BasedOn="{StaticResource BaseLabel}" TargetType="Label">
-        <Setter Property="FontSize" Value="15" />
         <Setter Property="VerticalOptions" Value="Center" />
         <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource TextMutedLight}, Dark={StaticResource TextMutedDark}}" />
     </Style>
 
     <Style x:Key="FieldValue" BasedOn="{StaticResource BaseLabel}" TargetType="Label">
-        <Setter Property="FontSize" Value="15" />
         <Setter Property="HorizontalTextAlignment" Value="End" />
         <Setter Property="VerticalOptions" Value="Center" />
         <Setter Property="LineBreakMode" Value="WordWrap" />
@@ -132,14 +141,16 @@
 
     <Style x:Key="MonoValue" BasedOn="{StaticResource FieldValue}" TargetType="Label">
         <Setter Property="FontFamily" Value="{StaticResource MonoFont}" />
-        <Setter Property="FontSize" Value="14" />
+        <Setter Property="FontSize" Value="{OnPlatform Default=14, WinUI=13}" />
     </Style>
 
     <!-- Containers -->
 
     <Style x:Key="Card" TargetType="Border">
         <Setter Property="StrokeThickness" Value="1" />
-        <Setter Property="StrokeShape" Value="RoundRectangle 14" />
+        <Setter Property="StrokeShape">
+            <RoundRectangle CornerRadius="{OnPlatform Default=14, WinUI=8}" />
+        </Setter>
         <Setter Property="Padding" Value="16,4" />
         <Setter Property="Stroke" Value="{AppThemeBinding Light={StaticResource BorderLight}, Dark={StaticResource BorderDark}}" />
         <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource SurfaceLight}, Dark={StaticResource SurfaceDark}}" />
@@ -147,7 +158,9 @@
 
     <Style x:Key="Notice" TargetType="Border">
         <Setter Property="StrokeThickness" Value="0" />
-        <Setter Property="StrokeShape" Value="RoundRectangle 10" />
+        <Setter Property="StrokeShape">
+            <RoundRectangle CornerRadius="{OnPlatform Default=10, WinUI=8}" />
+        </Setter>
         <Setter Property="Padding" Value="14,10" />
         <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource SurfaceMutedLight}, Dark={StaticResource SurfaceMutedDark}}" />
     </Style>
@@ -165,15 +178,19 @@
 
     <!-- Buttons -->
 
+    <!-- On Windows this is the Fluent standard button: neutral fill with a hairline border. -->
     <Style x:Key="SecondaryButton" BasedOn="{StaticResource BaseButton}" TargetType="Button">
         <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource AccentSoftLight}, Dark={StaticResource AccentSoftDark}}" />
-        <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource AccentLight}, Dark={StaticResource AccentDark}}" />
+        <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource OnAccentSoftLight}, Dark={StaticResource OnAccentSoftDark}}" />
+        <Setter Property="BorderWidth" Value="{OnPlatform Default=0, WinUI=1}" />
+        <Setter Property="BorderColor" Value="{AppThemeBinding Light={StaticResource BorderLight}, Dark={StaticResource BorderDark}}" />
     </Style>
 
     <Style x:Key="TextButton" BasedOn="{StaticResource BaseButton}" TargetType="Button">
         <Setter Property="BackgroundColor" Value="Transparent" />
         <Setter Property="Padding" Value="8,0" />
-        <Setter Property="HeightRequest" Value="40" />
+        <Setter Property="MinimumWidthRequest" Value="0" />
+        <Setter Property="HeightRequest" Value="{OnPlatform Default=40, WinUI=32}" />
         <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource AccentLight}, Dark={StaticResource AccentDark}}" />
     </Style>
 

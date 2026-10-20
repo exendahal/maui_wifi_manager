@@ -5,7 +5,7 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
     Title="Connect">
     <ScrollView>
-        <VerticalStackLayout Padding="20,16,20,32">
+        <VerticalStackLayout Padding="{OnPlatform Default='20,16,20,32', WinUI='40,28,40,40'}">
             <Label Style="{StaticResource PageTitle}" Text="Connect" />
             <Label Style="{StaticResource Muted}" Text="Join a network by name, or fill the form from a Wi-Fi QR code." />
 
@@ -26,7 +26,7 @@
                         <Label Style="{StaticResource FieldLabel}" Text="Security" />
                         <Picker
                             x:Name="securityPicker"
-                            Title="Security"
+                            Title="{OnPlatform Default=Security, WinUI={x:Null}}"
                             Grid.Column="1"
                             SelectedIndexChanged="SecurityChanged">
                             <Picker.Items>
@@ -86,6 +86,7 @@
             <Button
                 x:Name="connectBtn"
                 Margin="0,24,0,0"
+                HorizontalOptions="{OnPlatform Default=Fill, WinUI=Start}"
                 Clicked="ConnectClicked"
                 Text="Connect" />
 

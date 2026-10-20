@@ -6,7 +6,7 @@
     xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
     xmlns:zxing="clr-namespace:ZXing.Net.Maui.Controls;assembly=ZXing.Net.MAUI.Controls"
     Padding="0"
-    BackgroundColor="{AppThemeBinding Light={StaticResource SurfaceLight}, Dark={StaticResource SurfaceDark}}">
+    BackgroundColor="{AppThemeBinding Light={StaticResource DialogLight}, Dark={StaticResource DialogDark}}">
     <VerticalStackLayout
         Padding="20"
         Spacing="14"
