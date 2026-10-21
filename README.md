@@ -38,6 +38,13 @@ The Wi-Fi Manager for .NET MAUI is a simple and powerful library that helps you 
 - **Enterprise Wi-Fi (802.1X)**: Connect to PEAP/TTLS networks with a username and password.
 - **IoT Provisioning (Local-Only Networks)**: Connect to a device's access point without internet and route app traffic through it.
 - **Richer Scan Data**: Wi-Fi standard (Wi-Fi 4/5/6/7), channel width, and per-channel congestion.
+- **Connection Type**: Know whether the device is on Wi-Fi, mobile data or Ethernet, and get notified when that changes.
+- **Scan Readiness**: Find out whether a scan can run now, and if not, why (throttled, permission, location off, Wi-Fi off), plus an event whenever the OS finishes a scan.
+- **Connect by Name Prefix and With a Timeout**: Join the strongest network whose name starts with a prefix (e.g. `SmartPlug-`), and stop waiting after a set time.
+- **Turn Wi-Fi On or Off**: Switch the Wi-Fi radio (Windows, Android 9 and older; opens the Wi-Fi panel on Android 10+).
+- **Hotspot**: Start a hotspot and read its name and password; list connected devices on Windows.
+- **Network Diagnostics**: Ping, speed test, find devices on the local network, and browse mDNS/Bonjour services.
+- **Broadcast Address and Network Prefix**: Calculated from the IP address and subnet mask.
 
 ---
 
@@ -78,6 +85,17 @@ Also, include these permissions in your `AndroidManifest.xml` file:
 
 Make sure to request location permissions before scanning for Wi-Fi.
 
+Add these only if you use the matching features:
+
+```xml
+<!-- Android 13+: scanning, hotspot and RequestPermissionsAsync -->
+<uses-permission android:name="android.permission.NEARBY_WIFI_DEVICES" android:usesPermissionFlags="neverForLocation" />
+<!-- BrowseServicesAsync (mDNS): lets the app receive multicast answers -->
+<uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
+<!-- Ping, speed test, custom internet check -->
+<uses-permission android:name="android.permission.INTERNET" />
+```
+
 #### For iOS
 
 Add the following to your `Entitlements.plist`:
@@ -95,6 +113,8 @@ In `Info.plist`, request location permissions:
 <key>NSLocationWhenInUseUsageDescription</key>
 <string>The app needs location access to detect Wi-Fi networks.</string>
 ```
+
+To find devices on the local network or browse mDNS services, also add `NSLocalNetworkUsageDescription` (and `NSBonjourServices` listing the service types you browse) to `Info.plist`. Browsing mDNS on iOS 14+ additionally requires the `com.apple.developer.networking.multicast` entitlement, which Apple grants on request.
 
 ---
 
@@ -150,12 +170,50 @@ Available `WifiSecurityType` values:
 
 ---
 
+### Connect by Name Prefix or With a Timeout
+
+IoT devices often broadcast a name with a serial number, such as `SmartPlug-4F2A`. Set `IsSsidPrefix` to join the network whose name starts with the prefix, and `Timeout` to stop waiting after a set time:
+
+```csharp
+var response = await CrossWifiManager.Current.ConnectWifiAsync("SmartPlug-", "setup-password",
+    new WifiConnectionOptions
+    {
+        IsSsidPrefix = true,
+        Timeout = TimeSpan.FromSeconds(20)
+    });
+// response.Data.Ssid holds the full name that was joined.
+// A timeout returns WifiErrorCodes.OperationTimeout.
+```
+
+`IsSsidPrefix` and `Timeout` also work with `ConnectLocalOnlyAsync` and `AddNetworkSuggestionAsync`.
+
+**Platform notes:**
+- **iOS 13+**: iOS matches the prefix itself; your app never sees the list of networks.
+- **Android and Windows**: the library scans and picks the strongest matching network, so scanning permissions are needed.
+- Prefix matching doesn't work for hidden networks.
+
+---
+
 ### Scan for Available Networks
 
 To get a one-shot list of available Wi-Fi networks (Android and Windows only):
 
 ```csharp
 var response = await CrossWifiManager.Current.ScanWifiNetworksAsync();
+```
+
+When the OS refuses a new scan (Android allows 4 scans per 2 minutes; some Windows drivers abort scans), the previous results are returned and `ErrorMessage` says so. To find out ahead of time whether a scan can run:
+
+```csharp
+var ready = await CrossWifiManager.Current.CanStartScanAsync();
+// ready.Data: Ready, WifiDisabled, PermissionDenied, LocationServicesDisabled or Throttled
+```
+
+To get results whenever the OS finishes any scan, including scans started by the system (this costs no scan quota):
+
+```csharp
+CrossWifiManager.Current.ScanResultsAvailable += (s, e) =>
+    Debug.WriteLine($"{e.Networks.Count} networks (fresh: {e.IsFresh})");
 ```
 
 ---
@@ -239,6 +297,10 @@ if (response.ErrorCode == WifiErrorCodes.Success && response.Data != null)
 | `SignalStrength`   | `object?`            | All                    | Platform-specific signal indicator               |
 | `SecurityType`     | `object?`            | All                    | Security type string from the platform           |
 | `NativeObject`     | `object?`            | All                    | Platform-specific native network object          |
+| `WifiStandard`     | `WifiStandard`       | Android 11+, Windows scan | Wi-Fi 4/5/6/7 (802.11n/ac/ax/be)              |
+| `ChannelWidthMhz`  | `int?`               | Android scan           | Channel width in MHz                             |
+| `BroadcastAddress` | `string?`            | All                    | IPv4 broadcast address, calculated               |
+| `NetworkPrefixLength` | `int?`            | All                    | Prefix length, e.g. 24 for `255.255.255.0`       |
 
 ---
 
@@ -258,6 +320,12 @@ if (response.ErrorCode == WifiErrorCodes.Success)
 - **Android** — checks `NET_CAPABILITY_INTERNET` and `NET_CAPABILITY_VALIDATED` via `NetworkCapabilities`.
 - **Windows** — checks `NetworkConnectivityLevel.InternetAccess` via `NetworkInformation`.
 - **iOS / Mac Catalyst** — performs a DNS resolution check against `www.apple.com` with a 5-second timeout.
+
+To check against your own server instead, for example on networks that block the default probes, pass a URL. Any 2xx response counts as available, and a redirect (typical of captive portals) does not:
+
+```csharp
+var response = await CrossWifiManager.IsInternetAvailableAsync(new Uri("https://example.com/health"));
+```
 
 ---
 
@@ -480,6 +548,88 @@ foreach (var channel in WifiChannelUsage.FromScanResults(scan.Data!))
 
 ---
 
+### Connection Type
+
+```csharp
+var types = await CrossWifiManager.Current.GetConnectionTypesAsync();
+// types.Data: e.g. [WiFi] or [Cellular]; empty when offline
+
+CrossWifiManager.Current.ConnectionTypeChanged += (s, e) =>
+    Debug.WriteLine($"{string.Join(", ", e.ConnectionTypes)} internet={e.HasInternet}");
+```
+
+Built on .NET MAUI's `Connectivity`, so it works on every platform.
+
+---
+
+### Turn Wi-Fi On or Off
+
+```csharp
+var response = await CrossWifiManager.Current.SetWifiEnabledAsync(false);
+if (response.ErrorCode == WifiErrorCodes.Success && !response.Data)
+{
+    // Android 10+ doesn't let apps switch Wi-Fi; the system Wi-Fi panel was opened for the user instead.
+}
+```
+
+Supported on Windows and Android 9 and older. Not available on iOS.
+
+---
+
+### Hotspot
+
+```csharp
+var hotspot = await CrossWifiManager.Current.StartHotspotAsync();
+if (hotspot.ErrorCode == WifiErrorCodes.Success)
+    Debug.WriteLine($"Join {hotspot.Data!.Ssid} with password {hotspot.Data.Password}");
+
+var clients = await CrossWifiManager.Current.GetHotspotClientsAsync(); // Windows only
+await CrossWifiManager.Current.StopHotspotAsync();
+```
+
+**Platform notes:**
+- **Android 8+**: starts a *local-only* hotspot. Other devices can connect to the phone (handy for sending setup data to an IoT device), but the phone's internet isn't shared. Android picks the name and password. Needs location permission (Android 12 and older) or nearby Wi-Fi devices permission (Android 13+).
+- **Windows**: turns on Mobile Hotspot and shares the current internet connection, using the name and password set in Windows Settings.
+- **iOS**: not available.
+
+---
+
+### Network Diagnostics
+
+```csharp
+// Ping
+var ping = await CrossWifiManager.Current.PingAsync("one.one.one.one", count: 4);
+Debug.WriteLine($"avg {ping.Data?.AverageMs} ms, loss {ping.Data?.PacketLossPercent}%");
+
+// Speed test (Cloudflare's public endpoints by default; transfers up to ~30 MB)
+var speed = await CrossWifiManager.Current.MeasureSpeedAsync();
+Debug.WriteLine($"down {speed.Data?.DownloadMbps} Mbps, up {speed.Data?.UploadMbps} Mbps");
+
+// Your own endpoints
+var custom = await CrossWifiManager.Current.MeasureSpeedAsync(new SpeedTestOptions
+{
+    DownloadUrl = new Uri("https://files.example.com/10MB.bin"),
+    UploadUrl = null // skip upload
+});
+
+// Devices on the local network (pings the subnet, at most 254 addresses)
+var devices = await CrossWifiManager.Current.DiscoverDevicesAsync();
+foreach (var device in devices.Data ?? [])
+    Debug.WriteLine($"{device.IpAddress} {device.HostName}");
+
+// mDNS / Bonjour: list service types, then the devices for one type
+var types = await CrossWifiManager.Current.BrowseServicesAsync();
+var printers = await CrossWifiManager.Current.BrowseServicesAsync("_ipp._tcp");
+foreach (var printer in printers.Data ?? [])
+    Debug.WriteLine($"{printer.Name} at {printer.IpAddress}:{printer.Port}");
+```
+
+**Notes:**
+- Device discovery only finds devices that answer ping, and on larger networks it covers only the /24 around this device.
+- Ping, speed test, device discovery and mDNS are shared .NET code. They also work for custom `IWifiNetworkService` implementations.
+
+---
+
 ## Feature Support by Platform
 
 | Feature                              | Android     | iOS         | Windows     | Notes                                                     |
@@ -508,6 +658,17 @@ foreach (var channel in WifiChannelUsage.FromScanResults(scan.Data!))
 | Enterprise Wi-Fi (802.1X)            | ✅          | ✅          | ✅          | See platform notes above                                  |
 | Local-Only Network (IoT)             | ✅ API 23+  | ✅          | ✅          |                                                           |
 | Wi-Fi Standard / Channel Width       | ✅          | ❌          | ✅ standard | Channel width on Android only                             |
+| Connection Type + Event              | ✅          | ✅          | ✅          | Wi-Fi, mobile data, Ethernet, Bluetooth                   |
+| Scan Readiness / Scan Results Event  | ✅          | ❌          | ✅          | Android reports throttling                                |
+| Connect by SSID Prefix               | ✅          | ✅ iOS 13+  | ✅          | Android/Windows scan and pick the strongest match         |
+| Connection Timeout                   | ✅          | ✅          | ✅          |                                                           |
+| Custom Internet Check URL            | ✅          | ✅          | ✅          |                                                           |
+| Turn Wi-Fi On/Off                    | ✅*         | ❌          | ✅          | *Android 10+ opens the Wi-Fi panel                        |
+| Hotspot                              | ✅ API 26+  | ❌          | ✅          | Android: local-only; client list on Windows only          |
+| Ping / Speed Test                    | ✅          | ✅          | ✅          |                                                           |
+| Local Network Device Discovery       | ✅          | ✅          | ✅          | Devices must answer ping                                  |
+| mDNS / Bonjour Browsing              | ✅          | ✅*         | ✅          | *Needs Apple's multicast entitlement                      |
+| Broadcast Address / Prefix Length    | ✅          | ✅          | ✅          |                                                           |
 
 ---
 
