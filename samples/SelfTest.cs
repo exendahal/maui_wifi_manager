@@ -96,6 +96,16 @@ public static class SelfTest
                         Log("INFO", "mdns-service", $"{s.ServiceType} '{s.Name}' {s.HostName} {s.IpAddress}:{s.Port} {string.Join(",", s.Properties.Select(p => p.Key + "=" + p.Value))}");
                 });
                 break;
+            case "device":
+                foreach (var ip in parts.Skip(1))
+                    await Step($"device {ip}", async () =>
+                    {
+                        var r = await CrossWifiManager.GetDeviceDetailsAsync(ip);
+                        var d = r.Data;
+                        Check($"device {ip}", r.ErrorCode == WifiErrorCodes.Success,
+                            $"host={d?.HostName} netbios={d?.NetBiosName} mac={d?.MacAddress} private={d?.IsRandomizedMac} upnp={d?.FriendlyName}/{d?.Manufacturer}/{d?.ModelName} web='{d?.HttpTitle}' {d?.HttpServer} ports=[{string.Join(",", d?.OpenPorts ?? [])}] ping={d?.Ping?.Received}/{d?.Ping?.Sent}");
+                    });
+                break;
             case "speed":
                 await Step("speed", async () =>
                 {

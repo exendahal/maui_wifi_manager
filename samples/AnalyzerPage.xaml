@@ -17,7 +17,7 @@
                         x:Name="devicesSummaryTxt"
                         Padding="0,14"
                         Style="{StaticResource Muted}"
-                        Text="Finds devices by pinging every address in your subnet and listening for the names they advertise (mDNS). Tap a device to ping it." />
+                        Text="Finds devices by pinging every address in your subnet and listening for the names they advertise (mDNS). Tap a device to see everything it reveals: names, MAC address, model, open ports and ping." />
                     <VerticalStackLayout x:Name="devicesList" />
                     <BoxView Style="{StaticResource Divider}" />
                     <Button

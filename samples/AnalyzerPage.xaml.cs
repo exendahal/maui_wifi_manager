@@ -1,5 +1,6 @@
 namespace DemoApp;
 using MauiWifiManager;
+using CommunityToolkit.Maui.Extensions;
 using MauiWifiManager.Abstractions;
 using System.Diagnostics;
 
@@ -40,7 +41,7 @@ public partial class AnalyzerPage : ContentPage
 
     // ---- Devices ----
 
-    private sealed record DeviceRow(string Ip, string? HostName, long? RoundTripMs, string? Role, List<string> Services);
+    private sealed record DeviceRow(string Ip, string? HostName, long? RoundTripMs, string? Role, List<string> Services, List<NetworkServiceInfo> RawServices);
 
     private async void ScanDevicesClicked(object sender, EventArgs e)
     {
@@ -67,13 +68,14 @@ public partial class AnalyzerPage : ContentPage
         string? self = Ip(info.Data?.IpAddress ?? 0);
         var rows = new Dictionary<string, DeviceRow>();
         foreach (var d in sweep.Data!)
-            rows[d.IpAddress] = new DeviceRow(d.IpAddress, d.HostName, d.RoundTripMs, null, new());
+            rows[d.IpAddress] = new DeviceRow(d.IpAddress, d.HostName, d.RoundTripMs, null, new(), new());
         if (self != null && !rows.ContainsKey(self))
-            rows[self] = new DeviceRow(self, DeviceInfo.Current.Name, null, null, new());
+            rows[self] = new DeviceRow(self, DeviceInfo.Current.Name, null, null, new(), new());
         foreach (var s in services.Where(s => s.IpAddress != null))
         {
             if (!rows.TryGetValue(s.IpAddress!, out var row))
-                rows[s.IpAddress!] = row = new DeviceRow(s.IpAddress!, s.HostName, null, null, new());
+                rows[s.IpAddress!] = row = new DeviceRow(s.IpAddress!, s.HostName, null, null, new(), new());
+            row.RawServices.Add(s);
             var kind = ServiceKinds.GetValueOrDefault(s.ServiceType);
             var label = kind != null && !s.Name.StartsWith("nearby-", StringComparison.Ordinal) ? $"{kind}: {s.Name}" : kind ?? s.Name;
             if (!row.Services.Contains(label))
@@ -141,19 +143,10 @@ public partial class AnalyzerPage : ContentPage
         row.Add(right, 1);
 
         var tap = new TapGestureRecognizer();
-        tap.Tapped += async (_, _) => await PingDeviceAsync(device.Ip, title);
+        tap.Tapped += async (_, _) => await this.ShowPopupAsync(new DeviceSheet(title, device.Ip, device.Role, device.RawServices), AppPopup.Options);
         row.GestureRecognizers.Add(tap);
-        SemanticProperties.SetDescription(row, $"{title}, {string.Join(", ", details)}. Double tap to ping.");
+        SemanticProperties.SetDescription(row, $"{title}, {string.Join(", ", details)}. Double tap for details.");
         devicesList.Add(row);
-    }
-
-    private async Task PingDeviceAsync(string ip, string title)
-    {
-        var response = await CrossWifiManager.PingAsync(ip, 4);
-        var message = response.Data is { Received: > 0 } stats
-            ? $"{stats.Received} of {stats.Sent} replies\nmin {stats.MinMs} ms · avg {stats.AverageMs:0} ms · max {stats.MaxMs} ms\n{stats.PacketLossPercent:0}% packet loss"
-            : "No reply. The device may be asleep or block ping.";
-        await DisplayAlertAsync(title, message, "OK");
     }
 
     // ---- Channels ----
