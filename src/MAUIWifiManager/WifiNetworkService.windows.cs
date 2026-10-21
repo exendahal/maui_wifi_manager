@@ -769,6 +769,35 @@ namespace MauiWifiManager
             _ScanResultsAvailable?.Invoke(this, new WifiScanResultsEventArgs(networks, isFresh: true));
         }
 
+        public async Task<WifiManagerResponse<bool>> SetWifiEnabledAsync(bool enabled, CancellationToken cancellationToken = default)
+        {
+            if (cancellationToken.IsCancellationRequested)
+                return WifiManagerResponse<bool>.ErrorResponse(WifiErrorCodes.OperationCanceled, "Operation was canceled.");
+
+            try
+            {
+                if (await Radio.RequestAccessAsync() != RadioAccessStatus.Allowed)
+                    return WifiManagerResponse<bool>.ErrorResponse(WifiErrorCodes.PermissionDenied, "Radio access is not allowed for this app.");
+
+                var radio = await GetWifiRadioAsync();
+                if (radio == null)
+                    return WifiManagerResponse<bool>.ErrorResponse(WifiErrorCodes.UnsupportedHardware, "No Wi-Fi radio found.");
+
+                var wanted = enabled ? RadioState.On : RadioState.Off;
+                if (radio.State == wanted)
+                    return WifiManagerResponse<bool>.SuccessResponse(true, $"Wi-Fi is already {(enabled ? "on" : "off")}.");
+
+                var result = await radio.SetStateAsync(wanted);
+                return result == RadioAccessStatus.Allowed
+                    ? WifiManagerResponse<bool>.SuccessResponse(true, $"Wi-Fi turned {(enabled ? "on" : "off")}.")
+                    : WifiManagerResponse<bool>.ErrorResponse(WifiErrorCodes.PermissionDenied, $"Windows refused to change the Wi-Fi state: {result}.");
+            }
+            catch (Exception ex)
+            {
+                return WifiManagerResponse<bool>.ErrorResponse(WifiErrorCodes.UnknownError, ex.Message);
+            }
+        }
+
         private static async Task<Radio?> GetWifiRadioAsync()
         {
             var radios = await Radio.GetRadiosAsync();

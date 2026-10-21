@@ -379,6 +379,14 @@ namespace MauiWifiManager
         }
 
         /// <summary>
+        /// Turns Wi-Fi on or off (Android 9 and lower, Windows); opens the Wi-Fi panel on Android 10+.
+        /// </summary>
+        public static Task<Abstractions.WifiManagerResponse<bool>> SetWifiEnabledAsync(bool enabled, CancellationToken cancellationToken = default)
+        {
+            return Current.SetWifiEnabledAsync(enabled, cancellationToken);
+        }
+
+        /// <summary>
         /// Dispose of everything
         /// </summary>
         public static void Dispose()

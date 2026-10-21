@@ -1352,6 +1352,31 @@ namespace MauiWifiManager
                 .FirstOrDefault()?.Ssid;
         }
 
+        public async Task<WifiManagerResponse<bool>> SetWifiEnabledAsync(bool enabled, CancellationToken cancellationToken = default)
+        {
+            if (cancellationToken.IsCancellationRequested)
+                return CreateCanceledResponse<bool>(nameof(SetWifiEnabledAsync));
+
+            if (_Context.GetSystemService(Context.WifiService) is not WifiManager wifiManager)
+                return WifiManagerResponse<bool>.ErrorResponse(WifiErrorCodes.UnsupportedHardware, "Wi-Fi Manager is unavailable. Please ensure the device has Wi-Fi capability.");
+
+            if (wifiManager.IsWifiEnabled == enabled)
+                return WifiManagerResponse<bool>.SuccessResponse(true, $"Wi-Fi is already {(enabled ? "on" : "off")}.");
+
+            if (!OperatingSystem.IsAndroidVersionAtLeast(29))
+            {
+#pragma warning disable CA1422 // Deprecated in API 29; still works on older versions.
+                bool changed = wifiManager.SetWifiEnabled(enabled);
+#pragma warning restore CA1422
+                return changed
+                    ? WifiManagerResponse<bool>.SuccessResponse(true, $"Wi-Fi turned {(enabled ? "on" : "off")}.")
+                    : WifiManagerResponse<bool>.ErrorResponse(WifiErrorCodes.UnknownError, "Android refused to change the Wi-Fi state.");
+            }
+
+            await OpenWifiSetting();
+            return WifiManagerResponse<bool>.SuccessResponse(false, "Android 10+ does not let apps switch Wi-Fi, so the Wi-Fi panel was opened for the user.");
+        }
+
         private static int? GetChannelWidthMhz(int channelWidth) => channelWidth switch
         {
             0 => 20,

@@ -239,6 +239,13 @@ namespace MauiWifiManager
         Task<WifiManagerResponse<bool>> IsInternetAvailableAsync(Uri probeUrl, CancellationToken cancellationToken = default)
             => NetworkTools.ProbeInternetAsync(probeUrl, cancellationToken);
 
+        /// <summary>
+        /// Turns Wi-Fi on or off. Android 10+ does not allow apps to do this, so it opens the system Wi-Fi panel instead and
+        /// returns <see langword="false"/> in <see cref="WifiManagerResponse{T}.Data"/>. Supported on Android and Windows.
+        /// </summary>
+        Task<WifiManagerResponse<bool>> SetWifiEnabledAsync(bool enabled, CancellationToken cancellationToken = default)
+            => Task.FromResult(NotSupported<bool>(nameof(SetWifiEnabledAsync)));
+
         private static WifiManagerResponse<T> NotSupported<T>(string operation)
             => WifiManagerResponse<T>.ErrorResponse(WifiErrorCodes.UnsupportedHardware, $"{operation} is not supported on this platform.");
     }
