@@ -223,6 +223,108 @@ namespace MauiWifiManager
         }
 
         /// <summary>
+        /// Raised when Wi-Fi is turned on or off. Supported on Android and Windows.
+        /// </summary>
+        public static event EventHandler<Abstractions.WifiStateChangedEventArgs>? WifiStateChanged
+        {
+            add => Current.WifiStateChanged += value;
+            remove
+            {
+                if (_Implementation != null && _Implementation.IsValueCreated)
+                {
+                    _Implementation.Value.WifiStateChanged -= value;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Raised when the signal strength of the connected network changes. Supported on Android and Windows.
+        /// </summary>
+        public static event EventHandler<Abstractions.WifiSignalChangedEventArgs>? SignalStrengthChanged
+        {
+            add => Current.SignalStrengthChanged += value;
+            remove
+            {
+                if (_Implementation != null && _Implementation.IsValueCreated)
+                {
+                    _Implementation.Value.SignalStrengthChanged -= value;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Returns true when the Wi-Fi radio is on. Supported on Android and Windows.
+        /// </summary>
+        public static Task<Abstractions.WifiManagerResponse<bool>> IsWifiEnabledAsync(CancellationToken cancellationToken = default)
+        {
+            return Current.IsWifiEnabledAsync(cancellationToken);
+        }
+
+        /// <summary>
+        /// Checks and requests every permission needed to scan and read Wi-Fi details.
+        /// </summary>
+        public static Task<Abstractions.WifiManagerResponse<bool>> RequestPermissionsAsync(CancellationToken cancellationToken = default)
+        {
+            return Current.RequestPermissionsAsync(cancellationToken);
+        }
+
+        /// <summary>
+        /// Returns true when the active connection is metered or data-limited.
+        /// </summary>
+        public static Task<Abstractions.WifiManagerResponse<bool>> IsMeteredConnectionAsync(CancellationToken cancellationToken = default)
+        {
+            return Current.IsMeteredConnectionAsync(cancellationToken);
+        }
+
+        /// <summary>
+        /// Lists saved Wi-Fi networks by SSID.
+        /// </summary>
+        public static Task<Abstractions.WifiManagerResponse<List<string>>> GetSavedNetworksAsync(CancellationToken cancellationToken = default)
+        {
+            return Current.GetSavedNetworksAsync(cancellationToken);
+        }
+
+        /// <summary>
+        /// Removes a saved Wi-Fi network.
+        /// </summary>
+        public static Task<Abstractions.WifiManagerResponse<bool>> ForgetNetworkAsync(string ssid, CancellationToken cancellationToken = default)
+        {
+            return Current.ForgetNetworkAsync(ssid, cancellationToken);
+        }
+
+        /// <summary>
+        /// Silently saves a network suggestion that persists after the app closes (Android 10+ only).
+        /// </summary>
+        public static Task<Abstractions.WifiManagerResponse<bool>> AddNetworkSuggestionAsync(string ssid, string password, Abstractions.WifiConnectionOptions options, CancellationToken cancellationToken = default)
+        {
+            return Current.AddNetworkSuggestionAsync(ssid, password, options, cancellationToken);
+        }
+
+        /// <summary>
+        /// Connects to an 802.1X (WPA2/WPA3-Enterprise) network.
+        /// </summary>
+        public static Task<Abstractions.WifiManagerResponse<Abstractions.NetworkData>> ConnectEnterpriseWifiAsync(string ssid, Abstractions.WifiEnterpriseOptions options, CancellationToken cancellationToken = default)
+        {
+            return Current.ConnectEnterpriseWifiAsync(ssid, options, cancellationToken);
+        }
+
+        /// <summary>
+        /// Connects to a network without internet access (e.g. an IoT device's access point) and routes app traffic through it.
+        /// </summary>
+        public static Task<Abstractions.WifiManagerResponse<Abstractions.NetworkData>> ConnectLocalOnlyAsync(string ssid, string password, Abstractions.WifiConnectionOptions options, CancellationToken cancellationToken = default)
+        {
+            return Current.ConnectLocalOnlyAsync(ssid, password, options, cancellationToken);
+        }
+
+        /// <summary>
+        /// Releases the network acquired by <see cref="ConnectLocalOnlyAsync"/>.
+        /// </summary>
+        public static Task<Abstractions.WifiManagerResponse<bool>> ReleaseLocalOnlyAsync(CancellationToken cancellationToken = default)
+        {
+            return Current.ReleaseLocalOnlyAsync(cancellationToken);
+        }
+
+        /// <summary>
         /// Dispose of everything
         /// </summary>
         public static void Dispose()

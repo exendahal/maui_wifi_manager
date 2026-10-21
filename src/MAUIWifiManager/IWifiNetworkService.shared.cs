@@ -122,5 +122,89 @@ namespace MauiWifiManager
         /// on iOS performs an HTTP probe to Apple's captive portal detection endpoint.
         /// </summary>
         Task<WifiManagerResponse<bool>> IsCaptivePortalDetectedAsync(CancellationToken cancellationToken = default);
+
+        // Members below were added after 10.0.2. They have default implementations so existing
+        // implementations of this interface (custom services, test fakes) keep compiling.
+
+        /// <summary>
+        /// Raised when Wi-Fi is turned on or off. Supported on Android and Windows.
+        /// </summary>
+        event EventHandler<WifiStateChangedEventArgs>? WifiStateChanged { add { } remove { } }
+
+        /// <summary>
+        /// Raised when the signal strength of the connected network changes.
+        /// Android uses the system RSSI broadcast; Windows polls signal bars every 5 seconds.
+        /// </summary>
+        event EventHandler<WifiSignalChangedEventArgs>? SignalStrengthChanged { add { } remove { } }
+
+        /// <summary>
+        /// Returns true when the Wi-Fi radio is on. Supported on Android and Windows.
+        /// iOS/Mac Catalyst have no public API for this and return <see cref="WifiErrorCodes.UnsupportedHardware"/>.
+        /// </summary>
+        Task<WifiManagerResponse<bool>> IsWifiEnabledAsync(CancellationToken cancellationToken = default)
+            => Task.FromResult(NotSupported<bool>(nameof(IsWifiEnabledAsync)));
+
+        /// <summary>
+        /// Checks and requests every permission needed to scan and read Wi-Fi details
+        /// (location on Android/iOS, nearby Wi-Fi devices on Android 13+, Wi-Fi access on Windows).
+        /// Returns true when everything is granted; on Android also fails when location services are turned off.
+        /// </summary>
+        Task<WifiManagerResponse<bool>> RequestPermissionsAsync(CancellationToken cancellationToken = default)
+            => Task.FromResult(NotSupported<bool>(nameof(RequestPermissionsAsync)));
+
+        /// <summary>
+        /// Returns true when the active connection is metered or data-limited
+        /// (Android: NET_CAPABILITY_NOT_METERED; Windows: ConnectionCost; iOS: NWPath.IsExpensive/IsConstrained).
+        /// </summary>
+        Task<WifiManagerResponse<bool>> IsMeteredConnectionAsync(CancellationToken cancellationToken = default)
+            => Task.FromResult(NotSupported<bool>(nameof(IsMeteredConnectionAsync)));
+
+        /// <summary>
+        /// Lists saved Wi-Fi networks by SSID.
+        /// Windows: all saved profiles. iOS: networks configured by this app.
+        /// Android 10+: network suggestions added by this app; Android 9 and lower: configured networks.
+        /// </summary>
+        Task<WifiManagerResponse<List<string>>> GetSavedNetworksAsync(CancellationToken cancellationToken = default)
+            => Task.FromResult(NotSupported<List<string>>(nameof(GetSavedNetworksAsync)));
+
+        /// <summary>
+        /// Removes a saved Wi-Fi network. Same scope as <see cref="GetSavedNetworksAsync"/>:
+        /// on Android 11+ networks the user saved through the system dialog can only be removed by the user.
+        /// </summary>
+        Task<WifiManagerResponse<bool>> ForgetNetworkAsync(string ssid, CancellationToken cancellationToken = default)
+            => Task.FromResult(NotSupported<bool>(nameof(ForgetNetworkAsync)));
+
+        /// <summary>
+        /// Silently saves a network suggestion (Android 10+). The OS connects to it automatically when in range,
+        /// and keeps it after the app closes. The user is asked once to allow suggestions from the app.
+        /// Supported on Android only.
+        /// </summary>
+        Task<WifiManagerResponse<bool>> AddNetworkSuggestionAsync(string ssid, string password, WifiConnectionOptions options, CancellationToken cancellationToken = default)
+            => Task.FromResult(NotSupported<bool>(nameof(AddNetworkSuggestionAsync)));
+
+        /// <summary>
+        /// Connects to an 802.1X (WPA2/WPA3-Enterprise) network using PEAP, TTLS or PWD.
+        /// Android 10+ saves it as a network suggestion; Windows negotiates the EAP method itself and
+        /// uses only <see cref="WifiEnterpriseOptions.Identity"/> and <see cref="WifiEnterpriseOptions.Password"/>.
+        /// </summary>
+        Task<WifiManagerResponse<NetworkData>> ConnectEnterpriseWifiAsync(string ssid, WifiEnterpriseOptions options, CancellationToken cancellationToken = default)
+            => Task.FromResult(NotSupported<NetworkData>(nameof(ConnectEnterpriseWifiAsync)));
+
+        /// <summary>
+        /// Connects to a network without internet access, such as an IoT device's setup access point,
+        /// and routes the app's traffic through it so HTTP calls reach the device instead of falling back to cellular.
+        /// Call <see cref="ReleaseLocalOnlyAsync"/> when done so the device returns to its previous network.
+        /// </summary>
+        Task<WifiManagerResponse<NetworkData>> ConnectLocalOnlyAsync(string ssid, string password, WifiConnectionOptions options, CancellationToken cancellationToken = default)
+            => Task.FromResult(NotSupported<NetworkData>(nameof(ConnectLocalOnlyAsync)));
+
+        /// <summary>
+        /// Releases the network acquired by <see cref="ConnectLocalOnlyAsync"/>.
+        /// </summary>
+        Task<WifiManagerResponse<bool>> ReleaseLocalOnlyAsync(CancellationToken cancellationToken = default)
+            => Task.FromResult(NotSupported<bool>(nameof(ReleaseLocalOnlyAsync)));
+
+        private static WifiManagerResponse<T> NotSupported<T>(string operation)
+            => WifiManagerResponse<T>.ErrorResponse(WifiErrorCodes.UnsupportedHardware, $"{operation} is not supported on this platform.");
     }
 }

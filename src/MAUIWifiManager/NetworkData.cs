@@ -26,6 +26,157 @@ namespace MauiWifiManager.Abstractions
     }
 
     /// <summary>
+    /// Provides data for the <see cref="IWifiNetworkService.WifiStateChanged"/> event.
+    /// </summary>
+    public sealed class WifiStateChangedEventArgs : EventArgs
+    {
+        /// <summary>
+        /// Initializes a new instance with the new Wi-Fi radio state.
+        /// </summary>
+        public WifiStateChangedEventArgs(bool isEnabled)
+        {
+            IsEnabled = isEnabled;
+        }
+
+        /// <summary>
+        /// <see langword="true"/> when Wi-Fi is turned on.
+        /// </summary>
+        public bool IsEnabled { get; }
+    }
+
+    /// <summary>
+    /// Provides data for the <see cref="IWifiNetworkService.SignalStrengthChanged"/> event.
+    /// </summary>
+    public sealed class WifiSignalChangedEventArgs : EventArgs
+    {
+        /// <summary>
+        /// Initializes a new instance with the new signal readings.
+        /// </summary>
+        public WifiSignalChangedEventArgs(int? rssiDbm, int signalLevel, int signalPercentage)
+        {
+            RssiDbm = rssiDbm;
+            SignalLevel = signalLevel;
+            SignalPercentage = signalPercentage;
+        }
+
+        /// <summary>
+        /// Raw RSSI in dBm, or <see langword="null"/> when the platform only reports signal bars (Windows).
+        /// </summary>
+        public int? RssiDbm { get; }
+
+        /// <summary>
+        /// Signal level from 0 (weakest) to 4 (strongest).
+        /// </summary>
+        public int SignalLevel { get; }
+
+        /// <summary>
+        /// Signal quality from 0 to 100.
+        /// </summary>
+        public int SignalPercentage { get; }
+    }
+
+    /// <summary>
+    /// IEEE 802.11 standard used by an access point. Values match Android's <c>ScanResult.WIFI_STANDARD_*</c> constants.
+    /// </summary>
+    public enum WifiStandard
+    {
+        /// <summary>Standard is unknown or not reported by the platform.</summary>
+        Unknown = 0,
+        /// <summary>802.11a/b/g.</summary>
+        Legacy = 1,
+        /// <summary>802.11n (Wi-Fi 4).</summary>
+        Ieee80211n = 4,
+        /// <summary>802.11ac (Wi-Fi 5).</summary>
+        Ieee80211ac = 5,
+        /// <summary>802.11ax (Wi-Fi 6/6E).</summary>
+        Ieee80211ax = 6,
+        /// <summary>802.11ad (WiGig).</summary>
+        Ieee80211ad = 7,
+        /// <summary>802.11be (Wi-Fi 7).</summary>
+        Ieee80211be = 8,
+    }
+
+    /// <summary>
+    /// Outer EAP method used by an 802.1X (enterprise) network.
+    /// </summary>
+    public enum WifiEapMethod
+    {
+        /// <summary>Protected EAP (most common, e.g. eduroam and corporate networks).</summary>
+        Peap = 0,
+        /// <summary>EAP-TTLS.</summary>
+        Ttls = 1,
+        /// <summary>EAP-PWD. Supported on Android only.</summary>
+        Pwd = 2,
+    }
+
+    /// <summary>
+    /// Inner (phase 2) authentication used inside a PEAP or TTLS tunnel.
+    /// </summary>
+    public enum WifiPhase2Method
+    {
+        /// <summary>No inner authentication.</summary>
+        None = 0,
+        /// <summary>MSCHAPv2 (default for PEAP).</summary>
+        Mschapv2 = 1,
+        /// <summary>PAP (TTLS only).</summary>
+        Pap = 2,
+        /// <summary>GTC. Supported on Android only.</summary>
+        Gtc = 3,
+    }
+
+    /// <summary>
+    /// Credentials and server validation settings for an 802.1X (WPA2/WPA3-Enterprise) network.
+    /// </summary>
+    public class WifiEnterpriseOptions
+    {
+        /// <summary>
+        /// Outer EAP method. Defaults to <see cref="WifiEapMethod.Peap"/>.
+        /// </summary>
+        public WifiEapMethod EapMethod { get; set; } = WifiEapMethod.Peap;
+
+        /// <summary>
+        /// Inner authentication. Defaults to <see cref="WifiPhase2Method.Mschapv2"/>.
+        /// </summary>
+        public WifiPhase2Method Phase2Method { get; set; } = WifiPhase2Method.Mschapv2;
+
+        /// <summary>
+        /// User name (identity).
+        /// </summary>
+        public string Identity { get; set; } = string.Empty;
+
+        /// <summary>
+        /// User password.
+        /// </summary>
+        public string Password { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Outer (anonymous) identity sent before the tunnel is established, e.g. <c>anonymous@example.com</c>.
+        /// </summary>
+        public string? AnonymousIdentity { get; set; }
+
+        /// <summary>
+        /// Domain the RADIUS server certificate must match, e.g. <c>radius.example.com</c>.
+        /// Required on Android 11+ unless <see cref="CaCertificate"/> is set. Used as the trusted server name on iOS.
+        /// </summary>
+        public string? ServerDomain { get; set; }
+
+        /// <summary>
+        /// CA certificate used to validate the RADIUS server. Supported on Android only.
+        /// </summary>
+        public System.Security.Cryptography.X509Certificates.X509Certificate2? CaCertificate { get; set; }
+
+        /// <summary>
+        /// Whether the network's SSID is hidden (not broadcast).
+        /// </summary>
+        public bool IsHidden { get; set; }
+
+        /// <summary>
+        /// Use WPA3-Enterprise instead of WPA2-Enterprise. Supported on Android only.
+        /// </summary>
+        public bool UseWpa3 { get; set; }
+    }
+
+    /// <summary>
     /// Identifies the radio frequency band of a Wi-Fi connection.
     /// </summary>
     public enum WifiFrequencyBand
@@ -168,6 +319,16 @@ namespace MauiWifiManager.Abstractions
         /// TX link speed in Mbps. Supported on Android only.
         /// </summary>
         public int? LinkSpeedMbps { get; set; }
+
+        /// <summary>
+        /// IEEE 802.11 standard (Wi-Fi 4/5/6/7). Supported on Android (API 30+) and in Windows scan results.
+        /// </summary>
+        public WifiStandard WifiStandard { get; set; } = WifiStandard.Unknown;
+
+        /// <summary>
+        /// Channel width in MHz (20, 40, 80, 160 or 320). Supported in Android scan results only.
+        /// </summary>
+        public int? ChannelWidthMhz { get; set; }
     }
 
     /// <summary>
