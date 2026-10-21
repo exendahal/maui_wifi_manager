@@ -5,7 +5,7 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
     Title="Connect">
     <ScrollView>
-        <VerticalStackLayout Padding="{OnPlatform Default='20,16,20,32', WinUI='40,28,40,40'}">
+        <VerticalStackLayout Padding="{OnIdiom Phone='20,16,20,32', Default='40,28,40,40'}">
             <Label Style="{StaticResource PageTitle}" Text="Connect" />
             <Label Style="{StaticResource Muted}" Text="Join a network by name, or fill the form from a Wi-Fi QR code." />
 
@@ -106,7 +106,7 @@
             <Button
                 x:Name="connectBtn"
                 Margin="0,24,0,0"
-                HorizontalOptions="{OnPlatform Default=Fill, WinUI=Start}"
+                HorizontalOptions="{OnIdiom Phone=Fill, Default=Start}"
                 Clicked="ConnectClicked"
                 Text="Connect" />
 

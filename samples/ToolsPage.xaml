@@ -6,7 +6,7 @@
     xmlns:zxing="clr-namespace:ZXing.Net.Maui.Controls;assembly=ZXing.Net.MAUI.Controls"
     Title="Tools">
     <ScrollView>
-        <VerticalStackLayout Padding="{OnPlatform Default='20,16,20,32', WinUI='40,28,40,40'}">
+        <VerticalStackLayout Padding="{OnIdiom Phone='20,16,20,32', Default='40,28,40,40'}">
             <Label Style="{StaticResource PageTitle}" Text="Tools" />
             <Label Style="{StaticResource Muted}" Text="Device status, saved networks, QR sharing, hotspot, diagnostics and advanced connections." />
 

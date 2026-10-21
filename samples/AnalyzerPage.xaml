@@ -5,7 +5,7 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
     Title="Analyzer">
     <ScrollView>
-        <VerticalStackLayout Padding="{OnPlatform Default='20,16,20,32', WinUI='40,28,40,40'}">
+        <VerticalStackLayout Padding="{OnIdiom Phone='20,16,20,32', Default='40,28,40,40'}">
             <Label Style="{StaticResource PageTitle}" Text="Analyzer" />
             <Label Style="{StaticResource Muted}" Text="What is on your network, and how crowded the Wi-Fi channels around you are." />
 

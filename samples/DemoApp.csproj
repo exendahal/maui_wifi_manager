@@ -47,7 +47,9 @@
 		<MauiSplashScreen Include="Resources\Splash\splash.svg" Color="#2A62D9" BaseSize="128,128" />
 
 		<!-- Images -->
-		<MauiImage Include="Resources\Images\*" />
+		<MauiImage Include="Resources\Images\*" Exclude="Resources\Images\tab_*.svg" />
+		<!-- Tab icons are tinted gray so they read on light and dark backgrounds in the tablet side pane; the phone tab bar recolors them itself. -->
+		<MauiImage Include="Resources\Images\tab_*.svg" TintColor="#80878F" />
 
 		<!-- Custom Fonts -->
 		<MauiFont Include="Resources\Fonts\*" />
