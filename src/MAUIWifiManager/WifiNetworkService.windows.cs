@@ -910,6 +910,23 @@ namespace MauiWifiManager
             return profile == null ? null : NetworkOperatorTetheringManager.CreateFromConnectionProfile(profile);
         }
 
+        public async Task<WifiManagerResponse<LanDeviceDetails>> GetDeviceDetailsAsync(string ipAddress, CancellationToken cancellationToken = default)
+        {
+            var response = await DeviceProbe.GetDetailsAsync(ipAddress, cancellationToken);
+            // The probe just talked to the device, so the ARP table has its MAC even when NetBIOS did not report one.
+            if (response.Data is { MacAddress: null } details && IPAddress.TryParse(ipAddress, out var ip) && ip.AddressFamily == AddressFamily.InterNetwork)
+            {
+                var mac = new byte[6];
+                uint length = (uint)mac.Length;
+                if (SendARP(BitConverter.ToUInt32(ip.GetAddressBytes(), 0), 0, mac, ref length) == 0 && length == 6)
+                    response.Data = details with { MacAddress = string.Join(":", mac.Select(b => b.ToString("X2"))) };
+            }
+            return response;
+        }
+
+        [DllImport("iphlpapi.dll")]
+        private static extern int SendARP(uint destIp, uint srcIp, byte[] macAddress, ref uint physicalAddressLength);
+
         private static async Task<Radio?> GetWifiRadioAsync()
         {
             var radios = await Radio.GetRadiosAsync();

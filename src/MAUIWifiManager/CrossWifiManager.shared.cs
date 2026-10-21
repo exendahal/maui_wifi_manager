@@ -419,6 +419,14 @@ namespace MauiWifiManager
         }
 
         /// <summary>
+        /// Collects everything a device on the local network reveals (names, MAC, manufacturer, model, open ports, ping).
+        /// </summary>
+        public static Task<Abstractions.WifiManagerResponse<Abstractions.LanDeviceDetails>> GetDeviceDetailsAsync(string ipAddress, CancellationToken cancellationToken = default)
+        {
+            return Current.GetDeviceDetailsAsync(ipAddress, cancellationToken);
+        }
+
+        /// <summary>
         /// Finds services advertised over mDNS/Bonjour.
         /// </summary>
         public static Task<Abstractions.WifiManagerResponse<List<Abstractions.NetworkServiceInfo>>> BrowseServicesAsync(string serviceType = "_services._dns-sd._udp", TimeSpan? duration = null, CancellationToken cancellationToken = default)

@@ -234,9 +234,9 @@ namespace MauiWifiManager
         {
             try
             {
-                using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-                timeout.CancelAfter(TimeSpan.FromSeconds(2));
-                var entry = await Dns.GetHostEntryAsync(address.ToString(), timeout.Token).ConfigureAwait(false);
+                // WaitAsync: on Windows a failing reverse lookup ignores cancellation and takes ~5 s.
+                var entry = await Dns.GetHostEntryAsync(address.ToString(), cancellationToken)
+                    .WaitAsync(TimeSpan.FromSeconds(2), cancellationToken).ConfigureAwait(false);
                 return entry.HostName == address.ToString() ? null : entry.HostName;
             }
             catch
@@ -359,6 +359,238 @@ namespace MauiWifiManager
             {
                 return WifiManagerResponse<List<NetworkServiceInfo>>.ErrorResponse(WifiErrorCodes.NetworkUnavailable, $"mDNS query failed: {ex.Message}");
             }
+        }
+    }
+
+    /// <summary>
+    /// Looks up everything a device on the local network reveals: reverse DNS, NetBIOS, open ports, web page, UPnP and ping.
+    /// </summary>
+    internal static class DeviceProbe
+    {
+        private static readonly TimeSpan PortTimeout = TimeSpan.FromMilliseconds(800);
+        private static readonly TimeSpan ProbeTimeout = TimeSpan.FromSeconds(2.5);
+
+        public static async Task<WifiManagerResponse<LanDeviceDetails>> GetDetailsAsync(string ipAddress, CancellationToken cancellationToken)
+        {
+            if (!IPAddress.TryParse(ipAddress, out var address) || address.AddressFamily != AddressFamily.InterNetwork)
+                return WifiManagerResponse<LanDeviceDetails>.ErrorResponse(WifiErrorCodes.UnknownError, "Enter an IPv4 address.");
+
+            try
+            {
+                // Everything runs in parallel; each probe has its own short timeout, so a lookup takes about 3 seconds.
+                var hostTask = ReverseLookupAsync(address, cancellationToken);
+                var netBiosTask = QueryNetBiosAsync(address, cancellationToken);
+                var portsTask = ScanPortsAsync(address, cancellationToken);
+                var upnpTask = QueryUpnpAsync(address, cancellationToken);
+                var pingTask = NetworkTools.PingAsync(ipAddress, 3, cancellationToken);
+                var web80Task = ReadWebPageAsync(new Uri($"http://{ipAddress}/"), cancellationToken);
+                var web8080Task = ReadWebPageAsync(new Uri($"http://{ipAddress}:8080/"), cancellationToken);
+                await Task.WhenAll(hostTask, netBiosTask, portsTask, upnpTask, pingTask, web80Task, web8080Task).ConfigureAwait(false);
+
+                var ports = portsTask.Result;
+                var (server, title) = web80Task.Result.Server != null || web80Task.Result.Title != null ? web80Task.Result : web8080Task.Result;
+                var netBios = netBiosTask.Result;
+                var upnp = upnpTask.Result;
+
+                var details = new LanDeviceDetails
+                {
+                    IpAddress = ipAddress,
+                    HostName = hostTask.Result,
+                    NetBiosName = netBios.Name,
+                    MacAddress = netBios.Mac,
+                    FriendlyName = upnp.FriendlyName,
+                    Manufacturer = upnp.Manufacturer,
+                    ModelName = upnp.ModelName,
+                    ModelNumber = upnp.ModelNumber,
+                    HttpServer = server,
+                    HttpTitle = title,
+                    OpenPorts = ports,
+                    Ping = pingTask.Result.Data
+                };
+                return WifiManagerResponse<LanDeviceDetails>.SuccessResponse(details, "Device details collected.");
+            }
+            catch (OperationCanceledException)
+            {
+                return WifiManagerResponse<LanDeviceDetails>.ErrorResponse(WifiErrorCodes.OperationCanceled, "Operation was canceled.");
+            }
+        }
+
+        private static async Task<string?> ReverseLookupAsync(IPAddress address, CancellationToken cancellationToken)
+        {
+            try
+            {
+                // WaitAsync: on Windows a failing reverse lookup ignores cancellation and takes ~5 s.
+                var entry = await Dns.GetHostEntryAsync(address.ToString(), cancellationToken)
+                    .WaitAsync(ProbeTimeout, cancellationToken).ConfigureAwait(false);
+                return entry.HostName == address.ToString() ? null : entry.HostName;
+            }
+            catch (Exception ex) when (ex is SocketException or TimeoutException)
+            {
+                return null;
+            }
+        }
+
+        private static async Task<List<int>> ScanPortsAsync(IPAddress address, CancellationToken cancellationToken)
+        {
+            var open = await Task.WhenAll(LanDeviceDetails.KnownPorts.Keys.Select(async port =>
+            {
+                using var client = new TcpClient();
+                using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                timeout.CancelAfter(PortTimeout);
+                try
+                {
+                    await client.ConnectAsync(address, port, timeout.Token).ConfigureAwait(false);
+                    return port;
+                }
+                catch (Exception ex) when (ex is SocketException or OperationCanceledException && !cancellationToken.IsCancellationRequested)
+                {
+                    return -1;
+                }
+            })).ConfigureAwait(false);
+            return open.Where(p => p > 0).OrderBy(p => p).ToList();
+        }
+
+        /// <param name="followRefresh">Follow one &lt;meta http-equiv="refresh"&gt; when the page has no title (common on router login pages).</param>
+        internal static async Task<(string? Server, string? Title)> ReadWebPageAsync(Uri url, CancellationToken cancellationToken, bool followRefresh = true)
+        {
+            try
+            {
+                using var client = new HttpClient { Timeout = ProbeTimeout };
+                using var response = await client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+                var server = response.Headers.Server.Count > 0 ? response.Headers.Server.ToString() : null;
+                // Only the start of the page is needed for <title>.
+                using var stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+                var buffer = new byte[32 * 1024];
+                int length = 0, read;
+                while (length < buffer.Length && (read = await stream.ReadAsync(buffer.AsMemory(length), cancellationToken).ConfigureAwait(false)) > 0)
+                    length += read;
+                var html = Encoding.UTF8.GetString(buffer, 0, length);
+                var match = System.Text.RegularExpressions.Regex.Match(html, @"<title[^>]*>\s*(.*?)\s*</title>",
+                    System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Singleline);
+                var title = match.Success ? WebUtility.HtmlDecode(match.Groups[1].Value).Trim() : null;
+                if (string.IsNullOrEmpty(title) && followRefresh)
+                {
+                    var refresh = System.Text.RegularExpressions.Regex.Match(html, @"http-equiv\s*=\s*[""']?refresh[""']?[^>]*?url\s*=\s*([^""'>\s]+)",
+                        System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                    if (refresh.Success && Uri.TryCreate(url, refresh.Groups[1].Value, out var next) && next.Host == url.Host)
+                        title = (await ReadWebPageAsync(next, cancellationToken, followRefresh: false).ConfigureAwait(false)).Title;
+                }
+                return (server, string.IsNullOrEmpty(title) ? null : title);
+            }
+            catch (Exception ex) when (ex is HttpRequestException or OperationCanceledException && !cancellationToken.IsCancellationRequested)
+            {
+                return (null, null);
+            }
+        }
+
+        /// <summary>NetBIOS node status query (UDP 137): returns the computer name and, from the reply's unit ID, the MAC address.</summary>
+        private static async Task<(string? Name, string? Mac)> QueryNetBiosAsync(IPAddress address, CancellationToken cancellationToken)
+        {
+            try
+            {
+                using var udp = new UdpClient(new IPEndPoint(IPAddress.Any, 0));
+                using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                timeout.CancelAfter(ProbeTimeout);
+                await udp.SendAsync(BuildNetBiosQuery(), new IPEndPoint(address, 137), timeout.Token).ConfigureAwait(false);
+                var result = await udp.ReceiveAsync(timeout.Token).ConfigureAwait(false);
+                return ParseNetBiosResponse(result.Buffer);
+            }
+            catch (Exception ex) when (ex is SocketException or OperationCanceledException && !cancellationToken.IsCancellationRequested)
+            {
+                return (null, null);
+            }
+        }
+
+        internal static byte[] BuildNetBiosQuery()
+        {
+            var packet = new List<byte> { 0x13, 0x37, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0x20 };
+            // Name "*" padded to 16 bytes with zeros, first-level encoded as two letters per byte.
+            var name = new byte[16];
+            name[0] = (byte)'*';
+            foreach (var b in name)
+            {
+                packet.Add((byte)('A' + (b >> 4)));
+                packet.Add((byte)('A' + (b & 0x0F)));
+            }
+            packet.AddRange(new byte[] { 0, 0, 0x21, 0, 1 }); // end of name, type NBSTAT, class IN
+            return packet.ToArray();
+        }
+
+        internal static (string? Name, string? Mac) ParseNetBiosResponse(byte[] message)
+        {
+            // Header (12) + encoded name (34) + type, class, TTL, length (10) = 56, then the name count.
+            const int namesOffset = 57;
+            if (message.Length < namesOffset)
+                return (null, null);
+            int count = message[56];
+            string? name = null;
+            for (int i = 0; i < count; i++)
+            {
+                int entry = namesOffset + i * 18;
+                if (entry + 18 > message.Length)
+                    return (name, null);
+                bool isGroup = (message[entry + 16] & 0x80) != 0;
+                // Suffix 0x00 on a unique (non-group) name is the workstation (computer) name.
+                if (name == null && message[entry + 15] == 0x00 && !isGroup)
+                    name = Encoding.ASCII.GetString(message, entry, 15).TrimEnd(' ', '\0');
+            }
+            int macOffset = namesOffset + count * 18;
+            string? mac = null;
+            if (macOffset + 6 <= message.Length && message.Skip(macOffset).Take(6).Any(b => b != 0))
+                mac = string.Join(":", message.Skip(macOffset).Take(6).Select(b => b.ToString("X2")));
+            return (string.IsNullOrEmpty(name) ? null : name, mac);
+        }
+
+        internal sealed record UpnpInfo(string? FriendlyName = null, string? Manufacturer = null, string? ModelName = null, string? ModelNumber = null);
+
+        /// <summary>
+        /// Asks the device for its UPnP description with an SSDP search sent straight to it (port 1900),
+        /// then reads friendly name, manufacturer and model from the description XML.
+        /// </summary>
+        private static async Task<UpnpInfo> QueryUpnpAsync(IPAddress address, CancellationToken cancellationToken)
+        {
+            try
+            {
+                using var udp = new UdpClient(new IPEndPoint(IPAddress.Any, 0));
+                using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                timeout.CancelAfter(ProbeTimeout);
+                var search = Encoding.ASCII.GetBytes(
+                    $"M-SEARCH * HTTP/1.1\r\nHOST: {address}:1900\r\nMAN: \"ssdp:discover\"\r\nMX: 1\r\nST: ssdp:all\r\n\r\n");
+                // Sent to the device itself: the reply then comes from the address we sent to, which firewalls allow back in.
+                await udp.SendAsync(search, new IPEndPoint(address, 1900), timeout.Token).ConfigureAwait(false);
+                string? location = null;
+                while (location == null)
+                {
+                    var reply = await udp.ReceiveAsync(timeout.Token).ConfigureAwait(false);
+                    if (reply.RemoteEndPoint.Address.Equals(address))
+                        location = ParseSsdpLocation(Encoding.ASCII.GetString(reply.Buffer));
+                }
+
+                using var client = new HttpClient { Timeout = ProbeTimeout };
+                var xml = await client.GetStringAsync(location, cancellationToken).ConfigureAwait(false);
+                return ParseUpnpDescription(xml);
+            }
+            catch (Exception ex) when (ex is SocketException or HttpRequestException or System.Xml.XmlException or UriFormatException
+                                       or OperationCanceledException && !cancellationToken.IsCancellationRequested)
+            {
+                return new UpnpInfo();
+            }
+        }
+
+        internal static string? ParseSsdpLocation(string response)
+        {
+            foreach (var line in response.Split("\r\n"))
+                if (line.StartsWith("LOCATION:", StringComparison.OrdinalIgnoreCase))
+                    return line["LOCATION:".Length..].Trim();
+            return null;
+        }
+
+        internal static UpnpInfo ParseUpnpDescription(string xml)
+        {
+            var device = System.Xml.Linq.XDocument.Parse(xml).Descendants().FirstOrDefault(e => e.Name.LocalName == "device");
+            string? Read(string element) =>
+                device?.Elements().FirstOrDefault(e => e.Name.LocalName == element)?.Value.Trim() is { Length: > 0 } value ? value : null;
+            return new UpnpInfo(Read("friendlyName"), Read("manufacturer"), Read("modelName"), Read("modelNumber"));
         }
     }
 

@@ -617,6 +617,10 @@ var devices = await CrossWifiManager.Current.DiscoverDevicesAsync();
 foreach (var device in devices.Data ?? [])
     Debug.WriteLine($"{device.IpAddress} {device.HostName}");
 
+// Everything one device reveals: names, MAC, manufacturer/model, open ports, web page title, ping (about 3 s)
+var details = await CrossWifiManager.Current.GetDeviceDetailsAsync("192.168.1.1");
+Debug.WriteLine($"{details.Data?.HttpTitle} {details.Data?.MacAddress} ports: {string.Join(", ", details.Data?.OpenPorts ?? [])}");
+
 // mDNS / Bonjour: list service types, then the devices for one type
 var types = await CrossWifiManager.Current.BrowseServicesAsync();
 var printers = await CrossWifiManager.Current.BrowseServicesAsync("_ipp._tcp");
@@ -626,6 +630,9 @@ foreach (var printer in printers.Data ?? [])
 
 **Notes:**
 - Device discovery only finds devices that answer ping, and on larger networks it covers only the /24 around this device.
+- `GetDeviceDetailsAsync` combines reverse DNS, NetBIOS (computer name and MAC), UPnP (manufacturer and model), a check of common ports (`LanDeviceDetails.KnownPorts`), the device's web page title and ping. Devices only reveal what they answer to, so many fields can be empty.
+- MAC addresses come from the ARP table on Windows. Android 10+ and iOS hide it, so there the MAC is only known when the device answers NetBIOS. `IsRandomizedMac` tells you when a device (typically a phone) uses a private address.
+- Android blocks plain `http://` requests by default, which stops the web page title and UPnP lookups. To allow them, add `android:usesCleartextTraffic="true"` to the `<application>` element in `AndroidManifest.xml`, or allow cleartext only for local addresses with a [network security config](https://developer.android.com/privacy-and-security/security-config).
 - Ping, speed test, device discovery and mDNS are shared .NET code. They also work for custom `IWifiNetworkService` implementations.
 
 ---
@@ -667,6 +674,7 @@ foreach (var printer in printers.Data ?? [])
 | Hotspot                              | ✅ API 26+  | ❌          | ✅          | Android: local-only; client list on Windows only          |
 | Ping / Speed Test                    | ✅          | ✅          | ✅          |                                                           |
 | Local Network Device Discovery       | ✅          | ✅          | ✅          | Devices must answer ping                                  |
+| Device Details (name, MAC, model, ports) | ✅*     | ✅*         | ✅          | *MAC only via NetBIOS on Android 10+ and iOS              |
 | mDNS / Bonjour Browsing              | ✅          | ✅*         | ✅          | *Needs Apple's multicast entitlement                      |
 | Broadcast Address / Prefix Length    | ✅          | ✅          | ✅          |                                                           |
 

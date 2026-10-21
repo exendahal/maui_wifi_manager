@@ -273,6 +273,13 @@ namespace MauiWifiManager
             => NetworkTools.DiscoverDevicesAsync(cancellationToken);
 
         /// <summary>
+        /// Collects what a device on the local network reveals: host name, NetBIOS name, MAC address (Windows, or NetBIOS),
+        /// UPnP manufacturer and model, open well-known ports, its web page title, and ping times. Takes about 3 seconds.
+        /// </summary>
+        Task<WifiManagerResponse<LanDeviceDetails>> GetDeviceDetailsAsync(string ipAddress, CancellationToken cancellationToken = default)
+            => DeviceProbe.GetDetailsAsync(ipAddress, cancellationToken);
+
+        /// <summary>
         /// Finds services advertised over mDNS/Bonjour, e.g. <c>_http._tcp</c>, <c>_ipp._tcp</c> or <c>_googlecast._tcp</c>.
         /// The default <c>_services._dns-sd._udp</c> lists the service types present on the network.
         /// Android needs the CHANGE_WIFI_MULTICAST_STATE permission; iOS requires the multicast networking

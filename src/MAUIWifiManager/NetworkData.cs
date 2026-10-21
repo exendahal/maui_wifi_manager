@@ -376,6 +376,89 @@ namespace MauiWifiManager.Abstractions
     }
 
     /// <summary>
+    /// Everything that can be learned about a device on the local network from the outside.
+    /// Returned by <see cref="IWifiNetworkService.GetDeviceDetailsAsync"/>; any field may be missing.
+    /// </summary>
+    public sealed record LanDeviceDetails
+    {
+        /// <summary>IPv4 address.</summary>
+        public string IpAddress { get; init; } = string.Empty;
+
+        /// <summary>Host name from reverse DNS.</summary>
+        public string? HostName { get; init; }
+
+        /// <summary>NetBIOS computer name (Windows PCs, Samba servers and many NAS devices).</summary>
+        public string? NetBiosName { get; init; }
+
+        /// <summary>
+        /// MAC address, e.g. <c>A4:5E:60:12:34:56</c>. From the ARP table on Windows, otherwise from NetBIOS when the device answers it.
+        /// Android 10+ and iOS do not expose the ARP table.
+        /// </summary>
+        public string? MacAddress { get; init; }
+
+        /// <summary>
+        /// <see langword="true"/> when the MAC address is locally administered, which usually means the device uses a
+        /// private (randomized) address, as phones do by default.
+        /// </summary>
+        public bool? IsRandomizedMac => MacAddress is { Length: >= 2 } mac && int.TryParse(mac[..2], System.Globalization.NumberStyles.HexNumber, null, out var first)
+            ? (first & 0x02) != 0
+            : null;
+
+        /// <summary>Friendly name from the device's UPnP description, e.g. <c>Living Room TV</c>.</summary>
+        public string? FriendlyName { get; init; }
+
+        /// <summary>Manufacturer from UPnP, e.g. <c>Samsung Electronics</c>.</summary>
+        public string? Manufacturer { get; init; }
+
+        /// <summary>Model name from UPnP, e.g. <c>Archer C6</c>.</summary>
+        public string? ModelName { get; init; }
+
+        /// <summary>Model number from UPnP.</summary>
+        public string? ModelNumber { get; init; }
+
+        /// <summary>Server header of the device's web interface, e.g. <c>lighttpd/1.4</c>.</summary>
+        public string? HttpServer { get; init; }
+
+        /// <summary>Page title of the device's web interface, e.g. a router's login page.</summary>
+        public string? HttpTitle { get; init; }
+
+        /// <summary>Well-known TCP ports that accepted a connection; see <see cref="KnownPorts"/>.</summary>
+        public IReadOnlyList<int> OpenPorts { get; init; } = Array.Empty<int>();
+
+        /// <summary>Ping round-trip statistics.</summary>
+        public PingStatistics? Ping { get; init; }
+
+        /// <summary>
+        /// TCP ports checked by <see cref="IWifiNetworkService.GetDeviceDetailsAsync"/> and what they usually mean.
+        /// </summary>
+        public static IReadOnlyDictionary<int, string> KnownPorts { get; } = new Dictionary<int, string>
+        {
+            [21] = "FTP",
+            [22] = "SSH",
+            [23] = "Telnet",
+            [53] = "DNS",
+            [80] = "Web (HTTP)",
+            [139] = "NetBIOS",
+            [443] = "Web (HTTPS)",
+            [445] = "File sharing (SMB)",
+            [548] = "File sharing (AFP)",
+            [554] = "Video stream (RTSP)",
+            [631] = "Printing (IPP)",
+            [1883] = "MQTT (smart home)",
+            [3389] = "Remote Desktop",
+            [5000] = "UPnP / NAS admin",
+            [7000] = "AirPlay",
+            [8008] = "Chromecast",
+            [8009] = "Chromecast",
+            [8080] = "Web (alternate)",
+            [8443] = "Web (alternate HTTPS)",
+            [9100] = "Printing (raw)",
+            [32400] = "Plex",
+            [62078] = "iPhone / iPad sync",
+        };
+    }
+
+    /// <summary>
     /// A service advertised over mDNS/Bonjour, such as a printer or Chromecast.
     /// </summary>
     public sealed class NetworkServiceInfo
