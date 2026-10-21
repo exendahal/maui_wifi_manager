@@ -37,12 +37,18 @@ namespace MauiWifiManager
         private IntentReceiver? _WifiStateReceiver;
         private IntentReceiver? _RssiReceiver;
         private ConnectivityManager.NetworkCallback? _LocalOnlyCallback;
+        private EventHandler<WifiScanResultsEventArgs>? _ScanResultsAvailable;
+        private IntentReceiver? _ScanResultsReceiver;
+        // Times of scans this app started, to tell when Android's 4-per-2-minutes quota is used up.
+        private static readonly Queue<DateTime> _ScanRequests = new();
         // Android 10 has no API to read back suggestions, so the ones added in this process are kept to support removal.
         [SupportedOSPlatform("android29.0")]
         private static readonly Dictionary<string, WifiNetworkSuggestion> _AddedSuggestions = new();
 
         private static readonly TimeSpan DefaultScanSessionDuration = TimeSpan.FromSeconds(30);
         private static readonly TimeSpan ConnectTimeout = TimeSpan.FromSeconds(30);
+        private static readonly TimeSpan ScanQuotaWindow = TimeSpan.FromMinutes(2);
+        private const int ScanQuota = 4;
         private static readonly TimeSpan ScanResultsTimeout = TimeSpan.FromSeconds(10);
         private static readonly TimeSpan FreshScanInterval = TimeSpan.FromSeconds(30);
 
@@ -108,6 +114,27 @@ namespace MauiWifiManager
                     _SignalStrengthChanged -= value;
                     if (_SignalStrengthChanged == null)
                         UnregisterIntentReceiver(ref _RssiReceiver);
+                }
+            }
+        }
+
+        public event EventHandler<WifiScanResultsEventArgs>? ScanResultsAvailable
+        {
+            add
+            {
+                lock (_MonitorLock)
+                {
+                    _ScanResultsAvailable += value;
+                    _ScanResultsReceiver ??= RegisterIntentReceiver(WifiManager.ScanResultsAvailableAction, OnScanResultsIntent);
+                }
+            }
+            remove
+            {
+                lock (_MonitorLock)
+                {
+                    _ScanResultsAvailable -= value;
+                    if (_ScanResultsAvailable == null)
+                        UnregisterIntentReceiver(ref _ScanResultsReceiver);
                 }
             }
         }
@@ -515,16 +542,21 @@ namespace MauiWifiManager
         public async Task<WifiManagerResponse<List<NetworkData>>> ScanWifiNetworksAsync(CancellationToken cancellationToken = default)
         {
             CheckInit(_Context);
+            bool fresh = true;
             try
             {
                 if (_Context.GetSystemService(Context.WifiService) is WifiManager { IsWifiEnabled: true } wifiManager)
-                    await RequestFreshScanAsync(wifiManager, cancellationToken);
+                    fresh = await RequestFreshScanAsync(wifiManager, cancellationToken);
             }
             catch (System.OperationCanceledException)
             {
                 return CreateCanceledResponse<List<NetworkData>>(nameof(ScanWifiNetworks));
             }
-            return ScanWifiNetworksInternal(cancellationToken);
+            var response = ScanWifiNetworksInternal(cancellationToken);
+            // Still a success so existing callers keep working; the message tells them the list may be old.
+            if (!fresh && response.ErrorCode == WifiErrorCodes.Success)
+                response.ErrorMessage = "Android did not run a new scan (throttled or not allowed), so these are the previous results. Check CanStartScanAsync for the reason.";
+            return response;
         }
 
         /// <summary>
@@ -532,7 +564,7 @@ namespace MauiWifiManager
         /// reading ScanResults right after it returns the previous (cached) list.
         /// When the OS throttles the request (4 per 2 min in foreground) the cached results are used as-is.
         /// </summary>
-        private static async Task RequestFreshScanAsync(WifiManager wifiManager, CancellationToken cancellationToken)
+        private static async Task<bool> RequestFreshScanAsync(WifiManager wifiManager, CancellationToken cancellationToken)
         {
             var scanCompleted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             var receiver = new WifiScanReceiver(() => scanCompleted.TrySetResult());
@@ -546,11 +578,16 @@ namespace MauiWifiManager
             {
 #pragma warning disable CA1422 // Deprecated in API 28 but still the only way to request a scan.
                 if (!wifiManager.StartScan())
-                    return;
+                    return false;
 #pragma warning restore CA1422
+                lock (_ScanRequests) _ScanRequests.Enqueue(DateTime.UtcNow);
                 await scanCompleted.Task.WaitAsync(ScanResultsTimeout, cancellationToken);
+                return true;
             }
-            catch (TimeoutException) { }
+            catch (TimeoutException)
+            {
+                return false;
+            }
             finally
             {
                 _Context.UnregisterReceiver(receiver);
@@ -758,12 +795,7 @@ namespace MauiWifiManager
                 }
 
                 // SSIDs and scan results stay hidden while location services are off, even with the permission granted.
-                var locationManager = _Context.GetSystemService(Context.LocationService) as Android.Locations.LocationManager;
-                bool locationOn = OperatingSystem.IsAndroidVersionAtLeast(28)
-                    ? locationManager?.IsLocationEnabled == true
-                    : locationManager?.IsProviderEnabled(Android.Locations.LocationManager.GpsProvider) == true
-                      || locationManager?.IsProviderEnabled(Android.Locations.LocationManager.NetworkProvider) == true;
-                if (!locationOn)
+                if (!IsLocationEnabled())
                     return WifiManagerResponse<bool>.ErrorResponse(WifiErrorCodes.PermissionDenied, "Location services are turned off. Turn them on to scan and read Wi-Fi details.");
 
                 return WifiManagerResponse<bool>.SuccessResponse(true, "All Wi-Fi permissions are granted.");
@@ -1220,6 +1252,68 @@ namespace MauiWifiManager
             _SignalStrengthChanged?.Invoke(this, new WifiSignalChangedEventArgs(rssi, WifiSignal.GetSignalLevel(rssi), WifiSignal.GetSignalPercentage(rssi)));
         }
 
+        public Task<WifiManagerResponse<WifiScanAvailability>> CanStartScanAsync(CancellationToken cancellationToken = default)
+        {
+            if (cancellationToken.IsCancellationRequested)
+                return Task.FromResult(CreateCanceledResponse<WifiScanAvailability>(nameof(CanStartScanAsync)));
+
+            if (_Context.GetSystemService(Context.WifiService) is not WifiManager wifiManager)
+                return Task.FromResult(WifiManagerResponse<WifiScanAvailability>.ErrorResponse(WifiErrorCodes.UnsupportedHardware, "Wi-Fi Manager is unavailable. Please ensure the device has Wi-Fi capability."));
+
+            var (state, message) =
+                !wifiManager.IsWifiEnabled ? (WifiScanAvailability.WifiDisabled, "Wi-Fi is turned off.")
+                : !HasScanPermission() ? (WifiScanAvailability.PermissionDenied, "Location (or nearby Wi-Fi devices) permission is not granted.")
+                : !IsLocationEnabled() ? (WifiScanAvailability.LocationServicesDisabled, "Location services are turned off.")
+                : IsScanQuotaUsed(wifiManager) ? (WifiScanAvailability.Throttled, "This app used its 4 scans in the last 2 minutes; Android will return cached results.")
+                : (WifiScanAvailability.Ready, "A scan can start now.");
+            return Task.FromResult(WifiManagerResponse<WifiScanAvailability>.SuccessResponse(state, message));
+        }
+
+        private static bool HasScanPermission()
+        {
+            if (!OperatingSystem.IsAndroidVersionAtLeast(23))
+                return true;
+            if (_Context.CheckSelfPermission(Android.Manifest.Permission.AccessFineLocation) == Android.Content.PM.Permission.Granted)
+                return true;
+            return OperatingSystem.IsAndroidVersionAtLeast(33)
+                && _Context.CheckSelfPermission(Android.Manifest.Permission.NearbyWifiDevices) == Android.Content.PM.Permission.Granted;
+        }
+
+        private static bool IsLocationEnabled()
+        {
+            var locationManager = _Context.GetSystemService(Context.LocationService) as Android.Locations.LocationManager;
+            return OperatingSystem.IsAndroidVersionAtLeast(28)
+                ? locationManager?.IsLocationEnabled == true
+                : locationManager?.IsProviderEnabled(Android.Locations.LocationManager.GpsProvider) == true
+                  || locationManager?.IsProviderEnabled(Android.Locations.LocationManager.NetworkProvider) == true;
+        }
+
+        /// <summary>
+        /// Android 9+ allows 4 foreground scans per 2 minutes. Only scans started by this app are counted,
+        /// which is the quota Android applies per app.
+        /// </summary>
+        private static bool IsScanQuotaUsed(WifiManager wifiManager)
+        {
+            if (!OperatingSystem.IsAndroidVersionAtLeast(28))
+                return false;
+            if (OperatingSystem.IsAndroidVersionAtLeast(30) && !wifiManager.IsScanThrottleEnabled)
+                return false; // Throttling turned off in developer options.
+            lock (_ScanRequests)
+            {
+                while (_ScanRequests.Count > 0 && DateTime.UtcNow - _ScanRequests.Peek() > ScanQuotaWindow)
+                    _ScanRequests.Dequeue();
+                return _ScanRequests.Count >= ScanQuota;
+            }
+        }
+
+        private void OnScanResultsIntent(BroadcastReceiver receiver, Intent intent)
+        {
+            bool fresh = !OperatingSystem.IsAndroidVersionAtLeast(23) || intent.GetBooleanExtra(WifiManager.ExtraResultsUpdated, true);
+            var scan = ScanWifiNetworksInternal();
+            if (scan.ErrorCode == WifiErrorCodes.Success && scan.Data != null)
+                _ScanResultsAvailable?.Invoke(this, new WifiScanResultsEventArgs(scan.Data, fresh));
+        }
+
         private static int? GetChannelWidthMhz(int channelWidth) => channelWidth switch
         {
             0 => 20,
@@ -1510,6 +1604,7 @@ namespace MauiWifiManager
             {
                 UnregisterIntentReceiver(ref _WifiStateReceiver);
                 UnregisterIntentReceiver(ref _RssiReceiver);
+                UnregisterIntentReceiver(ref _ScanResultsReceiver);
             }
         }
 

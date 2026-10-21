@@ -340,11 +340,34 @@ namespace MauiWifiManager
         }
 
         /// <summary>
+        /// Raised whenever the OS finishes a Wi-Fi scan. Supported on Android and Windows.
+        /// </summary>
+        public static event EventHandler<Abstractions.WifiScanResultsEventArgs>? ScanResultsAvailable
+        {
+            add => Current.ScanResultsAvailable += value;
+            remove
+            {
+                if (_Implementation != null && _Implementation.IsValueCreated)
+                {
+                    _Implementation.Value.ScanResultsAvailable -= value;
+                }
+            }
+        }
+
+        /// <summary>
         /// Lists the kinds of network the device is connected to.
         /// </summary>
         public static Task<Abstractions.WifiManagerResponse<List<Abstractions.NetworkConnectionType>>> GetConnectionTypesAsync(CancellationToken cancellationToken = default)
         {
             return Current.GetConnectionTypesAsync(cancellationToken);
+        }
+
+        /// <summary>
+        /// Reports whether a Wi-Fi scan can start now, and if not, why. Supported on Android and Windows.
+        /// </summary>
+        public static Task<Abstractions.WifiManagerResponse<Abstractions.WifiScanAvailability>> CanStartScanAsync(CancellationToken cancellationToken = default)
+        {
+            return Current.CanStartScanAsync(cancellationToken);
         }
 
         /// <summary>

@@ -219,6 +219,19 @@ namespace MauiWifiManager
         Task<WifiManagerResponse<List<NetworkConnectionType>>> GetConnectionTypesAsync(CancellationToken cancellationToken = default)
             => Task.FromResult(ConnectionMonitor.GetConnectionTypes());
 
+        /// <summary>
+        /// Reports whether a Wi-Fi scan can start now, and if not, why (Wi-Fi off, permission, location off, throttled).
+        /// Supported on Android and Windows.
+        /// </summary>
+        Task<WifiManagerResponse<WifiScanAvailability>> CanStartScanAsync(CancellationToken cancellationToken = default)
+            => Task.FromResult(NotSupported<WifiScanAvailability>(nameof(CanStartScanAsync)));
+
+        /// <summary>
+        /// Raised whenever the OS finishes a Wi-Fi scan, including scans the system or other apps started.
+        /// Listening costs no scan quota. Supported on Android and Windows.
+        /// </summary>
+        event EventHandler<WifiScanResultsEventArgs>? ScanResultsAvailable { add { } remove { } }
+
         private static WifiManagerResponse<T> NotSupported<T>(string operation)
             => WifiManagerResponse<T>.ErrorResponse(WifiErrorCodes.UnsupportedHardware, $"{operation} is not supported on this platform.");
     }

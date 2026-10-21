@@ -277,6 +277,48 @@ namespace MauiWifiManager.Abstractions
     }
 
     /// <summary>
+    /// Whether a Wi-Fi scan can run right now, and if not, why.
+    /// </summary>
+    public enum WifiScanAvailability
+    {
+        /// <summary>A scan can be started.</summary>
+        Ready = 0,
+        /// <summary>Wi-Fi is turned off.</summary>
+        WifiDisabled = 1,
+        /// <summary>Location or nearby Wi-Fi devices permission is missing.</summary>
+        PermissionDenied = 2,
+        /// <summary>Location services are turned off (Android).</summary>
+        LocationServicesDisabled = 3,
+        /// <summary>The app used up the OS scan quota (Android: 4 scans per 2 minutes); results will be cached.</summary>
+        Throttled = 4,
+    }
+
+    /// <summary>
+    /// Provides data for the <see cref="IWifiNetworkService.ScanResultsAvailable"/> event.
+    /// </summary>
+    public sealed class WifiScanResultsEventArgs : EventArgs
+    {
+        /// <summary>
+        /// Initializes a new instance.
+        /// </summary>
+        public WifiScanResultsEventArgs(IReadOnlyList<NetworkData> networks, bool isFresh)
+        {
+            Networks = networks;
+            IsFresh = isFresh;
+        }
+
+        /// <summary>
+        /// Networks found by the scan.
+        /// </summary>
+        public IReadOnlyList<NetworkData> Networks { get; }
+
+        /// <summary>
+        /// <see langword="false"/> when the scan failed and the OS returned its previous results.
+        /// </summary>
+        public bool IsFresh { get; }
+    }
+
+    /// <summary>
     /// Represents information about a Wi-Fi network or the currently connected network.
     /// </summary>
     public class NetworkData

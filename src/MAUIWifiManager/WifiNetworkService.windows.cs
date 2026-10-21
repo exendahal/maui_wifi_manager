@@ -28,6 +28,11 @@ namespace MauiWifiManager
         private RadioState? _LastRadioState;
         private CancellationTokenSource? _SignalPollCts;
         private bool _LocalOnlyActive;
+        private EventHandler<WifiScanResultsEventArgs>? _ScanResultsAvailable;
+        private WiFiAdapter? _ScanEventAdapter;
+        // AvailableNetworksChanged only fires on the WiFiAdapter object that ran the scan, so scans and the
+        // ScanResultsAvailable event share one instance. ponytail: not refreshed if the adapter is replaced.
+        private static WiFiAdapter? _SharedAdapter;
 
         private static readonly TimeSpan DefaultScanSessionDuration = TimeSpan.FromSeconds(30);
         private static readonly TimeSpan SignalPollInterval = TimeSpan.FromSeconds(5);
@@ -101,6 +106,30 @@ namespace MauiWifiManager
                     _SignalStrengthChanged -= value;
                     if (_SignalStrengthChanged == null)
                         StopSignalPolling();
+                }
+            }
+        }
+
+        public event EventHandler<WifiScanResultsEventArgs>? ScanResultsAvailable
+        {
+            add
+            {
+                bool attach;
+                lock (_MonitorLock)
+                {
+                    attach = _ScanResultsAvailable == null;
+                    _ScanResultsAvailable += value;
+                }
+                if (attach)
+                    _ = AttachScanAdapterAsync();
+            }
+            remove
+            {
+                lock (_MonitorLock)
+                {
+                    _ScanResultsAvailable -= value;
+                    if (_ScanResultsAvailable == null)
+                        DetachScanAdapter();
                 }
             }
         }
@@ -354,6 +383,7 @@ namespace MauiWifiManager
             {
                 DetachRadio();
                 StopSignalPolling();
+                DetachScanAdapter();
             }
         }
 
@@ -373,29 +403,13 @@ namespace MauiWifiManager
                 var accessStatus = await WiFiAdapter.RequestAccessAsync();
                 if (accessStatus == WiFiAccessStatus.Allowed)
                 {
-                    var result = await WiFiAdapter.FindAllAdaptersAsync();
-                    if (result.Count > 0)
+                    var wifiAdapter = await GetSharedAdapterAsync();
+                    if (wifiAdapter != null)
                     {
-                        var wifiAdapter = result[0];
                         Debug.WriteLine("Wi-Fi Scan started.");
                         await wifiAdapter.ScanAsync().AsTask(cancellationToken);
 
-                        foreach (var network in wifiAdapter.NetworkReport.AvailableNetworks)
-                        {
-                            int freqMHz = (int)(network.ChannelCenterFrequencyInKilohertz / 1000);
-                            wifiNetworks.Add(new NetworkData
-                            {
-                                Ssid = network.Ssid,
-                                Bssid = network.Bssid,
-                                SignalStrength = network.SignalBars,
-                                SecurityType = network.PhyKind,
-                                FrequencyBand = freqMHz > 0 ? GetBandFromFrequencyMHz(freqMHz) : WifiFrequencyBand.Unknown,
-                                ChannelNumber = freqMHz > 0 ? GetChannelFromFrequencyMHz(freqMHz) : null,
-                                RssiDbm = (int)network.NetworkRssiInDecibelMilliwatts,
-                                WifiStandard = GetWifiStandard(network.PhyKind),
-                                NativeObject = network
-                            });
-                        }
+                        wifiNetworks.AddRange(wifiAdapter.NetworkReport.AvailableNetworks.Select(ToNetworkData));
                     }
                     Debug.WriteLine("Wi-Fi Scan complete.");
                     response.ErrorCode = WifiErrorCodes.Success;
@@ -655,6 +669,88 @@ namespace MauiWifiManager
             if (adapters.Count > 0)
                 adapters[0].Disconnect(); // Windows then reconnects to its preferred network.
             return WifiManagerResponse<bool>.SuccessResponse(true, "Local-only network released.");
+        }
+
+        private static NetworkData ToNetworkData(WiFiAvailableNetwork network)
+        {
+            int freqMHz = (int)(network.ChannelCenterFrequencyInKilohertz / 1000);
+            return new NetworkData
+            {
+                Ssid = network.Ssid,
+                Bssid = network.Bssid,
+                SignalStrength = network.SignalBars,
+                SecurityType = network.PhyKind,
+                FrequencyBand = freqMHz > 0 ? GetBandFromFrequencyMHz(freqMHz) : WifiFrequencyBand.Unknown,
+                ChannelNumber = freqMHz > 0 ? GetChannelFromFrequencyMHz(freqMHz) : null,
+                RssiDbm = (int)network.NetworkRssiInDecibelMilliwatts,
+                WifiStandard = GetWifiStandard(network.PhyKind),
+                NativeObject = network
+            };
+        }
+
+        public async Task<WifiManagerResponse<WifiScanAvailability>> CanStartScanAsync(CancellationToken cancellationToken = default)
+        {
+            if (cancellationToken.IsCancellationRequested)
+                return WifiManagerResponse<WifiScanAvailability>.ErrorResponse(WifiErrorCodes.OperationCanceled, "Operation was canceled.");
+
+            try
+            {
+                if (await WiFiAdapter.RequestAccessAsync() != WiFiAccessStatus.Allowed)
+                    return WifiManagerResponse<WifiScanAvailability>.SuccessResponse(WifiScanAvailability.PermissionDenied, "Wi-Fi access is not allowed for this app.");
+
+                var radio = await GetWifiRadioAsync();
+                if (radio == null)
+                    return WifiManagerResponse<WifiScanAvailability>.ErrorResponse(WifiErrorCodes.UnsupportedHardware, "No Wi-Fi radio found.");
+                if (radio.State != RadioState.On)
+                    return WifiManagerResponse<WifiScanAvailability>.SuccessResponse(WifiScanAvailability.WifiDisabled, "Wi-Fi is turned off.");
+
+                // Windows does not throttle app-initiated scans.
+                return WifiManagerResponse<WifiScanAvailability>.SuccessResponse(WifiScanAvailability.Ready, "A scan can start now.");
+            }
+            catch (Exception ex)
+            {
+                return WifiManagerResponse<WifiScanAvailability>.ErrorResponse(WifiErrorCodes.UnknownError, ex.Message);
+            }
+        }
+
+        private async Task AttachScanAdapterAsync()
+        {
+            WiFiAdapter? adapter;
+            try
+            {
+                if (await WiFiAdapter.RequestAccessAsync() != WiFiAccessStatus.Allowed) return;
+                adapter = await GetSharedAdapterAsync();
+            }
+            catch { return; }
+            if (adapter == null) return;
+
+            lock (_MonitorLock)
+            {
+                if (_ScanResultsAvailable == null || _ScanEventAdapter != null) return;
+                _ScanEventAdapter = adapter;
+                adapter.AvailableNetworksChanged += OnAvailableNetworksChanged;
+            }
+        }
+
+        private static async Task<WiFiAdapter?> GetSharedAdapterAsync()
+        {
+            if (_SharedAdapter != null)
+                return _SharedAdapter;
+            var adapters = await WiFiAdapter.FindAllAdaptersAsync();
+            return _SharedAdapter ??= adapters.FirstOrDefault();
+        }
+
+        private void DetachScanAdapter()
+        {
+            if (_ScanEventAdapter == null) return;
+            _ScanEventAdapter.AvailableNetworksChanged -= OnAvailableNetworksChanged;
+            _ScanEventAdapter = null;
+        }
+
+        private void OnAvailableNetworksChanged(WiFiAdapter sender, object args)
+        {
+            var networks = sender.NetworkReport.AvailableNetworks.Select(ToNetworkData).ToList();
+            _ScanResultsAvailable?.Invoke(this, new WifiScanResultsEventArgs(networks, isFresh: true));
         }
 
         private static async Task<Radio?> GetWifiRadioAsync()
