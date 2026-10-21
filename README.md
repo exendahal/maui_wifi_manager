@@ -31,7 +31,6 @@ The Wi-Fi Manager for .NET MAUI is a simple and powerful library that helps you 
 - **Open Wireless Settings**: Provide quick access to device wireless settings.
 - **Wi-Fi On/Off State**: Check whether Wi-Fi is on and get notified when it changes.
 - **Permission Helper**: Request every permission Wi-Fi scanning needs in one call.
-- **Wi-Fi QR Codes**: Parse and generate `WIFI:` QR code payloads.
 - **Signal Helpers**: Convert RSSI to bars/percentage and listen for signal changes.
 - **Metered Connection Detection**: Know when the connection is metered or data-limited.
 - **Saved Networks**: List and forget saved networks.
@@ -389,20 +388,6 @@ On Windows the event polls every 5 seconds and `RssiDbm` is `null` (only signal 
 
 ---
 
-### Wi-Fi QR Codes
-
-```csharp
-// Scanned text from any barcode reader
-var code = WifiQrCode.Parse("WIFI:T:WPA;S:Home;P:secret;;");
-if (code != null)
-    await CrossWifiManager.Current.ConnectWifiAsync(code.Ssid, code.Password, code.ToConnectionOptions());
-
-// Payload to render as a QR code
-string payload = new WifiQrCode("Home", "secret", WifiSecurityType.Wpa2Psk).ToString();
-```
-
----
-
 ### Metered Connection
 
 ```csharp
@@ -516,7 +501,6 @@ foreach (var channel in WifiChannelUsage.FromScanResults(scan.Data!))
 | Open Wireless Settings               | ✅          | ✅*         | ✅          | *Opens app settings on iOS                               |
 | Wi-Fi On/Off State + Event           | ✅          | ❌          | ✅          | No public API on iOS                                      |
 | Request Permissions                  | ✅          | ✅          | ✅          |                                                           |
-| Wi-Fi QR Codes                       | ✅          | ✅          | ✅          | Shared code                                               |
 | Signal Strength Event                | ✅          | ❌          | ✅          | Windows polls every 5 s                                   |
 | Metered Connection                   | ✅          | ✅          | ✅          |                                                           |
 | Saved Networks (list / forget)       | ✅*         | ✅*         | ✅          | *Only networks added by your app                          |
@@ -524,23 +508,6 @@ foreach (var channel in WifiChannelUsage.FromScanResults(scan.Data!))
 | Enterprise Wi-Fi (802.1X)            | ✅          | ✅          | ✅          | See platform notes above                                  |
 | Local-Only Network (IoT)             | ✅ API 23+  | ✅          | ✅          |                                                           |
 | Wi-Fi Standard / Channel Width       | ✅          | ❌          | ✅ standard | Channel width on Android only                             |
-
----
-
-## Changes in Version 3.0.0
-
-- The namespace `Plugin.MauiWifiManager` has been updated to `MauiWifiManager`.
-- `NetworkData` is now part of `WifiManagerResponse`.
-- Addition to `WifiManagerResponse`:
-
-```csharp
-public class WifiManagerResponse<T>
-{
-    public T? Data { get; set; }
-    public WifiErrorCodes? ErrorCode { get; set; }
-    public string? ErrorMessage { get; set; }
-}
-```
 
 ---
 
