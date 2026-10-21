@@ -99,7 +99,7 @@ public partial class ConnectWifi : ContentPage, IQueryAttributable
         if (popup.Result is not WifiQrCode code)
             return;
 
-        Fill(code.Ssid, code.Password, code.Security, code.IsHidden, bssid: null);
+        Fill(code.Ssid, code.Password, code.SecurityType, code.IsHidden, bssid: null);
         ShowResult($"Scanned \"{code.Ssid}\". Check the details, then tap Connect.", isError: false);
     }
 

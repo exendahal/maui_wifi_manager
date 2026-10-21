@@ -59,6 +59,17 @@ namespace DemoApp
             _ => null
         };
 
+        public static string? Standard(WifiStandard standard) => standard switch
+        {
+            WifiStandard.Legacy => "802.11a/b/g",
+            WifiStandard.Ieee80211n => "Wi-Fi 4 (802.11n)",
+            WifiStandard.Ieee80211ac => "Wi-Fi 5 (802.11ac)",
+            WifiStandard.Ieee80211ax => "Wi-Fi 6 (802.11ax)",
+            WifiStandard.Ieee80211ad => "WiGig (802.11ad)",
+            WifiStandard.Ieee80211be => "Wi-Fi 7 (802.11be)",
+            _ => null
+        };
+
         /// <summary>
         /// 0–4 bars. Android reports RSSI in dBm; Windows reports signal bars (0–5) in SignalStrength.
         /// </summary>

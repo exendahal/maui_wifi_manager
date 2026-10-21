@@ -33,5 +33,11 @@
             ContentTemplate="{DataTemplate local:ConnectWifi}"
             Icon="tab_connect.png"
             Route="connect" />
+        <ShellContent
+            x:Name="toolsItem"
+            Title="Tools"
+            ContentTemplate="{DataTemplate local:ToolsPage}"
+            Icon="tab_tools.png"
+            Route="tools" />
     </FlyoutItem>
 </Shell>

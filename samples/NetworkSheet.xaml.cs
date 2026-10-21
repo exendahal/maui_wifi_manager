@@ -22,6 +22,8 @@ public partial class NetworkSheet : Popup<bool>
             ("Signal", NetworkFormat.Signal(data), false),
             ("Band", Or(NetworkFormat.Band(data.FrequencyBand)), false),
             ("Channel", Or(data.ChannelNumber?.ToString()), false),
+            ("Channel width", data.ChannelWidthMhz is int width ? $"{width} MHz" : NetworkFormat.None, false),
+            ("Wi-Fi standard", Or(NetworkFormat.Standard(data.WifiStandard)), false),
             // Android reports the capabilities string here; Windows scan results carry the PHY kind (e.g. Vht, HE).
             (DeviceInfo.Current.Platform == DevicePlatform.WinUI ? "PHY type" : "Capabilities", Or(data.SecurityType?.ToString()), true)
         });

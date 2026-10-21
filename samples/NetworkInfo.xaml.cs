@@ -95,6 +95,7 @@ public partial class NetworkInfo : ContentPage
             ("Signal", data != null ? NetworkFormat.Signal(data) : NetworkFormat.None, false),
             ("Link speed", data?.LinkSpeedMbps is int mbps ? $"{mbps} Mbps" : NetworkFormat.None, false),
             ("Band", data != null ? Or(NetworkFormat.Band(data.FrequencyBand)) : NetworkFormat.None, false),
+            ("Wi-Fi standard", data != null ? Or(NetworkFormat.Standard(data.WifiStandard)) : NetworkFormat.None, false),
             ("Channel", Or(data?.ChannelNumber?.ToString()), false),
             ("Security", Or(NetworkFormat.Security(data?.SecurityType) ?? data?.SecurityType?.ToString()), false),
             ("IPv4 address", data != null ? NetworkFormat.Ip(data.IpAddress) : NetworkFormat.None, true),
