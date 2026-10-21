@@ -232,6 +232,19 @@ namespace MauiWifiManager.Abstractions
         /// Defaults to <see cref="WifiSecurityType.Wpa2Psk"/>.
         /// </summary>
         public WifiSecurityType SecurityType { get; set; } = WifiSecurityType.Wpa2Psk;
+
+        /// <summary>
+        /// Treat the SSID as a prefix and join the first network whose name starts with it, e.g. <c>SmartPlug-</c>.
+        /// iOS 13+ matches natively; Android and Windows scan and pick the strongest matching network.
+        /// Not supported for hidden networks.
+        /// </summary>
+        public bool IsSsidPrefix { get; set; }
+
+        /// <summary>
+        /// How long to wait for the connection before giving up with <see cref="WifiErrorCodes.OperationTimeout"/>.
+        /// <see langword="null"/> uses the platform default (30 seconds on Android, the OS limit elsewhere).
+        /// </summary>
+        public TimeSpan? Timeout { get; set; }
     }
 
     /// <summary>

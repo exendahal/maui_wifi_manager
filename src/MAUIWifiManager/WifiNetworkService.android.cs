@@ -190,6 +190,14 @@ namespace MauiWifiManager
                 return response;
             }
 
+            if (options.IsSsidPrefix)
+            {
+                var resolved = await ResolveSsidPrefixAsync(ssid, cancellationToken);
+                if (resolved == null)
+                    return WifiManagerResponse<NetworkData>.ErrorResponse(WifiErrorCodes.NetworkUnavailable, $"No network starting with \"{ssid}\" was found.");
+                ssid = resolved;
+            }
+
             try
             {
                 if (!OperatingSystem.IsAndroidVersionAtLeast(29))
@@ -888,24 +896,32 @@ namespace MauiWifiManager
             }
         }
 
-        public Task<WifiManagerResponse<bool>> AddNetworkSuggestionAsync(string ssid, string password, WifiConnectionOptions options, CancellationToken cancellationToken = default)
+        public async Task<WifiManagerResponse<bool>> AddNetworkSuggestionAsync(string ssid, string password, WifiConnectionOptions options, CancellationToken cancellationToken = default)
         {
             if (cancellationToken.IsCancellationRequested)
-                return Task.FromResult(CreateCanceledResponse<bool>(nameof(AddNetworkSuggestionAsync)));
+                return CreateCanceledResponse<bool>(nameof(AddNetworkSuggestionAsync));
 
             if (!OperatingSystem.IsAndroidVersionAtLeast(29))
-                return Task.FromResult(WifiManagerResponse<bool>.ErrorResponse(WifiErrorCodes.UnsupportedHardware, "Network suggestions require Android 10 (API 29) or later."));
+                return WifiManagerResponse<bool>.ErrorResponse(WifiErrorCodes.UnsupportedHardware, "Network suggestions require Android 10 (API 29) or later.");
 
             if (_Context.GetSystemService(Context.WifiService) is not WifiManager wifiManager)
-                return Task.FromResult(WifiManagerResponse<bool>.ErrorResponse(WifiErrorCodes.UnsupportedHardware, "Wi-Fi Manager is unavailable. Please ensure the device has Wi-Fi capability."));
+                return WifiManagerResponse<bool>.ErrorResponse(WifiErrorCodes.UnsupportedHardware, "Wi-Fi Manager is unavailable. Please ensure the device has Wi-Fi capability.");
+
+            if (options.IsSsidPrefix)
+            {
+                var resolved = await ResolveSsidPrefixAsync(ssid, cancellationToken);
+                if (resolved == null)
+                    return WifiManagerResponse<bool>.ErrorResponse(WifiErrorCodes.NetworkUnavailable, $"No network starting with \"{ssid}\" was found.");
+                ssid = resolved;
+            }
 
             try
             {
-                return Task.FromResult(SaveSuggestion(wifiManager, ssid, CreateSuggestionBuilder(ssid, password, options).Build()));
+                return SaveSuggestion(wifiManager, ssid, CreateSuggestionBuilder(ssid, password, options).Build());
             }
             catch (Exception ex)
             {
-                return Task.FromResult(WifiManagerResponse<bool>.ErrorResponse(WifiErrorCodes.UnknownError, $"Error while adding network suggestion: {ex.Message}"));
+                return WifiManagerResponse<bool>.ErrorResponse(WifiErrorCodes.UnknownError, $"Error while adding network suggestion: {ex.Message}");
             }
         }
 
@@ -981,6 +997,14 @@ namespace MauiWifiManager
             if (_Context.GetSystemService(Context.ConnectivityService) is not ConnectivityManager connectivityManager)
                 return WifiManagerResponse<NetworkData>.ErrorResponse(WifiErrorCodes.UnsupportedHardware, "Connectivity service is not available on this device.");
 
+            if (options.IsSsidPrefix)
+            {
+                var resolved = await ResolveSsidPrefixAsync(ssid, cancellationToken);
+                if (resolved == null)
+                    return WifiManagerResponse<NetworkData>.ErrorResponse(WifiErrorCodes.NetworkUnavailable, $"No network starting with \"{ssid}\" was found.");
+                ssid = resolved;
+            }
+
             await ReleaseLocalOnlyAsync();
 
             try
@@ -1016,19 +1040,23 @@ namespace MauiWifiManager
                 connectivityManager.RequestNetwork(requestBuilder.Build()!, callback);
 
                 Network? network;
+                bool timedOut = false;
                 try
                 {
-                    network = await tcs.Task.WaitAsync(ConnectTimeout, cancellationToken);
+                    network = await tcs.Task.WaitAsync(options.Timeout ?? ConnectTimeout, cancellationToken);
                 }
                 catch (TimeoutException)
                 {
                     network = null;
+                    timedOut = true;
                 }
 
                 if (network == null)
                 {
                     await ReleaseLocalOnlyAsync();
-                    return WifiManagerResponse<NetworkData>.ErrorResponse(WifiErrorCodes.NetworkUnavailable, "The network was not found or the user declined the connection request.");
+                    return timedOut
+                        ? WifiManagerResponse<NetworkData>.ErrorResponse(WifiErrorCodes.OperationTimeout, "Timed out waiting for the network; it may be out of range or the user has not approved the request.")
+                        : WifiManagerResponse<NetworkData>.ErrorResponse(WifiErrorCodes.NetworkUnavailable, "The network was not found or the user declined the connection request.");
                 }
 
                 var networkData = new NetworkData { StatusId = (int)WifiErrorCodes.Success, Ssid = ssid };
@@ -1314,6 +1342,16 @@ namespace MauiWifiManager
                 _ScanResultsAvailable?.Invoke(this, new WifiScanResultsEventArgs(scan.Data, fresh));
         }
 
+        /// <summary>Scans and returns the strongest network whose SSID starts with <paramref name="prefix"/>.</summary>
+        private async Task<string?> ResolveSsidPrefixAsync(string prefix, CancellationToken cancellationToken)
+        {
+            var scan = await ScanWifiNetworksAsync(cancellationToken);
+            return scan.Data?
+                .Where(n => n.Ssid?.StartsWith(prefix, StringComparison.Ordinal) == true)
+                .OrderByDescending(n => n.RssiDbm ?? int.MinValue)
+                .FirstOrDefault()?.Ssid;
+        }
+
         private static int? GetChannelWidthMhz(int channelWidth) => channelWidth switch
         {
             0 => 20,
@@ -1449,7 +1487,7 @@ namespace MauiWifiManager
                     if (networkRequest != null)
                         connectivityManager?.RegisterNetworkCallback(networkRequest, networkCallback);
 
-                    var timeoutTask = Task.Delay(TimeSpan.FromSeconds(30));
+                    var timeoutTask = Task.Delay(options.Timeout ?? ConnectTimeout);
                     var networkTask = tcs.Task.WaitAsync(cancellationToken);
                     var completedTask = await Task.WhenAny(networkTask, timeoutTask);
                     if (completedTask == timeoutTask)
@@ -1553,7 +1591,15 @@ namespace MauiWifiManager
                         _Requested = true;
                     }
 
-                    networkData = await tcs.Task.WaitAsync(cancellationToken);
+                    try
+                    {
+                        networkData = await tcs.Task.WaitAsync(options.Timeout ?? Timeout.InfiniteTimeSpan, cancellationToken);
+                    }
+                    catch (TimeoutException)
+                    {
+                        UnregisterNetworkCallback(networkCallback);
+                        return WifiManagerResponse<NetworkData>.ErrorResponse(WifiErrorCodes.OperationTimeout, "Timed out waiting for the Wi-Fi connection.");
+                    }
                     if (networkData != null && networkData.StatusId == 1)
                     {
                         response.ErrorCode = WifiErrorCodes.Success;

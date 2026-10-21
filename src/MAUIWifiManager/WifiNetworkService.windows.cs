@@ -187,19 +187,27 @@ namespace MauiWifiManager
                 return response;
             }
 
-            await adapter.ScanAsync().AsTask(cancellationToken);
-
-            // Find network by SSID (and optionally BSSID)
-            WiFiAvailableNetwork? target = null;
-            foreach (var network in adapter.NetworkReport.AvailableNetworks)
+            // The timeout covers the whole attempt (scan + connect), matching Android and iOS.
+            using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            if (options.Timeout is TimeSpan timeout)
+                timeoutCts.CancelAfter(timeout);
+            try
             {
-                if (network.Ssid == ssid &&
-                    (string.IsNullOrWhiteSpace(options.Bssid) || string.Equals(network.Bssid, options.Bssid, StringComparison.OrdinalIgnoreCase)))
-                {
-                    target = network;
-                    break;
-                }
+                await adapter.ScanAsync().AsTask(timeoutCts.Token);
             }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                return WifiManagerResponse<NetworkData>.ErrorResponse(WifiErrorCodes.OperationTimeout, "Timed out connecting to the network.");
+            }
+
+            // Find network by SSID or SSID prefix (and optionally BSSID); with a prefix, take the strongest match.
+            WiFiAvailableNetwork? target = adapter.NetworkReport.AvailableNetworks
+                .Where(network => (options.IsSsidPrefix ? network.Ssid.StartsWith(ssid, StringComparison.Ordinal) : network.Ssid == ssid)
+                    && (string.IsNullOrWhiteSpace(options.Bssid) || string.Equals(network.Bssid, options.Bssid, StringComparison.OrdinalIgnoreCase)))
+                .OrderByDescending(network => network.NetworkRssiInDecibelMilliwatts)
+                .FirstOrDefault();
+            if (target != null && options.IsSsidPrefix)
+                ssid = target.Ssid;
 
             // For hidden networks, fall back to empty-SSID entries matched by BSSID
             if (target == null && options.IsHidden)
@@ -225,6 +233,7 @@ namespace MauiWifiManager
                 response.ErrorCode = WifiErrorCodes.NoConnection;
                 response.ErrorMessage = options.IsHidden
                     ? "Hidden network not found in scan results."
+                    : options.IsSsidPrefix ? $"No network starting with \"{ssid}\" was found."
                     : (string.IsNullOrWhiteSpace(options.Bssid)
                         ? "The specified network was not found."
                         : "The specified SSID/BSSID network was not found.");
@@ -233,10 +242,17 @@ namespace MauiWifiManager
 
             // Use 4-param overload when connecting to a hidden network so Windows passes SSID explicitly
             WiFiConnectionResult status;
-            if (options.IsHidden || string.IsNullOrEmpty(target.Ssid))
-                status = await adapter.ConnectAsync(target, reconnectionKind, credential, ssid).AsTask(cancellationToken);
-            else
-                status = await adapter.ConnectAsync(target, reconnectionKind, credential).AsTask(cancellationToken);
+            try
+            {
+                if (options.IsHidden || string.IsNullOrEmpty(target.Ssid))
+                    status = await adapter.ConnectAsync(target, reconnectionKind, credential, ssid).AsTask(timeoutCts.Token);
+                else
+                    status = await adapter.ConnectAsync(target, reconnectionKind, credential).AsTask(timeoutCts.Token);
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                return WifiManagerResponse<NetworkData>.ErrorResponse(WifiErrorCodes.OperationTimeout, "Timed out connecting to the network.");
+            }
 
             if (status.ConnectionStatus == WiFiConnectionStatus.Success)
             {
