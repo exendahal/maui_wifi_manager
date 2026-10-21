@@ -11,6 +11,7 @@ namespace MauiWifiManager
     {
         public event EventHandler<WifiNetworkChangedEventArgs>? WifiNetworkChanged;
         public event EventHandler<NetworkData>? DeviceDiscovered;
+        public event EventHandler<NetworkData>? DeviceLost;
 
         public bool IsScanning => false;
 

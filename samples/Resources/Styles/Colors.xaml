@@ -1,45 +1,97 @@
 ﻿<?xml version="1.0" encoding="UTF-8" ?>
 <?xaml-comp compile="true" ?>
-<ResourceDictionary 
+<ResourceDictionary
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
-    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml">
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:local="clr-namespace:DemoApp">
 
     <!-- Note: For Android please see also Platforms\Android\Resources\values\colors.xml -->
+    <!-- Windows uses Fluent (Windows 11) tokens: pages are transparent so the Mica backdrop shows through,
+         and cards/controls use the translucent fills from the WinUI theme. The accent follows the Windows accent color. -->
 
-    <Color x:Key="Primary">#512BD4</Color>
-    <Color x:Key="PrimaryDark">#ac99ea</Color>
-    <Color x:Key="PrimaryDarkText">#242424</Color>
-    <Color x:Key="Secondary">#DFD8F7</Color>
-    <Color x:Key="SecondaryDarkText">#9880e5</Color>
-    <Color x:Key="Tertiary">#2B0B98</Color>
+    <!-- Light -->
+    <OnPlatform x:Key="BackgroundLight" x:TypeArguments="Color" Default="#F5F6F8">
+        <On Platform="WinUI" Value="Transparent" />
+    </OnPlatform>
+    <OnPlatform x:Key="SurfaceLight" x:TypeArguments="Color" Default="#FFFFFF">
+        <On Platform="WinUI" Value="#B3FFFFFF" />
+    </OnPlatform>
+    <OnPlatform x:Key="SurfaceMutedLight" x:TypeArguments="Color" Default="#EEF0F3">
+        <On Platform="WinUI" Value="#80F6F6F6" />
+    </OnPlatform>
+    <OnPlatform x:Key="DialogLight" x:TypeArguments="Color" Default="#FFFFFF">
+        <On Platform="WinUI" Value="#F9F9F9" />
+    </OnPlatform>
+    <OnPlatform x:Key="BorderLight" x:TypeArguments="Color" Default="#E2E5EA">
+        <On Platform="WinUI" Value="#0F000000" />
+    </OnPlatform>
+    <OnPlatform x:Key="TextLight" x:TypeArguments="Color" Default="#15181D">
+        <On Platform="WinUI" Value="#E4000000" />
+    </OnPlatform>
+    <OnPlatform x:Key="TextMutedLight" x:TypeArguments="Color" Default="#5D6470">
+        <On Platform="WinUI" Value="#9E000000" />
+    </OnPlatform>
+    <OnPlatform x:Key="AccentLight" x:TypeArguments="Color" Default="#2A62D9">
+        <On Platform="WinUI" Value="{x:Static local:WindowsAccent.Light}" />
+    </OnPlatform>
+    <OnPlatform x:Key="AccentSoftLight" x:TypeArguments="Color" Default="#E6EDFB">
+        <On Platform="WinUI" Value="#B3FFFFFF" />
+    </OnPlatform>
+    <OnPlatform x:Key="OnAccentSoftLight" x:TypeArguments="Color" Default="#2A62D9">
+        <On Platform="WinUI" Value="#E4000000" />
+    </OnPlatform>
+    <OnPlatform x:Key="SuccessLight" x:TypeArguments="Color" Default="#1D7F52">
+        <On Platform="WinUI" Value="#0F7B0F" />
+    </OnPlatform>
+    <OnPlatform x:Key="WarningLight" x:TypeArguments="Color" Default="#A86A12">
+        <On Platform="WinUI" Value="#9D5D00" />
+    </OnPlatform>
+    <OnPlatform x:Key="DangerLight" x:TypeArguments="Color" Default="#C23A34">
+        <On Platform="WinUI" Value="#C42B1C" />
+    </OnPlatform>
+    <Color x:Key="OnAccentLight">#FFFFFF</Color>
 
-    <Color x:Key="White">White</Color>
-    <Color x:Key="Black">Black</Color>
-    <Color x:Key="Magenta">#D600AA</Color>
-    <Color x:Key="MidnightBlue">#190649</Color>
-    <Color x:Key="OffBlack">#1f1f1f</Color>
-
-    <Color x:Key="Gray100">#E1E1E1</Color>
-    <Color x:Key="Gray200">#C8C8C8</Color>
-    <Color x:Key="Gray300">#ACACAC</Color>
-    <Color x:Key="Gray400">#919191</Color>
-    <Color x:Key="Gray500">#6E6E6E</Color>
-    <Color x:Key="Gray600">#404040</Color>
-    <Color x:Key="Gray900">#212121</Color>
-    <Color x:Key="Gray950">#141414</Color>
-
-    <SolidColorBrush x:Key="PrimaryBrush" Color="{StaticResource Primary}"/>
-    <SolidColorBrush x:Key="SecondaryBrush" Color="{StaticResource Secondary}"/>
-    <SolidColorBrush x:Key="TertiaryBrush" Color="{StaticResource Tertiary}"/>
-    <SolidColorBrush x:Key="WhiteBrush" Color="{StaticResource White}"/>
-    <SolidColorBrush x:Key="BlackBrush" Color="{StaticResource Black}"/>
-
-    <SolidColorBrush x:Key="Gray100Brush" Color="{StaticResource Gray100}"/>
-    <SolidColorBrush x:Key="Gray200Brush" Color="{StaticResource Gray200}"/>
-    <SolidColorBrush x:Key="Gray300Brush" Color="{StaticResource Gray300}"/>
-    <SolidColorBrush x:Key="Gray400Brush" Color="{StaticResource Gray400}"/>
-    <SolidColorBrush x:Key="Gray500Brush" Color="{StaticResource Gray500}"/>
-    <SolidColorBrush x:Key="Gray600Brush" Color="{StaticResource Gray600}"/>
-    <SolidColorBrush x:Key="Gray900Brush" Color="{StaticResource Gray900}"/>
-    <SolidColorBrush x:Key="Gray950Brush" Color="{StaticResource Gray950}"/>
+    <!-- Dark -->
+    <OnPlatform x:Key="BackgroundDark" x:TypeArguments="Color" Default="#0F1114">
+        <On Platform="WinUI" Value="Transparent" />
+    </OnPlatform>
+    <OnPlatform x:Key="SurfaceDark" x:TypeArguments="Color" Default="#181B20">
+        <On Platform="WinUI" Value="#0DFFFFFF" />
+    </OnPlatform>
+    <OnPlatform x:Key="SurfaceMutedDark" x:TypeArguments="Color" Default="#22262D">
+        <On Platform="WinUI" Value="#08FFFFFF" />
+    </OnPlatform>
+    <OnPlatform x:Key="DialogDark" x:TypeArguments="Color" Default="#181B20">
+        <On Platform="WinUI" Value="#2B2B2B" />
+    </OnPlatform>
+    <OnPlatform x:Key="BorderDark" x:TypeArguments="Color" Default="#2A2F37">
+        <On Platform="WinUI" Value="#19000000" />
+    </OnPlatform>
+    <OnPlatform x:Key="TextDark" x:TypeArguments="Color" Default="#E7E9EC">
+        <On Platform="WinUI" Value="#FFFFFF" />
+    </OnPlatform>
+    <OnPlatform x:Key="TextMutedDark" x:TypeArguments="Color" Default="#99A0AB">
+        <On Platform="WinUI" Value="#C5FFFFFF" />
+    </OnPlatform>
+    <OnPlatform x:Key="AccentDark" x:TypeArguments="Color" Default="#7AA5FF">
+        <On Platform="WinUI" Value="{x:Static local:WindowsAccent.Dark}" />
+    </OnPlatform>
+    <OnPlatform x:Key="AccentSoftDark" x:TypeArguments="Color" Default="#1E2A42">
+        <On Platform="WinUI" Value="#0FFFFFFF" />
+    </OnPlatform>
+    <OnPlatform x:Key="OnAccentSoftDark" x:TypeArguments="Color" Default="#7AA5FF">
+        <On Platform="WinUI" Value="#FFFFFF" />
+    </OnPlatform>
+    <OnPlatform x:Key="SuccessDark" x:TypeArguments="Color" Default="#4CC38A">
+        <On Platform="WinUI" Value="#6CCB5F" />
+    </OnPlatform>
+    <OnPlatform x:Key="WarningDark" x:TypeArguments="Color" Default="#E0A84A">
+        <On Platform="WinUI" Value="#FCE100" />
+    </OnPlatform>
+    <OnPlatform x:Key="DangerDark" x:TypeArguments="Color" Default="#F07A73">
+        <On Platform="WinUI" Value="#FF99A4" />
+    </OnPlatform>
+    <OnPlatform x:Key="OnAccentDark" x:TypeArguments="Color" Default="#0F1114">
+        <On Platform="WinUI" Value="#000000" />
+    </OnPlatform>
 </ResourceDictionary>

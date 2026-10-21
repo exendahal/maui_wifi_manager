@@ -4,10 +4,24 @@
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
     xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
-    xmlns:zxing="clr-namespace:ZXing.Net.Maui.Controls;assembly=ZXing.Net.MAUI.Controls">
-    <VerticalStackLayout>
-        <StackLayout Padding="40,20">
+    xmlns:zxing="clr-namespace:ZXing.Net.Maui.Controls;assembly=ZXing.Net.MAUI.Controls"
+    Padding="0"
+    BackgroundColor="{AppThemeBinding Light={StaticResource DialogLight}, Dark={StaticResource DialogDark}}">
+    <VerticalStackLayout
+        Padding="20"
+        Spacing="14"
+        WidthRequest="320">
+        <Label Style="{StaticResource RowTitle}" Text="Scan Wi-Fi QR code" />
+        <Border
+            HeightRequest="280"
+            StrokeShape="RoundRectangle 12"
+            StrokeThickness="0">
             <zxing:CameraBarcodeReaderView x:Name="barcodeReader" BarcodesDetected="BarcodesDetected" />
-        </StackLayout>
+        </Border>
+        <Label x:Name="hintTxt" Style="{StaticResource Muted}" Text="Point the camera at a QR code shared from a router or phone." />
+        <Button
+            Clicked="CancelClicked"
+            Style="{StaticResource SecondaryButton}"
+            Text="Cancel" />
     </VerticalStackLayout>
 </toolkit:Popup>

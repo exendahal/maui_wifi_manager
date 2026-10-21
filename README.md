@@ -29,6 +29,16 @@ The Wi-Fi Manager for .NET MAUI is a simple and powerful library that helps you 
 - **Disconnect Wi-Fi**: Disconnect from a specific Wi-Fi network.
 - **Open Wi-Fi Settings**: Provide quick access to device Wi-Fi settings.
 - **Open Wireless Settings**: Provide quick access to device wireless settings.
+- **Wi-Fi On/Off State**: Check whether Wi-Fi is on and get notified when it changes.
+- **Permission Helper**: Request every permission Wi-Fi scanning needs in one call.
+- **Wi-Fi QR Codes**: Parse and generate `WIFI:` QR code payloads.
+- **Signal Helpers**: Convert RSSI to bars/percentage and listen for signal changes.
+- **Metered Connection Detection**: Know when the connection is metered or data-limited.
+- **Saved Networks**: List and forget saved networks.
+- **Persistent Network Suggestions (Android)**: Save networks that Android joins automatically, even after the app closes.
+- **Enterprise Wi-Fi (802.1X)**: Connect to PEAP/TTLS networks with a username and password.
+- **IoT Provisioning (Local-Only Networks)**: Connect to a device's access point without internet and route app traffic through it.
+- **Richer Scan Data**: Wi-Fi standard (Wi-Fi 4/5/6/7), channel width, and per-channel congestion.
 
 ---
 
@@ -164,7 +174,14 @@ CrossWifiManager.DeviceDiscovered += (_, network) =>
     System.Diagnostics.Debug.WriteLine($"Discovered: {network.Ssid} ({network.Bssid})");
 };
 
-var startResponse = await CrossWifiManager.StartScanningForDevicesAsync();
+CrossWifiManager.DeviceLost += (_, network) =>
+{
+    System.Diagnostics.Debug.WriteLine($"Lost: {network.Ssid} ({network.Bssid})");
+};
+
+// Scanning stops when the token is canceled. Without a cancelable token it stops after 30 seconds.
+using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(2));
+var startResponse = await CrossWifiManager.StartScanningForDevicesAsync(cts.Token);
 if (startResponse.ErrorCode == WifiErrorCodes.Success && CrossWifiManager.IsScanning)
 {
     // Scanning is active
@@ -175,7 +192,8 @@ var stopResponse = await CrossWifiManager.StopScanningAsync();
 ```
 
 Notes:
-- `DeviceDiscovered` is raised only while scanning is active.
+- `DeviceDiscovered` and `DeviceLost` are raised only while scanning is active. `DeviceLost` fires when a network goes out of range or Wi-Fi is turned off.
+- Android throttles Wi-Fi scans (4 per 2 minutes in foreground, about 1 per 30 minutes in background). To stay within that quota a scan session requests a fresh scan only every 30 seconds and reads cached results (which also include scans made by the system) every 2 seconds in between, so new or removed networks may take up to ~30 seconds to show. This is an OS limit and cannot be bypassed by the library; for testing it can be turned off via Developer options → "Wi-Fi scan throttling".
 - `IsScanning` tells whether a scan session is currently running.
 - Continuous discovery is supported on Android and Windows.
 - iOS does not support Wi-Fi network scanning APIs.
@@ -328,6 +346,155 @@ await CrossWifiManager.Current.OpenWifiSetting();
 
 ---
 
+### Request Permissions
+
+Requests location (Android/iOS), nearby Wi-Fi devices (Android 13+) and Wi-Fi access (Windows). On Android it also fails when location services are turned off, since scan results stay empty in that case.
+
+```csharp
+var response = await CrossWifiManager.Current.RequestPermissionsAsync();
+if (response.ErrorCode != WifiErrorCodes.Success)
+    Debug.WriteLine(response.ErrorMessage);
+```
+
+On Android 13+ add this to `AndroidManifest.xml`:
+
+```xml
+<uses-permission android:name="android.permission.NEARBY_WIFI_DEVICES" android:usesPermissionFlags="neverForLocation" />
+```
+
+---
+
+### Wi-Fi On/Off State
+
+```csharp
+var enabled = await CrossWifiManager.Current.IsWifiEnabledAsync();
+
+CrossWifiManager.Current.WifiStateChanged += (s, e) =>
+    Debug.WriteLine(e.IsEnabled ? "Wi-Fi turned on" : "Wi-Fi turned off");
+```
+
+---
+
+### Signal Strength
+
+```csharp
+int bars = WifiSignal.GetSignalLevel(-67);        // 0–4
+int percent = WifiSignal.GetSignalPercentage(-67); // 0–100
+
+CrossWifiManager.Current.SignalStrengthChanged += (s, e) =>
+    Debug.WriteLine($"{e.SignalPercentage}% ({e.RssiDbm} dBm)");
+```
+
+On Windows the event polls every 5 seconds and `RssiDbm` is `null` (only signal bars are available).
+
+---
+
+### Wi-Fi QR Codes
+
+```csharp
+// Scanned text from any barcode reader
+var code = WifiQrCode.Parse("WIFI:T:WPA;S:Home;P:secret;;");
+if (code != null)
+    await CrossWifiManager.Current.ConnectWifiAsync(code.Ssid, code.Password, code.ToConnectionOptions());
+
+// Payload to render as a QR code
+string payload = new WifiQrCode("Home", "secret", WifiSecurityType.Wpa2Psk).ToString();
+```
+
+---
+
+### Metered Connection
+
+```csharp
+var metered = await CrossWifiManager.Current.IsMeteredConnectionAsync();
+if (metered.Data)
+    Debug.WriteLine("Skip large downloads");
+```
+
+---
+
+### Saved Networks
+
+```csharp
+var saved = await CrossWifiManager.Current.GetSavedNetworksAsync();
+await CrossWifiManager.Current.ForgetNetworkAsync("Old-Network");
+```
+
+What each platform lists and can remove:
+- **Windows**: all saved Wi-Fi profiles.
+- **iOS**: networks configured by your app.
+- **Android 10+**: network suggestions added by your app. Networks the user saved through the system dialog (used by `ConnectWifiAsync` on Android 11+) can only be removed by the user.
+
+---
+
+### Persistent Network Suggestions (Android 10+)
+
+Saves a network without showing UI. Android joins it automatically when it's in range, even after your app closes. The first time, the user is asked to allow suggestions from your app.
+
+```csharp
+var response = await CrossWifiManager.Current.AddNetworkSuggestionAsync(
+    "Office", "password", new WifiConnectionOptions { SecurityType = WifiSecurityType.Wpa2Psk });
+```
+
+---
+
+### Enterprise Wi-Fi (802.1X)
+
+```csharp
+var response = await CrossWifiManager.Current.ConnectEnterpriseWifiAsync("eduroam", new WifiEnterpriseOptions
+{
+    EapMethod = WifiEapMethod.Peap,
+    Phase2Method = WifiPhase2Method.Mschapv2,
+    Identity = "user@university.edu",
+    Password = "password",
+    AnonymousIdentity = "anonymous@university.edu",
+    ServerDomain = "radius.university.edu" // required on Android 11+ unless CaCertificate is set
+});
+```
+
+**Platform notes:**
+- **Android**: PEAP, TTLS and PWD. Optional `CaCertificate` validates the server. On Android 10+ the network is saved as a suggestion, so the user may have to allow it before it connects.
+- **iOS**: PEAP and TTLS. `ServerDomain` is used as the trusted server name.
+- **Windows**: Windows chooses the EAP method itself; only `Identity` and `Password` are used.
+
+---
+
+### IoT Provisioning (Local-Only Networks)
+
+Use this to connect to a device's setup access point that has no internet. Your app's HTTP calls then go to the device instead of falling back to cellular. Release the network when you're done, and the phone returns to its previous network.
+
+```csharp
+var response = await CrossWifiManager.Current.ConnectLocalOnlyAsync(
+    "SmartPlug-1234", "setup-password", new WifiConnectionOptions());
+
+if (response.ErrorCode == WifiErrorCodes.Success)
+{
+    using var http = new HttpClient();
+    await http.PostAsync("http://192.168.4.1/provision", content);
+}
+
+await CrossWifiManager.Current.ReleaseLocalOnlyAsync();
+```
+
+**Platform notes:**
+- **Android 10+**: The system shows a dialog asking the user to approve the connection, and the app's traffic is bound to the network. On Android 6–9 it joins the network and binds traffic to it.
+- **iOS**: Joins with `JoinOnce`, so the network isn't saved and iOS drops it when the app goes to the background.
+- **Windows**: Joins without auto-reconnect. Releasing disconnects, and Windows then reconnects to its preferred network.
+
+---
+
+### Richer Scan Data and Channel Congestion
+
+Scan results now include `WifiStandard` (Wi-Fi 4/5/6/7), plus `ChannelWidthMhz` on Android. Windows scan results also include `RssiDbm`.
+
+```csharp
+var scan = await CrossWifiManager.Current.ScanWifiNetworksAsync();
+foreach (var channel in WifiChannelUsage.FromScanResults(scan.Data!))
+    Debug.WriteLine($"{channel.FrequencyBand} ch {channel.ChannelNumber}: {channel.NetworkCount} networks");
+```
+
+---
+
 ## Feature Support by Platform
 
 | Feature                              | Android     | iOS         | Windows     | Notes                                                     |
@@ -347,6 +514,16 @@ await CrossWifiManager.Current.OpenWifiSetting();
 | Disconnect Wi-Fi                     | ✅          | ✅          | ✅          |                                                           |
 | Open Wi-Fi Settings                  | ✅          | ✅*         | ✅          | *Opens app settings on iOS                               |
 | Open Wireless Settings               | ✅          | ✅*         | ✅          | *Opens app settings on iOS                               |
+| Wi-Fi On/Off State + Event           | ✅          | ❌          | ✅          | No public API on iOS                                      |
+| Request Permissions                  | ✅          | ✅          | ✅          |                                                           |
+| Wi-Fi QR Codes                       | ✅          | ✅          | ✅          | Shared code                                               |
+| Signal Strength Event                | ✅          | ❌          | ✅          | Windows polls every 5 s                                   |
+| Metered Connection                   | ✅          | ✅          | ✅          |                                                           |
+| Saved Networks (list / forget)       | ✅*         | ✅*         | ✅          | *Only networks added by your app                          |
+| Network Suggestions                  | ✅ API 29+  | ❌          | ❌          |                                                           |
+| Enterprise Wi-Fi (802.1X)            | ✅          | ✅          | ✅          | See platform notes above                                  |
+| Local-Only Network (IoT)             | ✅ API 23+  | ✅          | ✅          |                                                           |
+| Wi-Fi Standard / Channel Width       | ✅          | ❌          | ✅ standard | Channel width on Android only                             |
 
 ---
 

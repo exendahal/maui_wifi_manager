@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<toolkit:Popup
+    x:Class="DemoApp.NetworkSheet"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
+    x:TypeArguments="x:Boolean"
+    Margin="12"
+    Padding="0"
+    WidthRequest="{OnPlatform Default=-1, WinUI=480}"
+    BackgroundColor="{AppThemeBinding Light={StaticResource DialogLight}, Dark={StaticResource DialogDark}}"
+    HorizontalOptions="{OnPlatform Default=Fill, WinUI=Center}"
+    VerticalOptions="{OnPlatform Default=End, WinUI=Center}">
+    <VerticalStackLayout Padding="{OnPlatform Default='20,22,20,12', WinUI='24'}">
+        <VerticalStackLayout Spacing="2">
+            <Label
+                x:Name="titleTxt"
+                FontFamily="{StaticResource DisplayFont}"
+                FontSize="20"
+                LineBreakMode="TailTruncation" />
+            <Label x:Name="summaryTxt" Style="{StaticResource Muted}" />
+        </VerticalStackLayout>
+
+        <Border
+            Margin="0,16,0,0"
+            Padding="16,0"
+            Style="{StaticResource Notice}">
+            <VerticalStackLayout x:Name="detailsList" />
+        </Border>
+
+        <Label
+            x:Name="hiddenHintTxt"
+            Margin="4,12,4,0"
+            IsVisible="False"
+            Style="{StaticResource Muted}"
+            Text="This network hides its name. You will need to type the SSID to connect." />
+
+        <!-- Phones stack the actions; Windows lays them out side by side like a ContentDialog footer. -->
+        <Grid
+            Margin="0,20,0,0"
+            ColumnDefinitions="{OnPlatform Default='*', WinUI='*,*'}"
+            ColumnSpacing="8"
+            RowDefinitions="{OnPlatform Default='Auto,Auto', WinUI='Auto'}"
+            RowSpacing="4">
+            <Button Clicked="ConnectClicked" Text="Connect" />
+            <Button
+                Grid.Row="{OnPlatform Default=1, WinUI=0}"
+                Grid.Column="{OnPlatform Default=0, WinUI=1}"
+                Clicked="CloseClicked"
+                Style="{OnPlatform Default={StaticResource TextButton}, WinUI={StaticResource SecondaryButton}}"
+                Text="Close" />
+        </Grid>
+    </VerticalStackLayout>
+</toolkit:Popup>

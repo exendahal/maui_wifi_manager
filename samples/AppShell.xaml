@@ -4,6 +4,40 @@
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
     xmlns:local="clr-namespace:DemoApp"
-    Title="MAUI Wi-FI Manager">
-    <ShellContent ContentTemplate="{DataTemplate local:MainPage}" />
+    xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
+    Title="Wi-Fi Manager"
+    FlyoutBackgroundColor="Transparent"
+    FlyoutBehavior="{OnPlatform Default=Disabled, WinUI=Locked}"
+    FlyoutWidth="280"
+    Shell.TabBarIsVisible="{OnPlatform Default=True, WinUI=False}">
+    <!-- Phones show the three pages as bottom tabs; Windows shows them in a left navigation pane. -->
+    <Shell.Behaviors>
+        <toolkit:StatusBarBehavior StatusBarColor="{AppThemeBinding Light={StaticResource BackgroundLight}, Dark={StaticResource BackgroundDark}}" StatusBarStyle="{AppThemeBinding Light=DarkContent, Dark=LightContent}" />
+    </Shell.Behaviors>
+    <FlyoutItem FlyoutDisplayOptions="AsMultipleItems">
+        <ShellContent
+            x:Name="networksItem"
+            Title="Networks"
+            ContentTemplate="{DataTemplate local:ScanListPage}"
+            Icon="tab_networks.png"
+            Route="networks" />
+        <ShellContent
+            x:Name="connectionItem"
+            Title="Connection"
+            ContentTemplate="{DataTemplate local:NetworkInfo}"
+            Icon="tab_connection.png"
+            Route="connection" />
+        <ShellContent
+            x:Name="connectItem"
+            Title="Connect"
+            ContentTemplate="{DataTemplate local:ConnectWifi}"
+            Icon="tab_connect.png"
+            Route="connect" />
+        <ShellContent
+            x:Name="toolsItem"
+            Title="Tools"
+            ContentTemplate="{DataTemplate local:ToolsPage}"
+            Icon="tab_tools.png"
+            Route="tools" />
+    </FlyoutItem>
 </Shell>

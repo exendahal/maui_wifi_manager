@@ -1,0 +1,174 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage
+    x:Class="DemoApp.ToolsPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:zxing="clr-namespace:ZXing.Net.Maui.Controls;assembly=ZXing.Net.MAUI.Controls"
+    Title="Tools">
+    <ScrollView>
+        <VerticalStackLayout Padding="{OnPlatform Default='20,16,20,32', WinUI='40,28,40,40'}">
+            <Label Style="{StaticResource PageTitle}" Text="Tools" />
+            <Label Style="{StaticResource Muted}" Text="Device status, saved networks, QR sharing, channel analysis and advanced connections." />
+
+            <!-- Wi-Fi state, permissions, metered and live signal -->
+            <Label Style="{StaticResource SectionHeader}" Text="Status" />
+            <Border Style="{StaticResource Card}">
+                <VerticalStackLayout>
+                    <Grid ColumnDefinitions="Auto,*" Style="{StaticResource FieldRow}">
+                        <Label Style="{StaticResource FieldLabel}" Text="Wi-Fi radio" />
+                        <Label x:Name="radioTxt" Grid.Column="1" Style="{StaticResource FieldValue}" />
+                    </Grid>
+                    <BoxView Style="{StaticResource Divider}" />
+                    <Grid ColumnDefinitions="Auto,*" Style="{StaticResource FieldRow}">
+                        <Label Style="{StaticResource FieldLabel}" Text="Permissions" />
+                        <Label x:Name="permissionTxt" Grid.Column="1" Style="{StaticResource FieldValue}" Text="Not requested" />
+                    </Grid>
+                    <BoxView Style="{StaticResource Divider}" />
+                    <Grid ColumnDefinitions="Auto,*" Style="{StaticResource FieldRow}">
+                        <Label Style="{StaticResource FieldLabel}" Text="Metered" />
+                        <Label x:Name="meteredTxt" Grid.Column="1" Style="{StaticResource FieldValue}" />
+                    </Grid>
+                    <BoxView Style="{StaticResource Divider}" />
+                    <Grid ColumnDefinitions="Auto,*" Style="{StaticResource FieldRow}">
+                        <Label Style="{StaticResource FieldLabel}" Text="Live signal" />
+                        <Label x:Name="signalTxt" Grid.Column="1" Style="{StaticResource FieldValue}" Text="Waiting for a change…" />
+                    </Grid>
+                    <BoxView Style="{StaticResource Divider}" />
+                    <HorizontalStackLayout Spacing="16">
+                        <Button Margin="0,4" Padding="0" Clicked="RequestPermissionsClicked" Style="{StaticResource TextButton}" Text="Request permissions" />
+                        <Button Margin="0,4" Padding="0" Clicked="RefreshStatusClicked" Style="{StaticResource TextButton}" Text="Refresh" />
+                    </HorizontalStackLayout>
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- Saved networks -->
+            <Label Style="{StaticResource SectionHeader}" Text="Saved networks" />
+            <Border Style="{StaticResource Card}">
+                <VerticalStackLayout>
+                    <Label x:Name="savedEmptyTxt" Padding="0,14" Style="{StaticResource Muted}" />
+                    <VerticalStackLayout x:Name="savedList" />
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- Share as QR code -->
+            <Label Style="{StaticResource SectionHeader}" Text="Share network as QR code" />
+            <Border Style="{StaticResource Card}">
+                <VerticalStackLayout>
+                    <Grid ColumnDefinitions="96,*" Style="{StaticResource FieldRow}">
+                        <Label Style="{StaticResource FieldLabel}" Text="Name" />
+                        <Entry x:Name="qrSsidEntry" Grid.Column="1" Placeholder="SSID" />
+                    </Grid>
+                    <BoxView Style="{StaticResource Divider}" />
+                    <Grid ColumnDefinitions="96,*" Style="{StaticResource FieldRow}">
+                        <Label Style="{StaticResource FieldLabel}" Text="Password" />
+                        <Entry x:Name="qrPasswordEntry" Grid.Column="1" IsPassword="True" Placeholder="Empty for open networks" />
+                    </Grid>
+                    <BoxView Style="{StaticResource Divider}" />
+                    <Button Margin="0,4" Padding="0" HorizontalOptions="Start" Clicked="GenerateQrClicked" Style="{StaticResource TextButton}" Text="Generate" />
+                    <VerticalStackLayout x:Name="qrResult" IsVisible="False" Padding="0,8,0,16" Spacing="8">
+                        <!-- White background keeps the code scannable in dark mode. -->
+                        <Border Padding="12" BackgroundColor="White" HorizontalOptions="Center" StrokeShape="RoundRectangle 8" StrokeThickness="0">
+                            <zxing:BarcodeGeneratorView
+                                x:Name="qrView"
+                                BackgroundColor="White"
+                                ForegroundColor="Black"
+                                Format="QrCode"
+                                HeightRequest="200"
+                                WidthRequest="200" />
+                        </Border>
+                        <Label x:Name="qrPayloadTxt" FontFamily="{StaticResource MonoFont}" FontSize="12" HorizontalTextAlignment="Center" Style="{StaticResource Muted}" />
+                    </VerticalStackLayout>
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- Channel congestion -->
+            <Label Style="{StaticResource SectionHeader}" Text="Channel congestion" />
+            <Border Style="{StaticResource Card}">
+                <VerticalStackLayout>
+                    <Label x:Name="channelEmptyTxt" Padding="0,14" Style="{StaticResource Muted}" Text="Scan to see how many networks share each channel (Android and Windows)." />
+                    <!-- One chart per band: channel numbers on 2.4 GHz and 5 GHz are not comparable on one axis. -->
+                    <VerticalStackLayout x:Name="channelCharts" Padding="0,8" Spacing="16" />
+                    <Label x:Name="channelSelectionTxt" Padding="0,0,0,8" IsVisible="False" />
+                    <Button
+                        x:Name="channelTableBtn"
+                        Margin="0,0,0,4"
+                        Padding="0"
+                        HorizontalOptions="Start"
+                        IsVisible="False"
+                        Clicked="ChannelTableClicked"
+                        Style="{StaticResource TextButton}"
+                        Text="Show as table" />
+                    <VerticalStackLayout x:Name="channelList" IsVisible="False" />
+                    <BoxView Style="{StaticResource Divider}" />
+                    <Button x:Name="analyzeBtn" Margin="0,4" Padding="0" HorizontalOptions="Start" Clicked="AnalyzeChannelsClicked" Style="{StaticResource TextButton}" Text="Analyze channels" />
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- Advanced connections -->
+            <Label Style="{StaticResource SectionHeader}" Text="Advanced connection" />
+            <Border Style="{StaticResource Card}">
+                <VerticalStackLayout>
+                    <Grid ColumnDefinitions="96,*" Style="{StaticResource FieldRow}">
+                        <Label Style="{StaticResource FieldLabel}" Text="Type" />
+                        <Picker
+                            x:Name="modePicker"
+                            Title="{OnPlatform Default=Type, WinUI={x:Null}}"
+                            Grid.Column="1"
+                            SelectedIndexChanged="ModeChanged">
+                            <Picker.Items>
+                                <x:String>Local-only (IoT setup)</x:String>
+                                <x:String>Enterprise (802.1X)</x:String>
+                                <x:String>Saved suggestion (Android)</x:String>
+                            </Picker.Items>
+                        </Picker>
+                    </Grid>
+                    <BoxView Style="{StaticResource Divider}" />
+                    <Label x:Name="modeHintTxt" Padding="0,10" Style="{StaticResource Muted}" />
+                    <BoxView Style="{StaticResource Divider}" />
+                    <Grid ColumnDefinitions="96,*" Style="{StaticResource FieldRow}">
+                        <Label Style="{StaticResource FieldLabel}" Text="Name" />
+                        <Entry x:Name="advSsidEntry" Grid.Column="1" Placeholder="SSID" />
+                    </Grid>
+                    <VerticalStackLayout x:Name="identityRow">
+                        <BoxView Style="{StaticResource Divider}" />
+                        <Grid ColumnDefinitions="96,*" Style="{StaticResource FieldRow}">
+                            <Label Style="{StaticResource FieldLabel}" Text="Username" />
+                            <Entry x:Name="identityEntry" Grid.Column="1" Placeholder="user@example.com" />
+                        </Grid>
+                    </VerticalStackLayout>
+                    <BoxView Style="{StaticResource Divider}" />
+                    <Grid ColumnDefinitions="96,*" Style="{StaticResource FieldRow}">
+                        <Label Style="{StaticResource FieldLabel}" Text="Password" />
+                        <Entry x:Name="advPasswordEntry" Grid.Column="1" IsPassword="True" Placeholder="Empty for open networks" />
+                    </Grid>
+                    <VerticalStackLayout x:Name="enterpriseRows">
+                        <BoxView Style="{StaticResource Divider}" />
+                        <Grid ColumnDefinitions="96,*" Style="{StaticResource FieldRow}">
+                            <Label Style="{StaticResource FieldLabel}" Text="EAP method" />
+                            <Picker x:Name="eapPicker" Title="{OnPlatform Default='EAP method', WinUI={x:Null}}" Grid.Column="1">
+                                <Picker.Items>
+                                    <x:String>PEAP / MSCHAPv2</x:String>
+                                    <x:String>TTLS / PAP</x:String>
+                                </Picker.Items>
+                            </Picker>
+                        </Grid>
+                        <BoxView Style="{StaticResource Divider}" />
+                        <Grid ColumnDefinitions="96,*" Style="{StaticResource FieldRow}">
+                            <Label Style="{StaticResource FieldLabel}" Text="Server" />
+                            <Entry x:Name="domainEntry" Grid.Column="1" Placeholder="radius.example.com" />
+                        </Grid>
+                    </VerticalStackLayout>
+                </VerticalStackLayout>
+            </Border>
+
+            <HorizontalStackLayout Margin="0,24,0,0" Spacing="12">
+                <Button x:Name="advConnectBtn" Clicked="AdvancedConnectClicked" Text="Connect" />
+                <Button x:Name="releaseBtn" Clicked="ReleaseClicked" IsVisible="False" Style="{StaticResource SecondaryButton}" Text="Release" />
+            </HorizontalStackLayout>
+
+            <Border x:Name="advResultNotice" Margin="0,12,0,0" IsVisible="False" Style="{StaticResource Notice}">
+                <Label x:Name="advResultTxt" />
+            </Border>
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>
