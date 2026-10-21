@@ -204,6 +204,21 @@ namespace MauiWifiManager
         Task<WifiManagerResponse<bool>> ReleaseLocalOnlyAsync(CancellationToken cancellationToken = default)
             => Task.FromResult(NotSupported<bool>(nameof(ReleaseLocalOnlyAsync)));
 
+        /// <summary>
+        /// Raised when the device switches between Wi-Fi, mobile data, Ethernet and offline, or gains or loses internet access.
+        /// </summary>
+        event EventHandler<ConnectionTypeChangedEventArgs>? ConnectionTypeChanged
+        {
+            add => ConnectionMonitor.Add(this, value);
+            remove => ConnectionMonitor.Remove(value);
+        }
+
+        /// <summary>
+        /// Lists the kinds of network the device is connected to (Wi-Fi, mobile data, Ethernet, Bluetooth); empty when offline.
+        /// </summary>
+        Task<WifiManagerResponse<List<NetworkConnectionType>>> GetConnectionTypesAsync(CancellationToken cancellationToken = default)
+            => Task.FromResult(ConnectionMonitor.GetConnectionTypes());
+
         private static WifiManagerResponse<T> NotSupported<T>(string operation)
             => WifiManagerResponse<T>.ErrorResponse(WifiErrorCodes.UnsupportedHardware, $"{operation} is not supported on this platform.");
     }

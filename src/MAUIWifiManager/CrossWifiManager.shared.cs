@@ -325,6 +325,29 @@ namespace MauiWifiManager
         }
 
         /// <summary>
+        /// Raised when the device switches between Wi-Fi, mobile data, Ethernet and offline.
+        /// </summary>
+        public static event EventHandler<Abstractions.ConnectionTypeChangedEventArgs>? ConnectionTypeChanged
+        {
+            add => Current.ConnectionTypeChanged += value;
+            remove
+            {
+                if (_Implementation != null && _Implementation.IsValueCreated)
+                {
+                    _Implementation.Value.ConnectionTypeChanged -= value;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Lists the kinds of network the device is connected to.
+        /// </summary>
+        public static Task<Abstractions.WifiManagerResponse<List<Abstractions.NetworkConnectionType>>> GetConnectionTypesAsync(CancellationToken cancellationToken = default)
+        {
+            return Current.GetConnectionTypesAsync(cancellationToken);
+        }
+
+        /// <summary>
         /// Dispose of everything
         /// </summary>
         public static void Dispose()

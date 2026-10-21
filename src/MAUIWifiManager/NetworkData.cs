@@ -235,6 +235,48 @@ namespace MauiWifiManager.Abstractions
     }
 
     /// <summary>
+    /// Kind of network the device is currently using.
+    /// </summary>
+    public enum NetworkConnectionType
+    {
+        /// <summary>Connection type could not be determined.</summary>
+        Unknown = 0,
+        /// <summary>Wi-Fi.</summary>
+        WiFi = 1,
+        /// <summary>Mobile data.</summary>
+        Cellular = 2,
+        /// <summary>Wired Ethernet.</summary>
+        Ethernet = 3,
+        /// <summary>Bluetooth tethering.</summary>
+        Bluetooth = 4,
+    }
+
+    /// <summary>
+    /// Provides data for the <see cref="IWifiNetworkService.ConnectionTypeChanged"/> event.
+    /// </summary>
+    public sealed class ConnectionTypeChangedEventArgs : EventArgs
+    {
+        /// <summary>
+        /// Initializes a new instance.
+        /// </summary>
+        public ConnectionTypeChangedEventArgs(IReadOnlyList<NetworkConnectionType> connectionTypes, bool hasInternet)
+        {
+            ConnectionTypes = connectionTypes;
+            HasInternet = hasInternet;
+        }
+
+        /// <summary>
+        /// Networks the device is connected to; empty when offline.
+        /// </summary>
+        public IReadOnlyList<NetworkConnectionType> ConnectionTypes { get; }
+
+        /// <summary>
+        /// <see langword="true"/> when the OS reports internet access.
+        /// </summary>
+        public bool HasInternet { get; }
+    }
+
+    /// <summary>
     /// Represents information about a Wi-Fi network or the currently connected network.
     /// </summary>
     public class NetworkData
