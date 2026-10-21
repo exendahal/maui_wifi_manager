@@ -424,9 +424,27 @@ namespace MauiWifiManager
                     if (wifiAdapter != null)
                     {
                         Debug.WriteLine("Wi-Fi Scan started.");
-                        await wifiAdapter.ScanAsync().AsTask(cancellationToken);
+                        Exception? scanError = null;
+                        try
+                        {
+                            await wifiAdapter.ScanAsync().AsTask(cancellationToken);
+                        }
+                        catch (Exception ex) when (ex is not OperationCanceledException)
+                        {
+                            // Some drivers intermittently abort or time out a scan; the adapter still has its last report.
+                            scanError = ex;
+                        }
 
                         wifiNetworks.AddRange(wifiAdapter.NetworkReport.AvailableNetworks.Select(ToNetworkData));
+                        if (scanError != null)
+                        {
+                            response.ErrorCode = wifiNetworks.Count > 0 ? WifiErrorCodes.Success : WifiErrorCodes.UnknownError;
+                            response.ErrorMessage = wifiNetworks.Count > 0
+                                ? $"Windows did not complete a new scan (0x{scanError.HResult:X8}), so these are the previous results."
+                                : $"Error while scanning Wi-Fi: {scanError.Message} (0x{scanError.HResult:X8})";
+                            response.Data = wifiNetworks.Count > 0 ? wifiNetworks : null;
+                            return response;
+                        }
                     }
                     Debug.WriteLine("Wi-Fi Scan complete.");
                     response.ErrorCode = WifiErrorCodes.Success;
