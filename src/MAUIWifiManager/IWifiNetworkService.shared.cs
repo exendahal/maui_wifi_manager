@@ -232,6 +232,13 @@ namespace MauiWifiManager
         /// </summary>
         event EventHandler<WifiScanResultsEventArgs>? ScanResultsAvailable { add { } remove { } }
 
+        /// <summary>
+        /// Checks internet access by requesting <paramref name="probeUrl"/>; any 2xx response counts as available.
+        /// Use this where the OS check is unreliable, e.g. networks that block the default probe servers.
+        /// </summary>
+        Task<WifiManagerResponse<bool>> IsInternetAvailableAsync(Uri probeUrl, CancellationToken cancellationToken = default)
+            => NetworkTools.ProbeInternetAsync(probeUrl, cancellationToken);
+
         private static WifiManagerResponse<T> NotSupported<T>(string operation)
             => WifiManagerResponse<T>.ErrorResponse(WifiErrorCodes.UnsupportedHardware, $"{operation} is not supported on this platform.");
     }

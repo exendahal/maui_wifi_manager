@@ -8,6 +8,36 @@ using System.Text;
 namespace MauiWifiManager
 {
     /// <summary>
+    /// Platform-independent network tools backing the default implementations on <see cref="IWifiNetworkService"/>.
+    /// </summary>
+    internal static class NetworkTools
+    {
+        private static readonly TimeSpan ProbeTimeout = TimeSpan.FromSeconds(5);
+
+        public static async Task<WifiManagerResponse<bool>> ProbeInternetAsync(Uri probeUrl, CancellationToken cancellationToken)
+        {
+            try
+            {
+                using var handler = new HttpClientHandler { AllowAutoRedirect = false };
+                using var client = new HttpClient(handler) { Timeout = ProbeTimeout };
+                using var response = await client.GetAsync(probeUrl, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+                // A redirect usually means a captive portal intercepted the request.
+                bool available = response.IsSuccessStatusCode;
+                return WifiManagerResponse<bool>.SuccessResponse(available,
+                    available ? "Internet is available." : $"Probe returned HTTP {(int)response.StatusCode}.");
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                return WifiManagerResponse<bool>.ErrorResponse(WifiErrorCodes.OperationCanceled, "Operation was canceled.");
+            }
+            catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
+            {
+                return WifiManagerResponse<bool>.SuccessResponse(false, $"Probe failed: {ex.Message}");
+            }
+        }
+    }
+
+    /// <summary>
     /// Connection type and change events, built on MAUI Essentials <see cref="Microsoft.Maui.Networking.Connectivity"/>.
     /// </summary>
     internal static class ConnectionMonitor

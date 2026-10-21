@@ -426,6 +426,33 @@ namespace MauiWifiManager.Abstractions
         /// Channel width in MHz (20, 40, 80, 160 or 320). Supported in Android scan results only.
         /// </summary>
         public int? ChannelWidthMhz { get; set; }
+
+        /// <summary>
+        /// IPv4 broadcast address (e.g. "192.168.1.255"), calculated from <see cref="IpAddress"/> and <see cref="SubnetMask"/>.
+        /// </summary>
+        public string? BroadcastAddress =>
+            TryGetIpv4AndMask(out var ip, out var mask) ? ToDottedString(ip | ~mask) : null;
+
+        /// <summary>
+        /// Network prefix length (e.g. 24 for 255.255.255.0), calculated from <see cref="SubnetMask"/>.
+        /// </summary>
+        public int? NetworkPrefixLength =>
+            TryGetIpv4AndMask(out _, out var mask) ? System.Numerics.BitOperations.PopCount(mask) : null;
+
+        // IpAddress stores the first octet in the lowest byte, so BitConverter on little-endian yields octets in order.
+        private bool TryGetIpv4AndMask(out uint ip, out uint mask)
+        {
+            ip = mask = 0;
+            if (IpAddress == 0 || !System.Net.IPAddress.TryParse(SubnetMask, out var maskAddress)
+                || maskAddress.AddressFamily != System.Net.Sockets.AddressFamily.InterNetwork)
+                return false;
+            ip = System.Buffers.Binary.BinaryPrimitives.ReadUInt32BigEndian(BitConverter.GetBytes(IpAddress));
+            mask = System.Buffers.Binary.BinaryPrimitives.ReadUInt32BigEndian(maskAddress.GetAddressBytes());
+            return true;
+        }
+
+        private static string ToDottedString(uint address) =>
+            $"{address >> 24}.{(address >> 16) & 0xFF}.{(address >> 8) & 0xFF}.{address & 0xFF}";
     }
 
     /// <summary>

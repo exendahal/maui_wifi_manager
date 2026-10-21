@@ -371,6 +371,14 @@ namespace MauiWifiManager
         }
 
         /// <summary>
+        /// Checks internet access by requesting <paramref name="probeUrl"/>.
+        /// </summary>
+        public static Task<Abstractions.WifiManagerResponse<bool>> IsInternetAvailableAsync(Uri probeUrl, CancellationToken cancellationToken = default)
+        {
+            return Current.IsInternetAvailableAsync(probeUrl, cancellationToken);
+        }
+
+        /// <summary>
         /// Dispose of everything
         /// </summary>
         public static void Dispose()
