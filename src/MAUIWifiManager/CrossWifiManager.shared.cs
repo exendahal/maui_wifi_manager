@@ -387,6 +387,30 @@ namespace MauiWifiManager
         }
 
         /// <summary>
+        /// Starts a hotspot and returns its credentials. Supported on Android and Windows.
+        /// </summary>
+        public static Task<Abstractions.WifiManagerResponse<Abstractions.HotspotInfo>> StartHotspotAsync(CancellationToken cancellationToken = default)
+        {
+            return Current.StartHotspotAsync(cancellationToken);
+        }
+
+        /// <summary>
+        /// Stops the hotspot started by <see cref="StartHotspotAsync"/>.
+        /// </summary>
+        public static Task<Abstractions.WifiManagerResponse<bool>> StopHotspotAsync(CancellationToken cancellationToken = default)
+        {
+            return Current.StopHotspotAsync(cancellationToken);
+        }
+
+        /// <summary>
+        /// Lists devices connected to the hotspot. Supported on Windows only.
+        /// </summary>
+        public static Task<Abstractions.WifiManagerResponse<List<Abstractions.HotspotClient>>> GetHotspotClientsAsync(CancellationToken cancellationToken = default)
+        {
+            return Current.GetHotspotClientsAsync(cancellationToken);
+        }
+
+        /// <summary>
         /// Dispose of everything
         /// </summary>
         public static void Dispose()

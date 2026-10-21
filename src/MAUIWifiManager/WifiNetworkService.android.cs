@@ -39,6 +39,7 @@ namespace MauiWifiManager
         private ConnectivityManager.NetworkCallback? _LocalOnlyCallback;
         private EventHandler<WifiScanResultsEventArgs>? _ScanResultsAvailable;
         private IntentReceiver? _ScanResultsReceiver;
+        private WifiManager.LocalOnlyHotspotReservation? _HotspotReservation;
         // Times of scans this app started, to tell when Android's 4-per-2-minutes quota is used up.
         private static readonly Queue<DateTime> _ScanRequests = new();
         // Android 10 has no API to read back suggestions, so the ones added in this process are kept to support removal.
@@ -49,6 +50,7 @@ namespace MauiWifiManager
         private static readonly TimeSpan ConnectTimeout = TimeSpan.FromSeconds(30);
         private static readonly TimeSpan ScanQuotaWindow = TimeSpan.FromMinutes(2);
         private const int ScanQuota = 4;
+        private static readonly TimeSpan HotspotStartTimeout = TimeSpan.FromSeconds(15);
         private static readonly TimeSpan ScanResultsTimeout = TimeSpan.FromSeconds(10);
         private static readonly TimeSpan FreshScanInterval = TimeSpan.FromSeconds(30);
 
@@ -1377,6 +1379,100 @@ namespace MauiWifiManager
             return WifiManagerResponse<bool>.SuccessResponse(false, "Android 10+ does not let apps switch Wi-Fi, so the Wi-Fi panel was opened for the user.");
         }
 
+        public async Task<WifiManagerResponse<HotspotInfo>> StartHotspotAsync(CancellationToken cancellationToken = default)
+        {
+            if (cancellationToken.IsCancellationRequested)
+                return CreateCanceledResponse<HotspotInfo>(nameof(StartHotspotAsync));
+
+            if (!OperatingSystem.IsAndroidVersionAtLeast(26))
+                return WifiManagerResponse<HotspotInfo>.ErrorResponse(WifiErrorCodes.UnsupportedHardware, "A local-only hotspot requires Android 8.0 (API 26) or later.");
+
+            if (_Context.GetSystemService(Context.WifiService) is not WifiManager wifiManager)
+                return WifiManagerResponse<HotspotInfo>.ErrorResponse(WifiErrorCodes.UnsupportedHardware, "Wi-Fi Manager is unavailable. Please ensure the device has Wi-Fi capability.");
+
+            if (_HotspotReservation is { } running)
+                return WifiManagerResponse<HotspotInfo>.SuccessResponse(ReadHotspotInfo(running), "Hotspot is already running.");
+
+            var tcs = new TaskCompletionSource<WifiManagerResponse<HotspotInfo>>(TaskCreationOptions.RunContinuationsAsynchronously);
+#pragma warning disable CA1416 // Callbacks run after the API 26 check above.
+            var callback = new HotspotCallback
+            {
+                Started = reservation =>
+                {
+                    _HotspotReservation = reservation;
+                    tcs.TrySetResult(WifiManagerResponse<HotspotInfo>.SuccessResponse(ReadHotspotInfo(reservation), "Hotspot started."));
+                },
+                // LocalOnlyHotspotCallback.ERROR_* codes.
+                Failed = reason => tcs.TrySetResult(WifiManagerResponse<HotspotInfo>.ErrorResponse(WifiErrorCodes.UnknownError, reason switch
+                {
+                    1 => "No channel is available for the hotspot.",
+                    3 => "Turn off the regular (tethering) hotspot first.",
+                    4 => "Tethering is not allowed on this device.",
+                    _ => "Android could not start the hotspot."
+                })),
+                Stopped = () => _HotspotReservation = null
+            };
+#pragma warning restore CA1416
+
+            try
+            {
+                wifiManager.StartLocalOnlyHotspot(callback, new Handler(Looper.MainLooper!));
+                return await tcs.Task.WaitAsync(HotspotStartTimeout, cancellationToken);
+            }
+            catch (Java.Lang.SecurityException ex)
+            {
+                return WifiManagerResponse<HotspotInfo>.ErrorResponse(WifiErrorCodes.PermissionDenied, $"Missing permission: {ex.Message}");
+            }
+            catch (Java.Lang.IllegalStateException ex)
+            {
+                return WifiManagerResponse<HotspotInfo>.ErrorResponse(WifiErrorCodes.UnknownError, ex.Message ?? "A hotspot request is already in progress.");
+            }
+            catch (TimeoutException)
+            {
+                return WifiManagerResponse<HotspotInfo>.ErrorResponse(WifiErrorCodes.OperationTimeout, "Timed out starting the hotspot.");
+            }
+            catch (System.OperationCanceledException)
+            {
+                return CreateCanceledResponse<HotspotInfo>(nameof(StartHotspotAsync));
+            }
+        }
+
+        public Task<WifiManagerResponse<bool>> StopHotspotAsync(CancellationToken cancellationToken = default)
+        {
+            if (!OperatingSystem.IsAndroidVersionAtLeast(26))
+                return Task.FromResult(WifiManagerResponse<bool>.SuccessResponse(false, "No hotspot is running."));
+            var reservation = Interlocked.Exchange(ref _HotspotReservation, null);
+            if (reservation == null)
+                return Task.FromResult(WifiManagerResponse<bool>.SuccessResponse(false, "No hotspot is running."));
+            reservation.Close();
+            return Task.FromResult(WifiManagerResponse<bool>.SuccessResponse(true, "Hotspot stopped."));
+        }
+
+        [SupportedOSPlatform("android26.0")]
+        private static HotspotInfo ReadHotspotInfo(WifiManager.LocalOnlyHotspotReservation reservation)
+        {
+            string? ssid, password;
+            if (OperatingSystem.IsAndroidVersionAtLeast(30))
+            {
+                var config = reservation.SoftApConfiguration;
+                ssid = OperatingSystem.IsAndroidVersionAtLeast(33) ? config.WifiSsid?.ToString() : GetLegacySoftApSsid(config);
+                password = config.Passphrase;
+            }
+            else
+            {
+#pragma warning disable CA1422 // Replaced by SoftApConfiguration in API 30.
+                ssid = reservation.WifiConfiguration?.Ssid;
+                password = reservation.WifiConfiguration?.PreSharedKey;
+#pragma warning restore CA1422
+            }
+            return new HotspotInfo { Ssid = ssid?.Trim(_TrimChars), Password = password?.Trim(_TrimChars), IsLocalOnly = true };
+        }
+
+        [SupportedOSPlatform("android30.0")]
+#pragma warning disable CA1422 // SoftApConfiguration.Ssid is replaced by WifiSsid in API 33.
+        private static string? GetLegacySoftApSsid(SoftApConfiguration config) => config.Ssid;
+#pragma warning restore CA1422
+
         private static int? GetChannelWidthMhz(int channelWidth) => channelWidth switch
         {
             0 => 20,
@@ -1677,6 +1773,7 @@ namespace MauiWifiManager
                 UnregisterIntentReceiver(ref _RssiReceiver);
                 UnregisterIntentReceiver(ref _ScanResultsReceiver);
             }
+            _ = StopHotspotAsync();
         }
 
         private async Task RunScanSessionAsync(CancellationToken cancellationToken)
@@ -1922,6 +2019,24 @@ namespace MauiWifiManager
                 ChannelWidthMhz = source.ChannelWidthMhz,
             };
         }
+    }
+
+    [SupportedOSPlatform("android26.0")]
+    internal sealed class HotspotCallback : WifiManager.LocalOnlyHotspotCallback
+    {
+        public Action<WifiManager.LocalOnlyHotspotReservation>? Started { get; init; }
+        public Action<int>? Failed { get; init; }
+        public Action? Stopped { get; init; }
+
+        public override void OnStarted(WifiManager.LocalOnlyHotspotReservation? reservation)
+        {
+            if (reservation != null)
+                Started?.Invoke(reservation);
+        }
+
+        public override void OnFailed([GeneratedEnum] LocalOnlyHotspotCallbackErrorCode reason) => Failed?.Invoke((int)reason);
+
+        public override void OnStopped() => Stopped?.Invoke();
     }
 
     internal sealed class IntentReceiver : BroadcastReceiver

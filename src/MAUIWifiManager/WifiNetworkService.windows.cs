@@ -6,6 +6,7 @@ using System.Net.Sockets;
 using System.Runtime.InteropServices;
 using Windows.Devices.Radios;
 using Windows.Devices.WiFi;
+using Windows.Networking.NetworkOperators;
 using Windows.Networking.Connectivity;
 using Windows.Security.Credentials;
 
@@ -796,6 +797,88 @@ namespace MauiWifiManager
             {
                 return WifiManagerResponse<bool>.ErrorResponse(WifiErrorCodes.UnknownError, ex.Message);
             }
+        }
+
+        public async Task<WifiManagerResponse<HotspotInfo>> StartHotspotAsync(CancellationToken cancellationToken = default)
+        {
+            if (cancellationToken.IsCancellationRequested)
+                return WifiManagerResponse<HotspotInfo>.ErrorResponse(WifiErrorCodes.OperationCanceled, "Operation was canceled.");
+
+            try
+            {
+                var profile = NetworkInformation.GetInternetConnectionProfile();
+                if (profile == null)
+                    return WifiManagerResponse<HotspotInfo>.ErrorResponse(WifiErrorCodes.NoConnection, "Mobile Hotspot shares an internet connection, and none is active.");
+
+                var capability = NetworkOperatorTetheringManager.GetTetheringCapabilityFromConnectionProfile(profile);
+                if (capability != TetheringCapability.Enabled)
+                    return WifiManagerResponse<HotspotInfo>.ErrorResponse(WifiErrorCodes.UnsupportedHardware, $"Mobile Hotspot is not available: {capability}.");
+
+                var manager = NetworkOperatorTetheringManager.CreateFromConnectionProfile(profile);
+                if (manager.TetheringOperationalState != TetheringOperationalState.On)
+                {
+                    var result = await manager.StartTetheringAsync().AsTask(cancellationToken);
+                    if (result.Status != TetheringOperationStatus.Success)
+                        return WifiManagerResponse<HotspotInfo>.ErrorResponse(WifiErrorCodes.UnknownError,
+                            $"Mobile Hotspot did not start: {result.Status}. {result.AdditionalErrorMessage}".Trim());
+                }
+
+                var config = manager.GetCurrentAccessPointConfiguration();
+                var info = new HotspotInfo { Ssid = config.Ssid, Password = config.Passphrase, IsLocalOnly = false };
+                return WifiManagerResponse<HotspotInfo>.SuccessResponse(info, "Mobile Hotspot is on.");
+            }
+            catch (OperationCanceledException)
+            {
+                return WifiManagerResponse<HotspotInfo>.ErrorResponse(WifiErrorCodes.OperationCanceled, "Operation was canceled.");
+            }
+            catch (Exception ex)
+            {
+                return WifiManagerResponse<HotspotInfo>.ErrorResponse(WifiErrorCodes.UnknownError, ex.Message);
+            }
+        }
+
+        public async Task<WifiManagerResponse<bool>> StopHotspotAsync(CancellationToken cancellationToken = default)
+        {
+            try
+            {
+                var manager = GetTetheringManager();
+                if (manager == null || manager.TetheringOperationalState != TetheringOperationalState.On)
+                    return WifiManagerResponse<bool>.SuccessResponse(false, "Mobile Hotspot is not running.");
+
+                var result = await manager.StopTetheringAsync().AsTask(cancellationToken);
+                return result.Status == TetheringOperationStatus.Success
+                    ? WifiManagerResponse<bool>.SuccessResponse(true, "Mobile Hotspot stopped.")
+                    : WifiManagerResponse<bool>.ErrorResponse(WifiErrorCodes.UnknownError, $"Mobile Hotspot did not stop: {result.Status}.");
+            }
+            catch (Exception ex)
+            {
+                return WifiManagerResponse<bool>.ErrorResponse(WifiErrorCodes.UnknownError, ex.Message);
+            }
+        }
+
+        public Task<WifiManagerResponse<List<HotspotClient>>> GetHotspotClientsAsync(CancellationToken cancellationToken = default)
+        {
+            try
+            {
+                var manager = GetTetheringManager();
+                if (manager == null || manager.TetheringOperationalState != TetheringOperationalState.On)
+                    return Task.FromResult(WifiManagerResponse<List<HotspotClient>>.ErrorResponse(WifiErrorCodes.NoConnection, "Mobile Hotspot is not running."));
+
+                var clients = manager.GetTetheringClients()
+                    .Select(c => new HotspotClient { MacAddress = c.MacAddress, HostName = c.HostNames.FirstOrDefault()?.DisplayName })
+                    .ToList();
+                return Task.FromResult(WifiManagerResponse<List<HotspotClient>>.SuccessResponse(clients, $"{clients.Count} device(s) connected."));
+            }
+            catch (Exception ex)
+            {
+                return Task.FromResult(WifiManagerResponse<List<HotspotClient>>.ErrorResponse(WifiErrorCodes.UnknownError, ex.Message));
+            }
+        }
+
+        private static NetworkOperatorTetheringManager? GetTetheringManager()
+        {
+            var profile = NetworkInformation.GetInternetConnectionProfile();
+            return profile == null ? null : NetworkOperatorTetheringManager.CreateFromConnectionProfile(profile);
         }
 
         private static async Task<Radio?> GetWifiRadioAsync()

@@ -332,6 +332,35 @@ namespace MauiWifiManager.Abstractions
     }
 
     /// <summary>
+    /// Credentials of a hotspot started by <see cref="IWifiNetworkService.StartHotspotAsync"/>.
+    /// </summary>
+    public sealed class HotspotInfo
+    {
+        /// <summary>Hotspot SSID.</summary>
+        public string? Ssid { get; init; }
+
+        /// <summary>Hotspot password.</summary>
+        public string? Password { get; init; }
+
+        /// <summary>
+        /// <see langword="true"/> on Android, where the hotspot only connects devices to this phone and does not share its internet.
+        /// </summary>
+        public bool IsLocalOnly { get; init; }
+    }
+
+    /// <summary>
+    /// A device connected to the hotspot.
+    /// </summary>
+    public sealed class HotspotClient
+    {
+        /// <summary>MAC address.</summary>
+        public string? MacAddress { get; init; }
+
+        /// <summary>Host name, when the device reports one.</summary>
+        public string? HostName { get; init; }
+    }
+
+    /// <summary>
     /// Represents information about a Wi-Fi network or the currently connected network.
     /// </summary>
     public class NetworkData

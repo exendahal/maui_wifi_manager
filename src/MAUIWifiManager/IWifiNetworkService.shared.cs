@@ -246,6 +246,25 @@ namespace MauiWifiManager
         Task<WifiManagerResponse<bool>> SetWifiEnabledAsync(bool enabled, CancellationToken cancellationToken = default)
             => Task.FromResult(NotSupported<bool>(nameof(SetWifiEnabledAsync)));
 
+        /// <summary>
+        /// Starts a hotspot and returns its credentials. Android starts a local-only hotspot (devices connect to this phone,
+        /// no internet sharing); Windows turns on Mobile Hotspot and shares the current connection.
+        /// </summary>
+        Task<WifiManagerResponse<HotspotInfo>> StartHotspotAsync(CancellationToken cancellationToken = default)
+            => Task.FromResult(NotSupported<HotspotInfo>(nameof(StartHotspotAsync)));
+
+        /// <summary>
+        /// Stops the hotspot started by <see cref="StartHotspotAsync"/>.
+        /// </summary>
+        Task<WifiManagerResponse<bool>> StopHotspotAsync(CancellationToken cancellationToken = default)
+            => Task.FromResult(NotSupported<bool>(nameof(StopHotspotAsync)));
+
+        /// <summary>
+        /// Lists devices connected to the hotspot. Supported on Windows only.
+        /// </summary>
+        Task<WifiManagerResponse<List<HotspotClient>>> GetHotspotClientsAsync(CancellationToken cancellationToken = default)
+            => Task.FromResult(NotSupported<List<HotspotClient>>(nameof(GetHotspotClientsAsync)));
+
         private static WifiManagerResponse<T> NotSupported<T>(string operation)
             => WifiManagerResponse<T>.ErrorResponse(WifiErrorCodes.UnsupportedHardware, $"{operation} is not supported on this platform.");
     }
