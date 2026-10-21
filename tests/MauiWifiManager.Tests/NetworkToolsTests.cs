@@ -286,7 +286,7 @@ public class NetworkToolsTests
     [InlineData(503, false)]
     public async Task ProbeInternet_UsesStatusCode(int status, bool expected)
     {
-        using var server = new LocalServer(context =>
+        using var server = new TestServer.LocalServer(context =>
         {
             context.Response.StatusCode = status;
             if (status == 302) context.Response.RedirectLocation = "http://portal.example/";
@@ -301,7 +301,7 @@ public class NetworkToolsTests
     [Fact]
     public async Task ProbeInternet_Unreachable_ReportsFalse()
     {
-        var response = await NetworkTools.ProbeInternetAsync(new Uri($"http://127.0.0.1:{FreePort()}/"), CancellationToken.None);
+        var response = await NetworkTools.ProbeInternetAsync(new Uri($"http://127.0.0.1:{TestServer.FreePort()}/"), CancellationToken.None);
 
         Assert.Equal(WifiErrorCodes.Success, response.ErrorCode);
         Assert.False(response.Data);
@@ -310,7 +310,7 @@ public class NetworkToolsTests
     [Fact]
     public async Task MeasureSpeed_AgainstLocalServer_ReportsAllFigures()
     {
-        using var server = new LocalServer(context =>
+        using var server = new TestServer.LocalServer(context =>
         {
             if (context.Request.HttpMethod == "POST")
             {
@@ -337,7 +337,7 @@ public class NetworkToolsTests
     [Fact]
     public async Task MeasureSpeed_NoUploadUrl_SkipsUpload()
     {
-        using var server = new LocalServer(context => context.Response.OutputStream.Write(new byte[1000]));
+        using var server = new TestServer.LocalServer(context => context.Response.OutputStream.Write(new byte[1000]));
 
         var response = await NetworkTools.MeasureSpeedAsync(new SpeedTestOptions { DownloadUrl = server.Url, UploadUrl = null }, CancellationToken.None);
 
@@ -348,14 +348,18 @@ public class NetworkToolsTests
     [Fact]
     public async Task MeasureSpeed_ServerError_ReportsNetworkUnavailable()
     {
-        using var server = new LocalServer(context => context.Response.StatusCode = 500);
+        using var server = new TestServer.LocalServer(context => context.Response.StatusCode = 500);
 
         var response = await NetworkTools.MeasureSpeedAsync(new SpeedTestOptions { DownloadUrl = server.Url, UploadUrl = null }, CancellationToken.None);
 
         Assert.Equal(WifiErrorCodes.NetworkUnavailable, response.ErrorCode);
     }
+}
 
-    private static int FreePort()
+/// <summary>Local HTTP server and free-port helper shared by the network tests.</summary>
+internal static class TestServer
+{
+    public static int FreePort()
     {
         var listener = new TcpListener(IPAddress.Loopback, 0);
         listener.Start();
@@ -365,7 +369,7 @@ public class NetworkToolsTests
     }
 
     /// <summary>Minimal HTTP server on localhost that runs <paramref name="handle"/> for every request.</summary>
-    private sealed class LocalServer : IDisposable
+    public sealed class LocalServer : IDisposable
     {
         private readonly HttpListener _Listener = new();
 
