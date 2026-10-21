@@ -17,7 +17,10 @@ namespace MauiWifiManager
         private const int SweepConcurrency = 64;
         public static readonly TimeSpan DefaultBrowseDuration = TimeSpan.FromSeconds(3);
 
-        public static async Task<WifiManagerResponse<bool>> ProbeInternetAsync(Uri probeUrl, CancellationToken cancellationToken)
+        public static Task<WifiManagerResponse<bool>> ProbeInternetAsync(Uri probeUrl, CancellationToken cancellationToken) =>
+            Task.Run(() => ProbeInternetCoreAsync(probeUrl, cancellationToken));
+
+        private static async Task<WifiManagerResponse<bool>> ProbeInternetCoreAsync(Uri probeUrl, CancellationToken cancellationToken)
         {
             try
             {
@@ -39,7 +42,10 @@ namespace MauiWifiManager
             }
         }
 
-        public static async Task<WifiManagerResponse<PingStatistics>> PingAsync(string host, int count, CancellationToken cancellationToken)
+        public static Task<WifiManagerResponse<PingStatistics>> PingAsync(string host, int count, CancellationToken cancellationToken) =>
+            Task.Run(() => PingCoreAsync(host, count, cancellationToken));
+
+        private static async Task<WifiManagerResponse<PingStatistics>> PingCoreAsync(string host, int count, CancellationToken cancellationToken)
         {
             if (count < 1)
                 return WifiManagerResponse<PingStatistics>.ErrorResponse(WifiErrorCodes.UnknownError, "Count must be at least 1.");
@@ -79,7 +85,10 @@ namespace MauiWifiManager
             return WifiManagerResponse<PingStatistics>.SuccessResponse(stats, $"{stats.Received}/{stats.Sent} replies.");
         }
 
-        public static async Task<WifiManagerResponse<SpeedTestResult>> MeasureSpeedAsync(SpeedTestOptions options, CancellationToken cancellationToken)
+        public static Task<WifiManagerResponse<SpeedTestResult>> MeasureSpeedAsync(SpeedTestOptions options, CancellationToken cancellationToken) =>
+            Task.Run(() => MeasureSpeedCoreAsync(options, cancellationToken));
+
+        private static async Task<WifiManagerResponse<SpeedTestResult>> MeasureSpeedCoreAsync(SpeedTestOptions options, CancellationToken cancellationToken)
         {
             try
             {
@@ -187,7 +196,19 @@ namespace MauiWifiManager
         }
 
         /// <param name="subnet">Network to sweep; defaults to the device's Wi-Fi (or first active) IPv4 network.</param>
-        public static async Task<WifiManagerResponse<List<LanDevice>>> DiscoverDevicesAsync(CancellationToken cancellationToken, (IPAddress Address, int PrefixLength)? subnet = null)
+        /// <param name="blockingProbe">
+        /// Optional reachability check returning the round-trip time, or null when the host did not answer. It is called
+        /// from <see cref="BlockingProbeThreads"/> dedicated threads; Android uses it to avoid <see cref="Ping"/>,
+        /// which there launches a <c>ping</c> process for every address.
+        /// </param>
+        public static Task<WifiManagerResponse<List<LanDevice>>> DiscoverDevicesAsync(CancellationToken cancellationToken,
+            (IPAddress Address, int PrefixLength)? subnet = null, Func<IPAddress, TimeSpan, long?>? blockingProbe = null) =>
+            Task.Run(() => DiscoverDevicesCoreAsync(cancellationToken, subnet, blockingProbe));
+
+        private const int BlockingProbeThreads = 32;
+
+        private static async Task<WifiManagerResponse<List<LanDevice>>> DiscoverDevicesCoreAsync(CancellationToken cancellationToken,
+            (IPAddress Address, int PrefixLength)? subnet, Func<IPAddress, TimeSpan, long?>? blockingProbe)
         {
             var local = subnet ?? GetLocalIpv4();
             if (local == null)
@@ -198,7 +219,19 @@ namespace MauiWifiManager
             using var gate = new SemaphoreSlim(SweepConcurrency);
             try
             {
-                await Task.WhenAll(hosts.Select(async host =>
+                if (blockingProbe != null)
+                {
+                    // Blocking probes get their own threads so they don't starve the shared thread pool.
+                    var queue = new System.Collections.Concurrent.ConcurrentQueue<IPAddress>(hosts);
+                    await Task.WhenAll(Enumerable.Range(0, BlockingProbeThreads).Select(_ => Task.Factory.StartNew(() =>
+                    {
+                        while (!cancellationToken.IsCancellationRequested && queue.TryDequeue(out var host))
+                            if (blockingProbe(host, SweepPingTimeout) is long ms)
+                                found.Add((host, ms));
+                    }, cancellationToken, TaskCreationOptions.LongRunning, TaskScheduler.Default))).ConfigureAwait(false);
+                    cancellationToken.ThrowIfCancellationRequested();
+                }
+                else await Task.WhenAll(hosts.Select(async host =>
                 {
                     await gate.WaitAsync(cancellationToken).ConfigureAwait(false);
                     try
@@ -316,7 +349,10 @@ namespace MauiWifiManager
             return udp;
         }
 
-        public static async Task<WifiManagerResponse<List<NetworkServiceInfo>>> BrowseServicesAsync(string serviceType, TimeSpan duration, CancellationToken cancellationToken)
+        public static Task<WifiManagerResponse<List<NetworkServiceInfo>>> BrowseServicesAsync(string serviceType, TimeSpan duration, CancellationToken cancellationToken) =>
+            Task.Run(() => BrowseServicesCoreAsync(serviceType, duration, cancellationToken));
+
+        private static async Task<WifiManagerResponse<List<NetworkServiceInfo>>> BrowseServicesCoreAsync(string serviceType, TimeSpan duration, CancellationToken cancellationToken)
         {
             var type = serviceType.Trim().TrimEnd('.');
             if (type.EndsWith(".local", StringComparison.OrdinalIgnoreCase))
@@ -370,7 +406,10 @@ namespace MauiWifiManager
         private static readonly TimeSpan PortTimeout = TimeSpan.FromMilliseconds(800);
         private static readonly TimeSpan ProbeTimeout = TimeSpan.FromSeconds(2.5);
 
-        public static async Task<WifiManagerResponse<LanDeviceDetails>> GetDetailsAsync(string ipAddress, CancellationToken cancellationToken)
+        public static Task<WifiManagerResponse<LanDeviceDetails>> GetDetailsAsync(string ipAddress, CancellationToken cancellationToken) =>
+            Task.Run(() => GetDetailsCoreAsync(ipAddress, cancellationToken));
+
+        private static async Task<WifiManagerResponse<LanDeviceDetails>> GetDetailsCoreAsync(string ipAddress, CancellationToken cancellationToken)
         {
             if (!IPAddress.TryParse(ipAddress, out var address) || address.AddressFamily != AddressFamily.InterNetwork)
                 return WifiManagerResponse<LanDeviceDetails>.ErrorResponse(WifiErrorCodes.UnknownError, "Enter an IPv4 address.");

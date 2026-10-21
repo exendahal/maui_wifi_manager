@@ -1482,8 +1482,26 @@ namespace MauiWifiManager
                 && connectivityManager.BoundNetworkForProcess is Network bound
                 && connectivityManager.GetLinkProperties(bound)?.LinkAddresses.FirstOrDefault(la => la.Address is Java.Net.Inet4Address) is LinkAddress link
                 && link.Address?.GetAddress() is { Length: 4 } bytes)
-                return NetworkTools.DiscoverDevicesAsync(cancellationToken, (new IPAddress(bytes), link.PrefixLength));
-            return NetworkTools.DiscoverDevicesAsync(cancellationToken);
+                return NetworkTools.DiscoverDevicesAsync(cancellationToken, (new IPAddress(bytes), link.PrefixLength), IsReachable);
+            return NetworkTools.DiscoverDevicesAsync(cancellationToken, blockingProbe: IsReachable);
+        }
+
+        /// <summary>
+        /// ICMP echo through Android's ping sockets via InetAddress.isReachable. System.Net.Ping launches a
+        /// <c>ping</c> process per address on Android, which for a 254-address sweep is slow and can freeze the app.
+        /// </summary>
+        private static long? IsReachable(IPAddress address, TimeSpan timeout)
+        {
+            try
+            {
+                using var target = Java.Net.InetAddress.GetByAddress(address.GetAddressBytes());
+                var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+                return target != null && target.IsReachable((int)timeout.TotalMilliseconds) ? stopwatch.ElapsedMilliseconds : null;
+            }
+            catch (Java.IO.IOException)
+            {
+                return null;
+            }
         }
 
         public async Task<WifiManagerResponse<List<NetworkServiceInfo>>> BrowseServicesAsync(string serviceType = "_services._dns-sd._udp", TimeSpan? duration = null, CancellationToken cancellationToken = default)
