@@ -55,6 +55,7 @@
 
 	<ItemGroup>
 		<PackageReference Include="Microsoft.SourceLink.GitHub" Version="1.1.1" PrivateAssets="All" />
+		<InternalsVisibleTo Include="MauiWifiManager.Tests" />
 	</ItemGroup>
 
 	<!-- iOS & MacCatalyst: exclude when not targeting these frameworks -->
