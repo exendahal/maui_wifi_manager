@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage
+    x:Class="DemoApp.AnalyzerPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    Title="Analyzer">
+    <ScrollView>
+        <VerticalStackLayout Padding="{OnPlatform Default='20,16,20,32', WinUI='40,28,40,40'}">
+            <Label Style="{StaticResource PageTitle}" Text="Analyzer" />
+            <Label Style="{StaticResource Muted}" Text="What is on your network, and how crowded the Wi-Fi channels around you are." />
+
+            <!-- Devices -->
+            <Label Style="{StaticResource SectionHeader}" Text="Devices on this network" />
+            <Border Style="{StaticResource Card}">
+                <VerticalStackLayout>
+                    <Label
+                        x:Name="devicesSummaryTxt"
+                        Padding="0,14"
+                        Style="{StaticResource Muted}"
+                        Text="Finds devices by pinging every address in your subnet and listening for the names they advertise (mDNS). Tap a device to ping it." />
+                    <VerticalStackLayout x:Name="devicesList" />
+                    <BoxView Style="{StaticResource Divider}" />
+                    <Button
+                        x:Name="devicesBtn"
+                        Margin="0,4"
+                        Padding="0"
+                        HorizontalOptions="Start"
+                        Clicked="ScanDevicesClicked"
+                        Style="{StaticResource TextButton}"
+                        Text="Scan for devices" />
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- Channels -->
+            <Label Style="{StaticResource SectionHeader}" Text="Channel congestion" />
+            <Border Style="{StaticResource Card}">
+                <VerticalStackLayout>
+                    <Label
+                        x:Name="channelEmptyTxt"
+                        Padding="0,14"
+                        Style="{StaticResource Muted}"
+                        Text="Scans nearby networks to show how many share each channel, and which channel your router should use (Android and Windows)." />
+                    <VerticalStackLayout x:Name="recommendationList" />
+                    <!-- One chart per band: channel numbers on 2.4 GHz and 5 GHz are not comparable on one axis. -->
+                    <VerticalStackLayout x:Name="channelCharts" Padding="0,8" Spacing="16" />
+                    <Label x:Name="channelSelectionTxt" Padding="0,0,0,8" IsVisible="False" />
+                    <Button
+                        x:Name="channelTableBtn"
+                        Margin="0,0,0,4"
+                        Padding="0"
+                        HorizontalOptions="Start"
+                        IsVisible="False"
+                        Clicked="ChannelTableClicked"
+                        Style="{StaticResource TextButton}"
+                        Text="Show as table" />
+                    <VerticalStackLayout x:Name="channelList" IsVisible="False" />
+                    <BoxView Style="{StaticResource Divider}" />
+                    <Button
+                        x:Name="analyzeBtn"
+                        Margin="0,4"
+                        Padding="0"
+                        HorizontalOptions="Start"
+                        Clicked="AnalyzeChannelsClicked"
+                        Style="{StaticResource TextButton}"
+                        Text="Analyze channels" />
+                </VerticalStackLayout>
+            </Border>
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

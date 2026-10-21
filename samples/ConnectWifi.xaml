@@ -80,6 +80,26 @@
                             Grid.Column="1"
                             Placeholder="Any access point" />
                     </Grid>
+                    <BoxView Style="{StaticResource Divider}" />
+                    <Grid ColumnDefinitions="*,Auto" Style="{StaticResource FieldRow}">
+                        <VerticalStackLayout Spacing="2" VerticalOptions="Center">
+                            <Label Text="Name is a prefix" />
+                            <Label Style="{StaticResource Muted}" Text="Join the strongest network whose name starts with it." />
+                        </VerticalStackLayout>
+                        <Switch
+                            x:Name="prefixSwitch"
+                            Grid.Column="1"
+                            VerticalOptions="Center" />
+                    </Grid>
+                    <BoxView Style="{StaticResource Divider}" />
+                    <Grid ColumnDefinitions="96,*" Style="{StaticResource FieldRow}">
+                        <Label Style="{StaticResource FieldLabel}" Text="Timeout (s)" />
+                        <Entry
+                            x:Name="timeoutEntry"
+                            Grid.Column="1"
+                            Keyboard="Numeric"
+                            Placeholder="Platform default" />
+                    </Grid>
                 </VerticalStackLayout>
             </Border>
 

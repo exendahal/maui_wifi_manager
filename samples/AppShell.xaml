@@ -34,6 +34,12 @@
             Icon="tab_connect.png"
             Route="connect" />
         <ShellContent
+            x:Name="analyzerItem"
+            Title="Analyzer"
+            ContentTemplate="{DataTemplate local:AnalyzerPage}"
+            Icon="tab_analyzer.png"
+            Route="analyzer" />
+        <ShellContent
             x:Name="toolsItem"
             Title="Tools"
             ContentTemplate="{DataTemplate local:ToolsPage}"

@@ -12,6 +12,7 @@
                 SetIcon(networksItem, "\uE701");   // Wifi
                 SetIcon(connectionItem, "\uE774"); // Globe
                 SetIcon(connectItem, "\uE8D7");    // Permissions (key)
+                SetIcon(analyzerItem, "\uE9D9");   // Diagnostic (chart)
                 SetIcon(toolsItem, "\uE90F");      // Repair (wrench)
             }
         }

@@ -8,15 +8,26 @@
     <ScrollView>
         <VerticalStackLayout Padding="{OnPlatform Default='20,16,20,32', WinUI='40,28,40,40'}">
             <Label Style="{StaticResource PageTitle}" Text="Tools" />
-            <Label Style="{StaticResource Muted}" Text="Device status, saved networks, QR sharing, channel analysis and advanced connections." />
+            <Label Style="{StaticResource Muted}" Text="Device status, saved networks, QR sharing, hotspot, diagnostics and advanced connections." />
 
             <!-- Wi-Fi state, permissions, metered and live signal -->
             <Label Style="{StaticResource SectionHeader}" Text="Status" />
             <Border Style="{StaticResource Card}">
                 <VerticalStackLayout>
-                    <Grid ColumnDefinitions="Auto,*" Style="{StaticResource FieldRow}">
+                    <Grid ColumnDefinitions="Auto,*,Auto" Style="{StaticResource FieldRow}">
                         <Label Style="{StaticResource FieldLabel}" Text="Wi-Fi radio" />
                         <Label x:Name="radioTxt" Grid.Column="1" Style="{StaticResource FieldValue}" />
+                        <Button x:Name="radioToggleBtn" Grid.Column="2" Padding="8,0,0,0" Clicked="ToggleWifiClicked" Style="{StaticResource TextButton}" Text="Turn off" />
+                    </Grid>
+                    <BoxView Style="{StaticResource Divider}" />
+                    <Grid ColumnDefinitions="Auto,*" Style="{StaticResource FieldRow}">
+                        <Label Style="{StaticResource FieldLabel}" Text="Connection" />
+                        <Label x:Name="connectionTypeTxt" Grid.Column="1" Style="{StaticResource FieldValue}" />
+                    </Grid>
+                    <BoxView Style="{StaticResource Divider}" />
+                    <Grid ColumnDefinitions="Auto,*" Style="{StaticResource FieldRow}">
+                        <Label Style="{StaticResource FieldLabel}" Text="Scan readiness" />
+                        <Label x:Name="scanReadyTxt" Grid.Column="1" Style="{StaticResource FieldValue}" />
                     </Grid>
                     <BoxView Style="{StaticResource Divider}" />
                     <Grid ColumnDefinitions="Auto,*" Style="{StaticResource FieldRow}">
@@ -81,26 +92,57 @@
                 </VerticalStackLayout>
             </Border>
 
-            <!-- Channel congestion -->
-            <Label Style="{StaticResource SectionHeader}" Text="Channel congestion" />
+            <!-- Hotspot -->
+            <Label Style="{StaticResource SectionHeader}" Text="Hotspot" />
             <Border Style="{StaticResource Card}">
                 <VerticalStackLayout>
-                    <Label x:Name="channelEmptyTxt" Padding="0,14" Style="{StaticResource Muted}" Text="Scan to see how many networks share each channel (Android and Windows)." />
-                    <!-- One chart per band: channel numbers on 2.4 GHz and 5 GHz are not comparable on one axis. -->
-                    <VerticalStackLayout x:Name="channelCharts" Padding="0,8" Spacing="16" />
-                    <Label x:Name="channelSelectionTxt" Padding="0,0,0,8" IsVisible="False" />
-                    <Button
-                        x:Name="channelTableBtn"
-                        Margin="0,0,0,4"
-                        Padding="0"
-                        HorizontalOptions="Start"
-                        IsVisible="False"
-                        Clicked="ChannelTableClicked"
-                        Style="{StaticResource TextButton}"
-                        Text="Show as table" />
-                    <VerticalStackLayout x:Name="channelList" IsVisible="False" />
+                    <Label x:Name="hotspotTxt" Padding="0,14" Style="{StaticResource Muted}" Text="Android starts a local-only hotspot (no internet sharing); Windows turns on Mobile Hotspot." />
+                    <VerticalStackLayout x:Name="hotspotDetails" />
                     <BoxView Style="{StaticResource Divider}" />
-                    <Button x:Name="analyzeBtn" Margin="0,4" Padding="0" HorizontalOptions="Start" Clicked="AnalyzeChannelsClicked" Style="{StaticResource TextButton}" Text="Analyze channels" />
+                    <HorizontalStackLayout Spacing="16">
+                        <Button x:Name="hotspotBtn" Margin="0,4" Padding="0" Clicked="HotspotClicked" Style="{StaticResource TextButton}" Text="Start hotspot" />
+                        <Button x:Name="hotspotClientsBtn" Margin="0,4" Padding="0" Clicked="HotspotClientsClicked" IsVisible="False" Style="{StaticResource TextButton}" Text="Connected devices" />
+                    </HorizontalStackLayout>
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- Diagnostics -->
+            <Label Style="{StaticResource SectionHeader}" Text="Network diagnostics" />
+            <Border Style="{StaticResource Card}">
+                <VerticalStackLayout>
+                    <Grid ColumnDefinitions="96,*,Auto" Style="{StaticResource FieldRow}">
+                        <Label Style="{StaticResource FieldLabel}" Text="Ping" />
+                        <Entry x:Name="pingHostEntry" Grid.Column="1" Placeholder="Host or IP" Text="one.one.one.one" />
+                        <Button x:Name="pingBtn" Grid.Column="2" Padding="8,0,0,0" Clicked="PingClicked" Style="{StaticResource TextButton}" Text="Ping" />
+                    </Grid>
+                    <Label x:Name="pingTxt" Padding="0,0,0,10" IsVisible="False" />
+                    <BoxView Style="{StaticResource Divider}" />
+                    <Grid ColumnDefinitions="*,Auto" Style="{StaticResource FieldRow}">
+                        <VerticalStackLayout Spacing="2" VerticalOptions="Center">
+                            <Label Text="Speed test" />
+                            <Label x:Name="speedTxt" Style="{StaticResource Muted}" Text="Uses Cloudflare's public endpoints; transfers up to ~30 MB." />
+                        </VerticalStackLayout>
+                        <Button x:Name="speedBtn" Grid.Column="1" Padding="8,0,0,0" Clicked="SpeedTestClicked" Style="{StaticResource TextButton}" Text="Run" />
+                    </Grid>
+                    <BoxView Style="{StaticResource Divider}" />
+                    <Grid ColumnDefinitions="96,*,Auto" Style="{StaticResource FieldRow}">
+                        <Label Style="{StaticResource FieldLabel}" Text="mDNS" />
+                        <Entry x:Name="serviceTypeEntry" Grid.Column="1" Placeholder="All types, or e.g. _http._tcp" />
+                        <Button x:Name="browseBtn" Grid.Column="2" Padding="8,0,0,0" Clicked="BrowseServicesClicked" Style="{StaticResource TextButton}" Text="Browse" />
+                    </Grid>
+                    <Label x:Name="servicesTxt" Padding="0,0,0,10" IsVisible="False" Style="{StaticResource Muted}" />
+                    <VerticalStackLayout x:Name="servicesList" />
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- Self-test -->
+            <Label Style="{StaticResource SectionHeader}" Text="Self-test" />
+            <Border Style="{StaticResource Card}">
+                <VerticalStackLayout>
+                    <Label Padding="0,10" Style="{StaticResource Muted}" Text="Runs every library feature against this device and lists the results. Starts a hotspot briefly and transfers ~30 MB for the speed test." />
+                    <Label x:Name="selfTestTxt" FontFamily="{StaticResource MonoFont}" FontSize="11" IsVisible="False" />
+                    <BoxView Style="{StaticResource Divider}" />
+                    <Button x:Name="selfTestBtn" Margin="0,4" Padding="0" HorizontalOptions="Start" Clicked="SelfTestClicked" Style="{StaticResource TextButton}" Text="Run all checks" />
                 </VerticalStackLayout>
             </Border>
 
@@ -128,6 +170,19 @@
                     <Grid ColumnDefinitions="96,*" Style="{StaticResource FieldRow}">
                         <Label Style="{StaticResource FieldLabel}" Text="Name" />
                         <Entry x:Name="advSsidEntry" Grid.Column="1" Placeholder="SSID" />
+                    </Grid>
+                    <BoxView Style="{StaticResource Divider}" />
+                    <Grid ColumnDefinitions="*,Auto" Style="{StaticResource FieldRow}">
+                        <VerticalStackLayout Spacing="2" VerticalOptions="Center">
+                            <Label Text="Name is a prefix" />
+                            <Label Style="{StaticResource Muted}" Text="Join the strongest network starting with it, e.g. SmartPlug-" />
+                        </VerticalStackLayout>
+                        <Switch x:Name="advPrefixSwitch" Grid.Column="1" VerticalOptions="Center" />
+                    </Grid>
+                    <BoxView Style="{StaticResource Divider}" />
+                    <Grid ColumnDefinitions="96,*" Style="{StaticResource FieldRow}">
+                        <Label Style="{StaticResource FieldLabel}" Text="Timeout (s)" />
+                        <Entry x:Name="advTimeoutEntry" Grid.Column="1" Keyboard="Numeric" Placeholder="Platform default" />
                     </Grid>
                     <VerticalStackLayout x:Name="identityRow">
                         <BoxView Style="{StaticResource Divider}" />

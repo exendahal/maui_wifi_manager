@@ -3,8 +3,8 @@ using MauiWifiManager;
 using MauiWifiManager.Abstractions;
 
 /// <summary>
-/// Demonstrates the Wi-Fi state and signal events, permissions, metered check, saved networks,
-/// QR generation, channel congestion and the advanced connection types.
+/// Demonstrates the Wi-Fi state, signal and connection-type events, permissions, metered check, saved networks,
+/// QR generation, hotspot, network diagnostics, the self-test and the advanced connection types.
 /// </summary>
 public partial class ToolsPage : ContentPage
 {
@@ -13,6 +13,7 @@ public partial class ToolsPage : ContentPage
     private const int SuggestionMode = 2;
 
     private bool _IsSubscribed;
+    private bool _HotspotRunning;
 
     public ToolsPage()
     {
@@ -28,6 +29,7 @@ public partial class ToolsPage : ContentPage
         {
             CrossWifiManager.WifiStateChanged += OnWifiStateChanged;
             CrossWifiManager.SignalStrengthChanged += OnSignalChanged;
+            CrossWifiManager.ConnectionTypeChanged += OnConnectionTypeChanged;
             _IsSubscribed = true;
         }
         await RefreshStatusAsync();
@@ -41,6 +43,7 @@ public partial class ToolsPage : ContentPage
         {
             CrossWifiManager.WifiStateChanged -= OnWifiStateChanged;
             CrossWifiManager.SignalStrengthChanged -= OnSignalChanged;
+            CrossWifiManager.ConnectionTypeChanged -= OnConnectionTypeChanged;
             _IsSubscribed = false;
         }
     }
@@ -51,9 +54,21 @@ public partial class ToolsPage : ContentPage
     {
         var radio = await CrossWifiManager.IsWifiEnabledAsync();
         if (radio.ErrorCode == WifiErrorCodes.Success)
-            SetStatus(radioTxt, radio.Data ? "On" : "Off", radio.Data ? "Success" : "Danger");
+            ShowRadio(radio.Data);
         else
+        {
             SetStatus(radioTxt, "Not available on this platform", "TextMuted");
+            radioToggleBtn.IsVisible = false;
+        }
+
+        var types = await CrossWifiManager.GetConnectionTypesAsync();
+        ShowConnectionTypes(types.Data ?? new List<NetworkConnectionType>(), hasInternet: null);
+
+        var scanReady = await CrossWifiManager.CanStartScanAsync();
+        if (scanReady.ErrorCode == WifiErrorCodes.Success)
+            SetStatus(scanReadyTxt, scanReady.ErrorMessage ?? scanReady.Data.ToString(), scanReady.Data == WifiScanAvailability.Ready ? "Success" : "Warning");
+        else
+            SetStatus(scanReadyTxt, "Not available on this platform", "TextMuted");
 
         var metered = await CrossWifiManager.IsMeteredConnectionAsync();
         if (metered.ErrorCode == WifiErrorCodes.Success)
@@ -79,7 +94,37 @@ public partial class ToolsPage : ContentPage
     }
 
     private void OnWifiStateChanged(object? sender, WifiStateChangedEventArgs e) =>
-        MainThread.BeginInvokeOnMainThread(() => SetStatus(radioTxt, e.IsEnabled ? "On" : "Off", e.IsEnabled ? "Success" : "Danger"));
+        MainThread.BeginInvokeOnMainThread(() => ShowRadio(e.IsEnabled));
+
+    private void ShowRadio(bool enabled)
+    {
+        SetStatus(radioTxt, enabled ? "On" : "Off", enabled ? "Success" : "Danger");
+        radioToggleBtn.Text = enabled ? "Turn off" : "Turn on";
+        radioToggleBtn.IsVisible = true;
+    }
+
+    private async void ToggleWifiClicked(object sender, EventArgs e)
+    {
+        bool turnOn = radioToggleBtn.Text == "Turn on";
+        var response = await CrossWifiManager.SetWifiEnabledAsync(turnOn);
+        if (response.ErrorCode != WifiErrorCodes.Success)
+            await DisplayAlertAsync("Could not change Wi-Fi", response.ErrorMessage, "OK");
+        else if (!response.Data)
+            SetStatus(radioTxt, "Use the Wi-Fi panel", "Warning"); // Android 10+ opened the system panel
+        else
+            ShowRadio(turnOn);
+    }
+
+    private void OnConnectionTypeChanged(object? sender, ConnectionTypeChangedEventArgs e) =>
+        MainThread.BeginInvokeOnMainThread(() => ShowConnectionTypes(e.ConnectionTypes, e.HasInternet));
+
+    private void ShowConnectionTypes(IReadOnlyList<NetworkConnectionType> types, bool? hasInternet)
+    {
+        var text = types.Count == 0 ? "Offline" : string.Join(" + ", types);
+        if (hasInternet == false && types.Count > 0)
+            text += " (no internet)";
+        SetStatus(connectionTypeTxt, text, types.Count == 0 ? "Danger" : "Text");
+    }
 
     private void OnSignalChanged(object? sender, WifiSignalChangedEventArgs e) =>
         MainThread.BeginInvokeOnMainThread(() => ShowSignal(e.RssiDbm, e.SignalPercentage));
@@ -153,98 +198,104 @@ public partial class ToolsPage : ContentPage
         qrResult.IsVisible = true;
     }
 
-    // ---- Channel congestion ----
 
-    private async void AnalyzeChannelsClicked(object sender, EventArgs e)
+    // ---- Hotspot ----
+
+    private async void HotspotClicked(object sender, EventArgs e)
     {
-        var locationError = await LocationAccess.CheckAsync();
-        if (locationError != null)
+        hotspotBtn.IsEnabled = false;
+        if (_HotspotRunning)
         {
-            channelEmptyTxt.Text = locationError;
-            return;
+            var stopped = await CrossWifiManager.StopHotspotAsync();
+            _HotspotRunning = false;
+            hotspotTxt.Text = stopped.ErrorMessage;
+            hotspotDetails.Clear();
         }
-
-        analyzeBtn.IsEnabled = false;
-        channelEmptyTxt.Text = "Scanning…";
-        channelEmptyTxt.IsVisible = true;
-        channelList.Clear();
-        channelCharts.Clear();
-        channelSelectionTxt.IsVisible = false;
-
-        var scan = await CrossWifiManager.ScanWifiNetworksAsync();
-        analyzeBtn.IsEnabled = true;
-        if (scan.ErrorCode != WifiErrorCodes.Success || scan.Data == null)
+        else
         {
-            channelEmptyTxt.Text = scan.ErrorMessage;
-            return;
-        }
-
-        var usage = WifiChannelUsage.FromScanResults(scan.Data);
-        channelEmptyTxt.IsVisible = usage.Count == 0;
-        channelEmptyTxt.Text = "No channel information in the scan results.";
-        DetailList.Fill(channelList, usage.Select(u => (
-            $"{NetworkFormat.Band(u.FrequencyBand) ?? "?"} · ch {u.ChannelNumber}",
-            $"{u.NetworkCount} network{(u.NetworkCount == 1 ? "" : "s")}" + (u.StrongestRssiDbm is int dbm ? $" · strongest {dbm} dBm" : ""),
-            false)));
-
-        channelTableBtn.IsVisible = usage.Count > 0;
-        foreach (var band in usage.Select(u => u.FrequencyBand).Distinct().OrderBy(b => b))
-            channelCharts.Add(CreateChart(band, usage.Where(u => u.FrequencyBand == band)));
-        channelSelectionTxt.Text = "Tap a bar for details.";
-        channelSelectionTxt.TextColor = ThemeColor.Get("TextMuted");
-        channelSelectionTxt.IsVisible = usage.Count > 0;
-    }
-
-    private View CreateChart(WifiFrequencyBand band, IEnumerable<WifiChannelUsage> usage)
-    {
-        var chart = new ChannelChart(band, usage);
-        var view = new GraphicsView { Drawable = chart, HeightRequest = 150 };
-        SemanticProperties.SetDescription(view, $"{NetworkFormat.Band(band)} channel usage: " +
-            string.Join(", ", chart.Bars.Where(b => b.NetworkCount > 0).Select(b => $"channel {b.ChannelNumber}, {b.NetworkCount}")));
-
-        void Select(PointF? point)
-        {
-            var index = point is PointF p ? chart.HitTest(p) : null;
-            if (index == chart.SelectedIndex) return;
-            // Only one bar is selected across all band charts.
-            foreach (var other in channelCharts.OfType<VerticalStackLayout>().SelectMany(s => s.OfType<GraphicsView>()))
-                if (other != view && other.Drawable is ChannelChart c && c.SelectedIndex != null)
+            hotspotTxt.Text = "Starting…";
+            var started = await CrossWifiManager.StartHotspotAsync();
+            _HotspotRunning = started.ErrorCode == WifiErrorCodes.Success;
+            hotspotTxt.Text = started.ErrorMessage;
+            if (_HotspotRunning)
+                DetailList.Fill(hotspotDetails, new (string, string, bool)[]
                 {
-                    c.SelectedIndex = null;
-                    other.Invalidate();
-                }
-            chart.SelectedIndex = index;
-            view.Invalidate();
-
-            if (index is int i)
-            {
-                var bar = chart.Bars[i];
-                channelSelectionTxt.Text = $"{NetworkFormat.Band(band)} · channel {bar.ChannelNumber}: "
-                    + (bar.NetworkCount == 0 ? "free"
-                        : $"{bar.NetworkCount} network{(bar.NetworkCount == 1 ? "" : "s")}" + (bar.StrongestRssiDbm is int dbm ? $", strongest {dbm} dBm" : ""));
-                channelSelectionTxt.TextColor = ThemeColor.Get("Text");
-            }
+                    ("Name", started.Data!.Ssid ?? NetworkFormat.None, false),
+                    ("Password", started.Data.Password ?? NetworkFormat.None, true),
+                    ("Internet sharing", started.Data.IsLocalOnly ? "No (local-only)" : "Yes", false)
+                });
         }
-
-        view.StartInteraction += (_, e) => Select(e.Touches.FirstOrDefault());
-        view.StartHoverInteraction += (_, e) => Select(e.Touches.FirstOrDefault());
-        view.MoveHoverInteraction += (_, e) => Select(e.Touches.FirstOrDefault());
-
-        return new VerticalStackLayout
-        {
-            Spacing = 4,
-            Children =
-            {
-                new Label { Text = NetworkFormat.Band(band) ?? "Unknown band", Style = DetailList.AppStyle("FieldLabel") },
-                view
-            }
-        };
+        hotspotBtn.Text = _HotspotRunning ? "Stop hotspot" : "Start hotspot";
+        hotspotClientsBtn.IsVisible = _HotspotRunning && DeviceInfo.Current.Platform == DevicePlatform.WinUI;
+        hotspotBtn.IsEnabled = true;
     }
 
-    private void ChannelTableClicked(object sender, EventArgs e)
+    private async void HotspotClientsClicked(object sender, EventArgs e)
     {
-        channelList.IsVisible = !channelList.IsVisible;
-        channelTableBtn.Text = channelList.IsVisible ? "Hide table" : "Show as table";
+        var clients = await CrossWifiManager.GetHotspotClientsAsync();
+        var list = clients.Data is { Count: > 0 } c
+            ? string.Join("\n", c.Select(x => $"{x.HostName ?? "Unknown"}  {x.MacAddress}"))
+            : clients.ErrorMessage;
+        await DisplayAlertAsync("Connected devices", list, "OK");
+    }
+
+    // ---- Diagnostics ----
+
+    private async void PingClicked(object sender, EventArgs e)
+    {
+        var host = pingHostEntry.Text?.Trim();
+        if (string.IsNullOrEmpty(host)) return;
+        pingBtn.IsEnabled = false;
+        pingTxt.IsVisible = true;
+        SetStatus(pingTxt, "Pinging…", "TextMuted");
+        var response = await CrossWifiManager.PingAsync(host);
+        if (response.Data is { } stats && stats.Received > 0)
+            SetStatus(pingTxt, $"{stats.Received}/{stats.Sent} replies · min {stats.MinMs} / avg {stats.AverageMs:0} / max {stats.MaxMs} ms · {stats.PacketLossPercent:0}% loss", "Text");
+        else
+            SetStatus(pingTxt, response.ErrorMessage ?? "No reply", "Danger");
+        pingBtn.IsEnabled = true;
+    }
+
+    private async void SpeedTestClicked(object sender, EventArgs e)
+    {
+        speedBtn.IsEnabled = false;
+        SetStatus(speedTxt, "Testing… (up to 20 s)", "TextMuted");
+        var response = await CrossWifiManager.MeasureSpeedAsync();
+        if (response.Data is { } r)
+            SetStatus(speedTxt, $"↓ {r.DownloadMbps:0.0} Mbps · ↑ {r.UploadMbps:0.0} Mbps · {r.LatencyMs:0} ms", "Text");
+        else
+            SetStatus(speedTxt, response.ErrorMessage ?? "Failed", "Danger");
+        speedBtn.IsEnabled = true;
+    }
+
+    private async void BrowseServicesClicked(object sender, EventArgs e)
+    {
+        browseBtn.IsEnabled = false;
+        servicesList.Clear();
+        servicesTxt.IsVisible = true;
+        SetStatus(servicesTxt, "Listening for 3 s…", "TextMuted");
+        var type = serviceTypeEntry.Text?.Trim();
+        var response = string.IsNullOrEmpty(type)
+            ? await CrossWifiManager.BrowseServicesAsync()
+            : await CrossWifiManager.BrowseServicesAsync(type);
+        SetStatus(servicesTxt, response.ErrorMessage ?? string.Empty, response.ErrorCode == WifiErrorCodes.Success ? "TextMuted" : "Danger");
+        DetailList.Fill(servicesList, (response.Data ?? new List<NetworkServiceInfo>()).Select(s =>
+            string.IsNullOrEmpty(type)
+                ? (s.Name, "Enter this type and tap Browse", false)
+                : (s.Name, $"{s.IpAddress ?? s.HostName}:{s.Port}", true)));
+        browseBtn.IsEnabled = true;
+    }
+
+    // ---- Self-test ----
+
+    private async void SelfTestClicked(object sender, EventArgs e)
+    {
+        selfTestBtn.IsEnabled = false;
+        selfTestTxt.IsVisible = true;
+        selfTestTxt.Text = string.Empty;
+        await SelfTest.RunAsync("basic", line => MainThread.BeginInvokeOnMainThread(() =>
+            selfTestTxt.Text += line.Replace(SelfTest.LogPrefix + " ", string.Empty) + "\n"));
+        selfTestBtn.IsEnabled = true;
     }
 
     // ---- Advanced connection ----
@@ -274,7 +325,9 @@ public partial class ToolsPage : ContentPage
         var password = advPasswordEntry.Text ?? string.Empty;
         var options = new WifiConnectionOptions
         {
-            SecurityType = password.Length == 0 ? WifiSecurityType.Open : WifiSecurityType.Wpa2Psk
+            SecurityType = password.Length == 0 ? WifiSecurityType.Open : WifiSecurityType.Wpa2Psk,
+            IsSsidPrefix = advPrefixSwitch.IsToggled,
+            Timeout = double.TryParse(advTimeoutEntry.Text, out var seconds) && seconds > 0 ? TimeSpan.FromSeconds(seconds) : null
         };
 
         advConnectBtn.IsEnabled = false;

@@ -10,6 +10,8 @@ namespace DemoApp
     {        
         protected override void OnCreate(Bundle savedInstanceState)
         {
+            // adb shell am start -n <activity> --es selftest basic
+            SelfTest.PendingMode = Intent?.GetStringExtra("selftest");
             base.OnCreate(savedInstanceState);
         }
         public override void OnRequestPermissionsResult(int requestCode, string[] permissions, [GeneratedEnum] Permission[] grantResults)
