@@ -258,17 +258,28 @@ namespace MauiWifiManager
             if (status.ConnectionStatus == WiFiConnectionStatus.Success)
             {
                 Debug.WriteLine("Connected successfully to the network.");
+                // Right after joining, a network without internet (e.g. a device's setup AP) can still report
+                // connectivity level None, so give its profile a few seconds to appear.
                 var networkData = await GetNetworkInfoAsync(cancellationToken);
-                if (networkData.ErrorCode == WifiErrorCodes.Success)
+                for (int attempt = 0; attempt < 10 && networkData.ErrorCode != WifiErrorCodes.Success; attempt++)
                 {
-                    response.ErrorCode = WifiErrorCodes.Success;
-                    response.Data = networkData.Data;
+                    await Task.Delay(500, cancellationToken);
+                    networkData = await GetNetworkInfoAsync(cancellationToken);
                 }
-                else
-                {
-                    response.ErrorCode = WifiErrorCodes.UnknownError;
-                    response.ErrorMessage = "Connected but failed to retrieve network info.";
-                }
+                response.ErrorCode = WifiErrorCodes.Success;
+                response.Data = networkData.ErrorCode == WifiErrorCodes.Success
+                    ? networkData.Data
+                    : new NetworkData
+                    {
+                        StatusId = (int)WifiErrorCodes.Success,
+                        Ssid = target.Ssid.Length > 0 ? target.Ssid : ssid,
+                        Bssid = target.Bssid,
+                        SignalStrength = target.SignalBars,
+                        RssiDbm = (int)target.NetworkRssiInDecibelMilliwatts,
+                        NativeObject = target
+                    };
+                if (networkData.ErrorCode != WifiErrorCodes.Success)
+                    response.ErrorMessage = "Connected; detailed network info is not available yet.";
             }
             else
             {
