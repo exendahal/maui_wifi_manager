@@ -1,4 +1,5 @@
 namespace DemoApp;
+using CommunityToolkit.Maui.Extensions;
 using MauiWifiManager;
 using MauiWifiManager.Abstractions;
 using System.Collections.ObjectModel;
@@ -6,233 +7,217 @@ using System.Diagnostics;
 
 public partial class ScanListPage : ContentPage
 {
-    private readonly ObservableCollection<NetworkDataModel> _NetworkDataModel = [];
-    private readonly HashSet<string> _DiscoveredNetworkKeys = new(StringComparer.OrdinalIgnoreCase);
-    private readonly Queue<NetworkData> _PendingNetworks = new();
-    private readonly object _QueueLock = new();
-    private bool _IsDeviceDiscoveredSubscribed;
-    private bool _IsProcessingQueue ;
+    // Android refreshes scan results about every 30 seconds, so a session needs a few minutes to show changes.
+    private static readonly TimeSpan ScanSessionDuration = TimeSpan.FromMinutes(2);
 
-    public Command InfoCommand { get; }
-    public Command ConnectCommand { get; }
+    private readonly ObservableCollection<NetworkDataModel> _Networks = [];
+    private readonly Dictionary<string, NetworkDataModel> _NetworksByKey = new(StringComparer.OrdinalIgnoreCase);
+    private CancellationTokenSource? _ScanCts;
+    private bool _IsScanEventsSubscribed;
+    // The toolkit shows popups as modal pages, which raises OnDisappearing/OnAppearing on this page.
+    private bool _IsShowingPopup;
 
     public ScanListPage()
-	{
-		InitializeComponent();
-        BindingContext = this;
-        InfoCommand = new Command<NetworkDataModel>(ExecuteInfoCommand);
-        ConnectCommand = new Command<NetworkDataModel>(ExecuteConnectCommand);
-        scanCollectionView.ItemsSource = _NetworkDataModel;
-        UpdateScanButtonState();
+    {
+        InitializeComponent();
+        networkList.ItemsSource = _Networks;
+        throttleNotice.IsVisible = DeviceInfo.Current.Platform == DevicePlatform.Android;
+        UpdateStatus();
     }
 
     protected override async void OnAppearing()
     {
         base.OnAppearing();
-        await StartScanSessionAsync();
+        if (!_IsShowingPopup)
+            await StartScanSessionAsync();
     }
 
     protected override async void OnDisappearing()
     {
-        await StopScanSessionAsync();
-        UnsubscribeDeviceDiscovered();
         base.OnDisappearing();
+        if (_IsShowingPopup)
+            return;
+        await StopScanSessionAsync();
+        UnsubscribeScanEvents();
     }
-
-    private async void ExecuteConnectCommand(NetworkDataModel model)
-    {
-        if (!string.IsNullOrWhiteSpace(model.SsidName))
-        {
-            var response = await DisplayPromptAsync("Connect " + model.SsidName, "Enter password to connect");
-            if (!string.IsNullOrWhiteSpace(response) && response.Length >= 8)
-            {
-                var status = await CrossWifiManager.Current.ConnectWifiAsync(model.SsidName, response);
-            }
-        }
-    }
-
-    private async void ExecuteInfoCommand(NetworkDataModel model)
-    {
-        var info = $"StatusId: {model.StatusId}, " +
-               $"Ssid: {model.SsidName}, " +
-               $"IpAddress: {model.IpAddress}, " +
-               $"GatewayAddress: {model.GatewayAddress ?? "N/A"}, " +
-               $"NativeObject: {model.NativeObject}, " +
-               $"Bssid: {model.Bssid}";
-        await DisplayAlertAsync("Network info", info, "OK");
-    }   
 
     private async void ScanClicked(object sender, EventArgs e)
     {
         if (CrossWifiManager.IsScanning)
-        {
             await StopScanSessionAsync();
-        }
         else
-        {
             await StartScanSessionAsync();
-        }
     }
 
     private async Task StartScanSessionAsync()
     {
-        if (!await EnsureLocationPermissionAsync())
+        if (CrossWifiManager.IsScanning)
+            return;
+
+        var locationError = await LocationAccess.CheckAsync();
+        if (locationError != null)
         {
+            ShowEmptyState("Location needed", locationError);
             return;
         }
 
-        loading.IsRunning = true;
-        scanCollectionView.IsVisible = true;
-        _NetworkDataModel.Clear();
-        _DiscoveredNetworkKeys.Clear();
-        lock (_QueueLock)
-        {
-            _PendingNetworks.Clear();
-            _IsProcessingQueue = false;
-        }
+        ClearNetworks();
+        ShowEmptyState("Looking for networks", "Networks in range appear here as they are found.");
+        SubscribeScanEvents();
 
-        SubscribeDeviceDiscovered();
+        // The plugin stops the session when this token is canceled.
+        var cts = new CancellationTokenSource(ScanSessionDuration);
+        _ScanCts = cts;
+        cts.Token.Register(() => MainThread.BeginInvokeOnMainThread(async () =>
+        {
+            if (_ScanCts == cts)
+                await StopScanSessionAsync();
+        }));
 
-        var response = await CrossWifiManager.StartScanningForDevicesAsync();
-        if (response.ErrorCode == WifiErrorCodes.Success)
+        var response = await CrossWifiManager.StartScanningForDevicesAsync(cts.Token);
+        if (response.ErrorCode != WifiErrorCodes.Success)
         {
-            UpdateScanButtonState();
+            _ScanCts = null;
+            cts.Dispose();
+            ShowEmptyState("Scanning unavailable", response.ErrorMessage ?? "This device could not start a Wi-Fi scan.");
         }
-        else
-        {
-            loading.IsRunning = false;
-            scanCollectionView.IsVisible = true;
-            await DisplayAlertAsync("Scan failed", response.ErrorMessage ?? "Unable to start scanning.", "OK");
-            UpdateScanButtonState();
-        }
+        UpdateStatus();
     }
 
     private async Task StopScanSessionAsync()
     {
+        var cts = _ScanCts;
+        _ScanCts = null;
+
         var response = await CrossWifiManager.StopScanningAsync();
         if (response.ErrorCode != WifiErrorCodes.Success)
-        {
             Debug.WriteLine("Stop scanning failed: " + response.ErrorMessage);
-        }
 
-        lock (_QueueLock)
-        {
-            _PendingNetworks.Clear();
-            _IsProcessingQueue = false;
-        }
-
-        UpdateScanButtonState();
-        loading.IsRunning = false;
-        scanCollectionView.IsVisible = true;
+        cts?.Dispose();
+        if (_Networks.Count == 0)
+            ShowEmptyState("Not scanning", "Tap Scan or pull down to look for networks.");
+        UpdateStatus();
     }
 
-    private void OnDeviceDiscovered(object? sender, NetworkData network)
+    // Setting IsRefreshing raises Refreshing, so the button and the pull gesture share one code path.
+    private void RefreshClicked(object sender, EventArgs e) => refreshView.IsRefreshing = true;
+
+    /// <summary>Pull to refresh runs a single ScanWifiNetworksAsync call and replaces the list with its result.</summary>
+    private async void OnRefreshing(object? sender, EventArgs e)
     {
-        lock (_QueueLock)
+        var locationError = await LocationAccess.CheckAsync();
+        if (locationError != null)
         {
-            _PendingNetworks.Enqueue(network);
-            if (_IsProcessingQueue)
-            {
-                return;
-            }
-
-            _IsProcessingQueue = true;
-        }
-
-        _ = ProcessDiscoveredQueueAsync();
-    }
-
-    private async Task ProcessDiscoveredQueueAsync()
-    {
-        while (true)
-        {
-            NetworkData? nextNetwork;
-
-            lock (_QueueLock)
-            {
-                if (_PendingNetworks.Count == 0)
-                {
-                    _IsProcessingQueue = false;
-                    return;
-                }
-
-                nextNetwork = _PendingNetworks.Dequeue();
-            }
-
-            await MainThread.InvokeOnMainThreadAsync(() =>
-            {
-                AddDiscoveredNetwork(nextNetwork);
-                loading.IsRunning = false;
-                scanCollectionView.IsVisible = true;
-            });
-
-            await Task.Delay(75);
-        }
-    }
-
-    private void AddDiscoveredNetwork(NetworkData item)
-    {
-        var key = BuildNetworkKey(item.Ssid, item.Bssid);
-        if (!_DiscoveredNetworkKeys.Add(key))
-        {
+            ShowEmptyState("Location needed", locationError);
+            refreshView.IsRefreshing = false;
             return;
         }
 
-        _NetworkDataModel.Add(new NetworkDataModel()
+        var response = await CrossWifiManager.ScanWifiNetworksAsync();
+        if (response.ErrorCode == WifiErrorCodes.Success && response.Data != null)
         {
-            StatusId = item.StatusId,
-            IpAddress = item.IpAddress,
-            Bssid = item.Bssid,
-            Ssid = item.Ssid,
-            GatewayAddress = item.GatewayAddress.ToString(),
-            NativeObject = item.NativeObject
+            ClearNetworks();
+            foreach (var network in response.Data)
+                AddNetwork(network);
+            ShowEmptyState("No networks found", "Move closer to an access point and pull down to scan again.");
+        }
+        else
+            ShowEmptyState("Scan failed", response.ErrorMessage ?? "This device could not scan for Wi-Fi networks.");
+
+        refreshView.IsRefreshing = false;
+        UpdateStatus();
+    }
+
+    private void OnDeviceDiscovered(object? sender, NetworkData network) =>
+        MainThread.BeginInvokeOnMainThread(() =>
+        {
+            AddNetwork(network);
+            UpdateStatus();
         });
 
-        loading.IsRunning = false;
-        Debug.WriteLine("Networks found: " + _NetworkDataModel.Count);
-    }
-
-    private static string BuildNetworkKey(string? ssid, object? bssid)
-    {
-        return string.Concat(ssid?.Trim() ?? string.Empty, "|", bssid?.ToString()?.Trim() ?? string.Empty);
-    }
-
-    private async Task<bool> EnsureLocationPermissionAsync()
-    {
-        var status = await Permissions.RequestAsync<Permissions.LocationWhenInUse>();
-        if (status == PermissionStatus.Granted || DeviceInfo.Current.Platform == DevicePlatform.WinUI)
+    private void OnDeviceLost(object? sender, NetworkData network) =>
+        MainThread.BeginInvokeOnMainThread(() =>
         {
-            return true;
-        }
+            if (_NetworksByKey.Remove(BuildNetworkKey(network), out var model))
+                _Networks.Remove(model);
+            UpdateStatus();
+        });
 
-        await DisplayAlertAsync("No location permisson", "Please provide location permission", "OK");
-        return false;
-    }
-
-    private void SubscribeDeviceDiscovered()
+    private void AddNetwork(NetworkData network)
     {
-        if (_IsDeviceDiscoveredSubscribed)
-        {
+        var key = BuildNetworkKey(network);
+        if (_NetworksByKey.ContainsKey(key))
             return;
+
+        var model = new NetworkDataModel(network);
+        _NetworksByKey[key] = model;
+
+        // Keep the strongest networks on top.
+        var index = 0;
+        while (index < _Networks.Count && (_Networks[index].Data.RssiDbm ?? int.MinValue) >= (network.RssiDbm ?? int.MinValue))
+            index++;
+        _Networks.Insert(index, model);
+    }
+
+    private void ClearNetworks()
+    {
+        _Networks.Clear();
+        _NetworksByKey.Clear();
+    }
+
+    // List selection (rather than a tap gesture) keeps rows reachable by keyboard, UI Automation and screen readers.
+    private async void NetworkSelected(object? sender, SelectionChangedEventArgs e)
+    {
+        if (e.CurrentSelection.FirstOrDefault() is not NetworkDataModel model)
+            return;
+        networkList.SelectedItem = null;
+
+        _IsShowingPopup = true;
+        var result = await this.ShowPopupAsync<bool>(new NetworkSheet(model), AppPopup.Options);
+        _IsShowingPopup = false;
+        if (result.Result)
+        {
+            await Shell.Current.GoToAsync("//connect", new ShellNavigationQueryParameters
+            {
+                { ConnectWifi.NetworkQueryKey, model }
+            });
         }
+    }
+
+    private void ShowEmptyState(string title, string message)
+    {
+        emptyTitle.Text = title;
+        emptyMessage.Text = message;
+    }
+
+    private void UpdateStatus()
+    {
+        var count = _Networks.Count == 1 ? "1 network" : $"{_Networks.Count} networks";
+        statusTxt.Text = CrossWifiManager.IsScanning ? $"Scanning  ·  {count}" : $"Not scanning  ·  {count}";
+        scanBtn.Text = CrossWifiManager.IsScanning ? "Stop" : "Scan";
+        scanningIndicator.IsRunning = scanningIndicator.IsVisible = CrossWifiManager.IsScanning;
+    }
+
+    private static string BuildNetworkKey(NetworkData network) =>
+        string.Concat(network.Ssid?.Trim() ?? string.Empty, "|", network.Bssid?.ToString()?.Trim() ?? string.Empty);
+
+    private void SubscribeScanEvents()
+    {
+        if (_IsScanEventsSubscribed)
+            return;
 
         CrossWifiManager.DeviceDiscovered += OnDeviceDiscovered;
-        _IsDeviceDiscoveredSubscribed = true;
+        CrossWifiManager.DeviceLost += OnDeviceLost;
+        _IsScanEventsSubscribed = true;
     }
 
-    private void UnsubscribeDeviceDiscovered()
+    private void UnsubscribeScanEvents()
     {
-        if (!_IsDeviceDiscoveredSubscribed)
-        {
+        if (!_IsScanEventsSubscribed)
             return;
-        }
 
         CrossWifiManager.DeviceDiscovered -= OnDeviceDiscovered;
-        _IsDeviceDiscoveredSubscribed = false;
-    }
-
-    private void UpdateScanButtonState()
-    {
-        scan.Text = CrossWifiManager.IsScanning ? "Stop" : "Scan";
+        CrossWifiManager.DeviceLost -= OnDeviceLost;
+        _IsScanEventsSubscribed = false;
     }
 }

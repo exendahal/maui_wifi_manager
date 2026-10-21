@@ -1,30 +1,32 @@
 namespace DemoApp;
 using MauiWifiManager;
 using MauiWifiManager.Abstractions;
-using System.Diagnostics;
-using System.Net;
 using System.Text;
 
 public partial class NetworkInfo : ContentPage
 {
-    private bool _isSubscribedToWifiEvents;
+    private const int MaxActivityEntries = 20;
+
+    private NetworkData? _Current;
+    private bool _IsSubscribedToWifiEvents;
 
     public NetworkInfo()
     {
         InitializeComponent();
+        versionTxt.Text = $"MauiWifiManager {typeof(CrossWifiManager).Assembly.GetName().Version}";
+        disconnectHintTxt.Text = DeviceInfo.Current.Platform == DevicePlatform.Android
+            ? "On Android 10 and later this opens the system Wi-Fi panel."
+            : DeviceInfo.Current.Platform == DevicePlatform.iOS || DeviceInfo.Current.Platform == DevicePlatform.MacCatalyst
+                ? "Removes the configuration this app added for the network."
+                : string.Empty;
+        disconnectHintTxt.IsVisible = disconnectHintTxt.Text.Length > 0;
     }
 
     protected override async void OnAppearing()
     {
         base.OnAppearing();
-        PermissionStatus status = await Permissions.RequestAsync<Permissions.LocationWhenInUse>();
-        if (status == PermissionStatus.Granted || DeviceInfo.Current.Platform == DevicePlatform.WinUI)
-        {
-            SubscribeToWifiChanges();
-            await LoadAndRenderCurrentNetworkInfo();
-        }
-        else
-            await DisplayAlertAsync("No location permission", "Please provide location permission", "OK");
+        SubscribeToWifiChanges();
+        await RefreshAsync();
     }
 
     protected override void OnDisappearing()
@@ -33,159 +35,213 @@ public partial class NetworkInfo : ContentPage
         UnsubscribeFromWifiChanges();
     }
 
-    private async Task LoadAndRenderCurrentNetworkInfo()
+    private async void OnRefreshing(object? sender, EventArgs e)
     {
-        var response = await CrossWifiManager.Current.GetNetworkInfoAsync();
-        if (response?.ErrorCode == WifiErrorCodes.Success && response.Data != null)
-            RenderNetworkData(response.Data);
+        await RefreshAsync();
+        refreshView.IsRefreshing = false;
     }
 
-    private void RenderNetworkData(NetworkData data)
+    private async Task RefreshAsync()
     {
-        IPAddress ipAddress = new(BitConverter.GetBytes(data.IpAddress));
-        IPAddress gateway = new(BitConverter.GetBytes(data.GatewayAddress));
-        IPAddress serverAddress = new(BitConverter.GetBytes(data.DhcpServerAddress));
-
-        wifiSsid.Text = data.Ssid;
-        wifiBssid.Text = data.Bssid?.ToString();
-        ipAddressTxt.Text = $"IP: {ipAddress}\nGateway: {gateway}\nDHCP: {serverAddress}";
-        ipv6AddressTxt.Text = data.IPv6Address ?? "—";
-        subnetMaskTxt.Text = data.SubnetMask ?? "—";
-        dnsServersTxt.Text = data.DnsAddresses?.Count > 0
-            ? string.Join(", ", data.DnsAddresses)
-            : "—";
-        securityTxt.Text = data.SecurityType?.ToString();
-        rssiTxt.Text = data.RssiDbm.HasValue ? $"{data.RssiDbm} dBm" : "—";
-        frequencyBandTxt.Text = data.FrequencyBand.ToString();
-        channelTxt.Text = data.ChannelNumber.HasValue ? data.ChannelNumber.ToString() : "—";
-        linkSpeedTxt.Text = data.LinkSpeedMbps.HasValue ? $"{data.LinkSpeedMbps} Mbps" : "—";
-
-        if (data.NativeObject != null)
+        var locationError = await LocationAccess.CheckAsync();
+        if (locationError != null)
         {
-            Debug.WriteLine(data.NativeObject);
-            nativeObject.Text = FormatNativeObject(data.NativeObject);
+            Render(null);
+            ssidTxt.Text = "Location needed";
+            summaryTxt.Text = locationError;
         }
+        else
+        {
+            var response = await CrossWifiManager.GetNetworkInfoAsync();
+            Render(response.ErrorCode == WifiErrorCodes.Success ? response.Data : null);
+        }
+        await RunConnectivityChecksAsync();
     }
 
-    private async void CheckInternetBtnClicked(object sender, EventArgs e)
+    private void Render(NetworkData? data)
     {
-        CheckInternetBtn.IsEnabled = false;
-        internetStatusTxt.Text = "Checking...";
-        var response = await CrossWifiManager.IsInternetAvailableAsync();
-        internetStatusTxt.Text = response.ErrorCode == WifiErrorCodes.Success
-            ? (response.Data ? "Internet available" : "No internet connection")
-            : $"Error: {response.ErrorMessage}";
-        CheckInternetBtn.IsEnabled = true;
+        var isConnected = !string.IsNullOrWhiteSpace(data?.Ssid);
+        _Current = isConnected ? data : null;
+
+        ssidTxt.Text = isConnected ? data!.Ssid : "Not connected";
+        summaryTxt.Text = isConnected
+            ? string.Join("  ·  ", new[]
+              {
+                  NetworkFormat.Band(data!.FrequencyBand),
+                  data.ChannelNumber is int ch ? $"Ch {ch}" : null,
+                  NetworkFormat.Security(data.SecurityType),
+                  data.LinkSpeedMbps is int mbps ? $"{mbps} Mbps" : null
+              }.Where(s => !string.IsNullOrEmpty(s)))
+            : "Join a network from the Networks or Connect tab.";
+
+        statusPillTxt.Text = isConnected ? "Connected" : "Offline";
+        statusPillTxt.TextColor = ThemeColor.Get(isConnected ? "Success" : "TextMuted");
+        statusPill.BackgroundColor = ThemeColor.Get("SurfaceMuted");
+
+        disconnectSection.IsVisible = isConnected;
+        disconnectBtn.Text = isConnected ? $"Disconnect from {data!.Ssid}" : "Disconnect";
+
+        RenderDetails(_Current);
+        nativeTxt.Text = _Current?.NativeObject != null ? FormatNativeObject(_Current.NativeObject) : "No platform object.";
     }
 
-    private async void CheckCaptiveBtnClicked(object sender, EventArgs e)
+    private void RenderDetails(NetworkData? data)
     {
-        CheckCaptiveBtn.IsEnabled = false;
-        captivePortalTxt.Text = "Checking...";
-        var response = await CrossWifiManager.IsCaptivePortalDetectedAsync();
-        captivePortalTxt.Text = response.ErrorCode == WifiErrorCodes.Success
-            ? (response.Data ? "Captive portal detected" : "No captive portal")
-            : $"Error: {response.ErrorMessage}";
-        CheckCaptiveBtn.IsEnabled = true;
+        string Or(string? value) => string.IsNullOrWhiteSpace(value) ? NetworkFormat.None : value;
+
+        var rows = new (string Label, string Value, bool Mono)[]
+        {
+            ("BSSID", Or(data?.Bssid?.ToString()), true),
+            ("Signal", data != null ? NetworkFormat.Signal(data) : NetworkFormat.None, false),
+            ("Link speed", data?.LinkSpeedMbps is int mbps ? $"{mbps} Mbps" : NetworkFormat.None, false),
+            ("Band", data != null ? Or(NetworkFormat.Band(data.FrequencyBand)) : NetworkFormat.None, false),
+            ("Wi-Fi standard", data != null ? Or(NetworkFormat.Standard(data.WifiStandard)) : NetworkFormat.None, false),
+            ("Channel", Or(data?.ChannelNumber?.ToString()), false),
+            ("Security", Or(NetworkFormat.Security(data?.SecurityType) ?? data?.SecurityType?.ToString()), false),
+            ("IPv4 address", data != null ? NetworkFormat.Ip(data.IpAddress) : NetworkFormat.None, true),
+            ("Subnet mask", Or(data?.SubnetMask), true),
+            ("Gateway", data != null ? NetworkFormat.Ip(data.GatewayAddress) : NetworkFormat.None, true),
+            ("DHCP server", data != null ? NetworkFormat.Ip(data.DhcpServerAddress) : NetworkFormat.None, true),
+            ("IPv6 address", Or(data?.IPv6Address), true),
+            ("DNS servers", data?.DnsAddresses is { Count: > 0 } dns ? string.Join("\n", dns) : NetworkFormat.None, true)
+        };
+
+        DetailList.Fill(detailsList, rows);
     }
 
-    private void SubscribeToWifiChanges()
+    private async void CheckClicked(object sender, EventArgs e) => await RunConnectivityChecksAsync();
+
+    private async Task RunConnectivityChecksAsync()
     {
-        if (_isSubscribedToWifiEvents)
-            return;
-        CrossWifiManager.WifiNetworkChanged += OnWifiNetworkChanged;
-        _isSubscribedToWifiEvents = true;
-        wifiChangeStatus.Text = "Subscribed: listening for Wi-Fi changes";
+        checkBtn.IsEnabled = false;
+        SetStatus(internetTxt, "Checking…", "TextMuted");
+        SetStatus(captiveTxt, "Checking…", "TextMuted");
+
+        var internet = await CrossWifiManager.IsInternetAvailableAsync();
+        if (internet.ErrorCode == WifiErrorCodes.Success)
+            SetStatus(internetTxt, internet.Data ? "Available" : "Not available", internet.Data ? "Success" : "Danger");
+        else
+            SetStatus(internetTxt, internet.ErrorMessage ?? "Unknown", "Warning");
+
+        var captive = await CrossWifiManager.IsCaptivePortalDetectedAsync();
+        if (captive.ErrorCode == WifiErrorCodes.Success)
+            SetStatus(captiveTxt, captive.Data ? "Sign-in required" : "None detected", captive.Data ? "Warning" : "Text");
+        else
+            SetStatus(captiveTxt, captive.ErrorMessage ?? "Unknown", "Warning");
+
+        checkBtn.IsEnabled = true;
     }
 
-    private void UnsubscribeFromWifiChanges()
+    private static void SetStatus(Label label, string text, string color)
     {
-        if (!_isSubscribedToWifiEvents)
-            return;
-        CrossWifiManager.WifiNetworkChanged -= OnWifiNetworkChanged;
-        _isSubscribedToWifiEvents = false;
-        wifiChangeStatus.Text = "Not subscribed";
+        label.Text = text;
+        label.TextColor = ThemeColor.Get(color);
     }
 
     private void OnWifiNetworkChanged(object? sender, WifiNetworkChangedEventArgs e)
     {
-        MainThread.BeginInvokeOnMainThread(() =>
+        MainThread.BeginInvokeOnMainThread(async () =>
         {
-            var oldSnapshot = FormatNetworkSnapshot("Old", e.OldNetwork);
-            var newSnapshot = FormatNetworkSnapshot("New", e.NewNetwork);
-            wifiChangeLog.Text = $"{oldSnapshot}\n\n{newSnapshot}";
-
-            if (e.NewNetwork != null)
-            {
-                RenderNetworkData(e.NewNetwork);
-            }
-            else
-            {
-                wifiSsid.Text = "";
-                wifiBssid.Text = "";
-                ipAddressTxt.Text = string.Empty;
-                ipv6AddressTxt.Text = "—";
-                subnetMaskTxt.Text = "—";
-                dnsServersTxt.Text = "—";
-                securityTxt.Text = string.Empty;
-                rssiTxt.Text = "—";
-                frequencyBandTxt.Text = "—";
-                channelTxt.Text = "—";
-                linkSpeedTxt.Text = "—";
-                nativeObject.Text = string.Empty;
-            }
+            AddActivity(DescribeChange(e.OldNetwork, e.NewNetwork));
+            Render(e.NewNetwork);
+            await RunConnectivityChecksAsync();
         });
     }
 
-    private static string FormatNetworkSnapshot(string title, MauiWifiManager.Abstractions.NetworkData? network)
+    private static string DescribeChange(NetworkData? oldNetwork, NetworkData? newNetwork)
     {
-        if (network == null)
-            return $"{title}: (none)";
-
-        var ipAddress = new IPAddress(BitConverter.GetBytes(network.IpAddress));
-        var gateway = new IPAddress(BitConverter.GetBytes(network.GatewayAddress));
-        var serverAddress = new IPAddress(BitConverter.GetBytes(network.DhcpServerAddress));
-
-        return $"{title}:\n"
-            + $"StatusId: {network.StatusId}\n"
-            + $"SSID: {network.Ssid}\n"
-            + $"BSSID: {network.Bssid}\n"
-            + $"SignalStrength: {network.SignalStrength}\n"
-            + $"SecurityType: {network.SecurityType}\n"
-            + $"IP: {ipAddress}\n"
-            + $"Gateway: {gateway}\n"
-            + $"DHCP: {serverAddress}\n"
-            + $"IPv6: {network.IPv6Address ?? "—"}\n"
-            + $"Subnet: {network.SubnetMask ?? "—"}\n"
-            + $"DNS: {(network.DnsAddresses?.Count > 0 ? string.Join(", ", network.DnsAddresses) : "—")}\n"
-            + $"RSSI: {(network.RssiDbm.HasValue ? $"{network.RssiDbm} dBm" : "—")}\n"
-            + $"Band: {network.FrequencyBand}\n"
-            + $"Channel: {(network.ChannelNumber.HasValue ? network.ChannelNumber.ToString() : "—")}\n"
-            + $"LinkSpeed: {(network.LinkSpeedMbps.HasValue ? $"{network.LinkSpeedMbps} Mbps" : "—")}";
+        var oldSsid = oldNetwork?.Ssid;
+        var newSsid = newNetwork?.Ssid;
+        if (string.IsNullOrEmpty(oldSsid) && !string.IsNullOrEmpty(newSsid))
+            return $"Connected to {newSsid}";
+        if (!string.IsNullOrEmpty(oldSsid) && string.IsNullOrEmpty(newSsid))
+            return $"Disconnected from {oldSsid}";
+        if (oldSsid != newSsid)
+            return $"Switched from {oldSsid} to {newSsid}";
+        if (oldNetwork?.Bssid?.ToString() != newNetwork?.Bssid?.ToString())
+            return $"Roamed to another access point on {newSsid}";
+        return $"Connection details updated on {newSsid}";
     }
 
-    private string FormatNativeObject(object nativeObject)
+    private void AddActivity(string text)
     {
-        if (nativeObject == null) return "No data available";
+        activityEmptyTxt.IsVisible = false;
 
+        var row = new Grid { ColumnDefinitions = LabelValueColumns(), Style = DetailList.AppStyle("FieldRow") };
+        row.Add(new Label
+        {
+            Text = DateTime.Now.ToString("HH:mm:ss"),
+            FontFamily = (string)Application.Current!.Resources["MonoFont"],
+            Style = DetailList.AppStyle("Muted"),
+            VerticalOptions = LayoutOptions.Center
+        });
+        row.Add(new Label { Text = text, VerticalOptions = LayoutOptions.Center }, 1);
+
+        if (activityList.Count > 0)
+            activityList.Insert(0, new BoxView { Style = DetailList.AppStyle("Divider") });
+        activityList.Insert(0, row);
+
+        // Each entry is a row plus a divider.
+        while (activityList.Count > MaxActivityEntries * 2 - 1)
+            activityList.RemoveAt(activityList.Count - 1);
+    }
+
+    private async void DisconnectClicked(object sender, EventArgs e)
+    {
+        if (_Current?.Ssid is not string ssid)
+            return;
+
+        if (await DisplayAlertAsync($"Disconnect from {ssid}?", "Your device may reconnect to another saved network.", "Disconnect", "Cancel"))
+            CrossWifiManager.DisconnectWifi(ssid);
+    }
+
+    private async void WifiSettingsTapped(object? sender, TappedEventArgs e) => await CrossWifiManager.OpenWifiSetting();
+
+    private async void NetworkSettingsTapped(object? sender, TappedEventArgs e) => await CrossWifiManager.OpenWirelessSetting();
+
+    private void NativeToggleClicked(object sender, EventArgs e)
+    {
+        nativeCard.IsVisible = !nativeCard.IsVisible;
+        nativeToggleBtn.Text = nativeCard.IsVisible ? "Hide platform object" : "Show platform object";
+    }
+
+    private void SubscribeToWifiChanges()
+    {
+        if (_IsSubscribedToWifiEvents)
+            return;
+        CrossWifiManager.WifiNetworkChanged += OnWifiNetworkChanged;
+        _IsSubscribedToWifiEvents = true;
+    }
+
+    private void UnsubscribeFromWifiChanges()
+    {
+        if (!_IsSubscribedToWifiEvents)
+            return;
+        CrossWifiManager.WifiNetworkChanged -= OnWifiNetworkChanged;
+        _IsSubscribedToWifiEvents = false;
+    }
+
+    private static ColumnDefinitionCollection LabelValueColumns() =>
+        new(new ColumnDefinition(GridLength.Auto), new ColumnDefinition(GridLength.Star));
+
+    private static string FormatNativeObject(object nativeObject)
+    {
         var sb = new StringBuilder();
-        Type type = nativeObject.GetType();
-
-        sb.AppendLine($"Object Type: {type.Name}");
+        var type = nativeObject.GetType();
+        sb.AppendLine(type.Name);
 
         foreach (var prop in type.GetProperties())
         {
             try
             {
-                var value = prop.GetValue(nativeObject, null);
-                sb.AppendLine($"{prop.Name}: {value}");
+                sb.AppendLine($"{prop.Name}: {prop.GetValue(nativeObject, null)}");
             }
             catch (Exception ex)
             {
-                sb.AppendLine($"{prop.Name}: Error retrieving value ({ex.Message})");
+                sb.AppendLine($"{prop.Name}: <{ex.GetType().Name}>");
             }
         }
 
-        return sb.ToString();
+        return sb.ToString().TrimEnd();
     }
 }

@@ -3,89 +3,145 @@
     x:Class="DemoApp.ScanListPage"
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
-    x:Name="scanPage">
-    <Shell.TitleView>
-        <Grid>
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="Auto" />
-            </Grid.ColumnDefinitions>
-            <Label
-                Grid.Column="0"
-                FontSize="Title"
-                HorizontalTextAlignment="Center"
-                Text="Wi-Fi List"
-                TextColor="{StaticResource SecondaryDarkText}"
-                TextTransform="Uppercase"
-                VerticalTextAlignment="Center" />
-            <Button
-                x:Name="scan"
+    xmlns:local="clr-namespace:DemoApp"
+    Title="Networks">
+    <Grid Padding="{OnPlatform Default='20,16,20,0', WinUI='40,28,40,0'}" RowDefinitions="Auto,Auto,*">
+        <Grid ColumnDefinitions="*,Auto">
+            <VerticalStackLayout Spacing="2">
+                <Label Style="{StaticResource PageTitle}" Text="Networks" />
+                <HorizontalStackLayout Spacing="8">
+                    <ActivityIndicator
+                        x:Name="scanningIndicator"
+                        HeightRequest="14"
+                        VerticalOptions="Center"
+                        WidthRequest="14" />
+                    <Label
+                        x:Name="statusTxt"
+                        Style="{StaticResource Muted}"
+                        VerticalOptions="Center" />
+                </HorizontalStackLayout>
+            </VerticalStackLayout>
+            <HorizontalStackLayout
                 Grid.Column="1"
-                BackgroundColor="Transparent"
-                Clicked="ScanClicked"
-                FontSize="Medium"
-                HorizontalOptions="End"
-                Text="Scan"
-                TextColor="{StaticResource SecondaryDarkText}"
-                TextTransform="Uppercase" />
+                Spacing="8"
+                VerticalOptions="{OnPlatform Default=Start, WinUI=Center}">
+                <!-- Pull to refresh is a touch gesture, so Windows gets an explicit button for the one-off scan. -->
+                <Button
+                    Clicked="RefreshClicked"
+                    IsVisible="{OnPlatform Default=False, WinUI=True}"
+                    Style="{StaticResource SecondaryButton}"
+                    Text="Refresh" />
+                <Button
+                    x:Name="scanBtn"
+                    Clicked="ScanClicked"
+                    Style="{OnPlatform Default={StaticResource TextButton}, WinUI={StaticResource BaseButton}}" />
+            </HorizontalStackLayout>
         </Grid>
-    </Shell.TitleView>
-    <Grid>
-        <ActivityIndicator
-            x:Name="loading"
-            HeightRequest="46"
-            IsRunning="True"
-            WidthRequest="46"
-            Color="{StaticResource SecondaryDarkText}" />
-        <ScrollView Padding="20,0">
-            <CollectionView x:Name="scanCollectionView" SelectionMode="None">
+
+        <Border
+            x:Name="throttleNotice"
+            Grid.Row="1"
+            Margin="0,16,0,0"
+            Style="{StaticResource Notice}">
+            <Label Style="{StaticResource Muted}" Text="Android allows 4 scans every 2 minutes, so this list refreshes about every 30 seconds. Pull down to scan now." />
+        </Border>
+
+        <RefreshView
+            x:Name="refreshView"
+            Grid.Row="2"
+            Margin="0,12,0,0"
+            Refreshing="OnRefreshing">
+            <CollectionView
+                x:Name="networkList"
+                SelectionChanged="NetworkSelected"
+                SelectionMode="Single">
+                <CollectionView.EmptyView>
+                    <VerticalStackLayout
+                        Padding="24,64"
+                        HorizontalOptions="Center"
+                        Spacing="6">
+                        <Label
+                            x:Name="emptyTitle"
+                            HorizontalTextAlignment="Center"
+                            Style="{StaticResource RowTitle}"
+                            Text="Looking for networks" />
+                        <Label
+                            x:Name="emptyMessage"
+                            HorizontalTextAlignment="Center"
+                            Style="{StaticResource Muted}"
+                            Text="Networks in range appear here as they are found." />
+                    </VerticalStackLayout>
+                </CollectionView.EmptyView>
                 <CollectionView.ItemsLayout>
-                    <LinearItemsLayout Orientation="Vertical" />
+                    <LinearItemsLayout ItemSpacing="{OnPlatform Default=8, WinUI=4}" Orientation="Vertical" />
                 </CollectionView.ItemsLayout>
+                <CollectionView.Footer>
+                    <BoxView HeightRequest="16" Color="Transparent" />
+                </CollectionView.Footer>
                 <CollectionView.ItemTemplate>
-                    <DataTemplate>
-                        <StackLayout Padding="12,6">
-                            <Grid ColumnSpacing="12">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <StackLayout Grid.Column="0" VerticalOptions="Center">
-                                    <Label FontSize="18" Text="{Binding SsidName}" />
-                                    <Label FontSize="14" Text="{Binding Bssid}" />
-                                </StackLayout>
-                                <Button
+                    <DataTemplate x:DataType="local:NetworkDataModel">
+                        <Border Padding="16,12" Style="{StaticResource Card}">
+                            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="14">
+                                <HorizontalStackLayout
+                                    HeightRequest="18"
+                                    Spacing="2"
+                                    VerticalOptions="Center">
+                                    <BoxView
+                                        CornerRadius="1"
+                                        HeightRequest="6"
+                                        Opacity="{Binding Bar1}"
+                                        VerticalOptions="End"
+                                        WidthRequest="4"
+                                        Color="{AppThemeBinding Light={StaticResource AccentLight}, Dark={StaticResource AccentDark}}" />
+                                    <BoxView
+                                        CornerRadius="1"
+                                        HeightRequest="10"
+                                        Opacity="{Binding Bar2}"
+                                        VerticalOptions="End"
+                                        WidthRequest="4"
+                                        Color="{AppThemeBinding Light={StaticResource AccentLight}, Dark={StaticResource AccentDark}}" />
+                                    <BoxView
+                                        CornerRadius="1"
+                                        HeightRequest="14"
+                                        Opacity="{Binding Bar3}"
+                                        VerticalOptions="End"
+                                        WidthRequest="4"
+                                        Color="{AppThemeBinding Light={StaticResource AccentLight}, Dark={StaticResource AccentDark}}" />
+                                    <BoxView
+                                        CornerRadius="1"
+                                        HeightRequest="18"
+                                        Opacity="{Binding Bar4}"
+                                        VerticalOptions="End"
+                                        WidthRequest="4"
+                                        Color="{AppThemeBinding Light={StaticResource AccentLight}, Dark={StaticResource AccentDark}}" />
+                                </HorizontalStackLayout>
+                                <VerticalStackLayout
                                     Grid.Column="1"
-                                    Padding="18,0"
-                                    Command="{Binding Source={x:Reference Name=scanPage}, Path=BindingContext.InfoCommand}"
-                                    CommandParameter="{Binding .}"
-                                    CornerRadius="2"
-                                    HeightRequest="44"
-                                    Text="Info"
-                                    TextTransform="Uppercase"
-                                    VerticalOptions="Center" />
-                                <Button
+                                    Spacing="2"
+                                    VerticalOptions="Center">
+                                    <Label Style="{StaticResource RowTitle}" Text="{Binding DisplayName}">
+                                        <Label.Triggers>
+                                            <DataTrigger
+                                                Binding="{Binding IsHidden}"
+                                                TargetType="Label"
+                                                Value="True">
+                                                <Setter Property="FontAttributes" Value="Italic" />
+                                                <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource TextMutedLight}, Dark={StaticResource TextMutedDark}}" />
+                                            </DataTrigger>
+                                        </Label.Triggers>
+                                    </Label>
+                                    <Label Style="{StaticResource Muted}" Text="{Binding Summary}" />
+                                </VerticalStackLayout>
+                                <Label
                                     Grid.Column="2"
-                                    Padding="8,0"
-                                    Command="{Binding Source={x:Reference Name=scanPage}, Path=BindingContext.ConnectCommand}"
-                                    CommandParameter="{Binding .}"
-                                    CornerRadius="2"
-                                    HeightRequest="44"
-                                    Text="Connect"
-                                    TextTransform="Uppercase"
+                                    Style="{StaticResource Muted}"
+                                    Text="{Binding SignalText}"
                                     VerticalOptions="Center" />
                             </Grid>
-                            <BoxView
-                                Margin="0,8"
-                                BackgroundColor="{AppThemeBinding Light=Black,
-                                                                  Dark=White}"
-                                HeightRequest="0.1" />
-                        </StackLayout>
+                        </Border>
                     </DataTemplate>
                 </CollectionView.ItemTemplate>
             </CollectionView>
-        </ScrollView>
+        </RefreshView>
     </Grid>
-
 </ContentPage>

@@ -1,6 +1,8 @@
+using CoreFoundation;
 using CoreLocation;
 using Foundation;
 using MauiWifiManager.Abstractions;
+using Network;
 using NetworkExtension;
 using System.Diagnostics;
 using System.Net;
@@ -16,9 +18,11 @@ namespace MauiWifiManager
         public NEHotspotHelper _HotspotHelper;
         private EventHandler<WifiNetworkChangedEventArgs>? _WifiNetworkChanged;
         public event EventHandler<NetworkData>? DeviceDiscovered;
+        public event EventHandler<NetworkData>? DeviceLost;
         private readonly object _MonitorLock = new();
         private NetworkData? _LastKnownNetwork;
         private bool _IsMonitoring;
+        private string? _LocalOnlySsid;
 
         public bool IsScanning => false;
 
@@ -53,7 +57,34 @@ namespace MauiWifiManager
             return ConnectWifiAsync(ssid, password, new WifiConnectionOptions { Bssid = bssid }, cancellationToken);
         }
 
-        public async Task<WifiManagerResponse<NetworkData>> ConnectWifiAsync(string ssid, string password, WifiConnectionOptions options, CancellationToken cancellationToken = default)
+        public Task<WifiManagerResponse<NetworkData>> ConnectWifiAsync(string ssid, string password, WifiConnectionOptions options, CancellationToken cancellationToken = default)
+        {
+            return ApplyConfigurationAsync(ssid, () => CreateHotspotConfiguration(ssid, password, options, joinOnce: false), cancellationToken);
+        }
+
+        private static NEHotspotConfiguration CreateHotspotConfiguration(string ssid, string password, WifiConnectionOptions options, bool joinOnce)
+        {
+            NEHotspotConfiguration config;
+            if (options.SecurityType == WifiSecurityType.Open || string.IsNullOrEmpty(password))
+            {
+                config = new NEHotspotConfiguration(ssid);
+            }
+            else
+            {
+                bool isWep = options.SecurityType == WifiSecurityType.Wep;
+                config = new NEHotspotConfiguration(ssid, password, isWep: isWep);
+            }
+
+            config.JoinOnce = joinOnce;
+
+            // Hidden network support (iOS 13+)
+            if (options.IsHidden && IsAppleVersionAtLeast(13))
+                config.Hidden = true;
+
+            return config;
+        }
+
+        private async Task<WifiManagerResponse<NetworkData>> ApplyConfigurationAsync(string ssid, Func<NEHotspotConfiguration> createConfig, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -61,22 +92,7 @@ namespace MauiWifiManager
             {
                 NEHotspotConfigurationManager.SharedManager.RemoveConfiguration(ssid);
 
-                NEHotspotConfiguration config;
-                if (options.SecurityType == WifiSecurityType.Open || string.IsNullOrEmpty(password))
-                {
-                    config = new NEHotspotConfiguration(ssid);
-                }
-                else
-                {
-                    bool isWep = options.SecurityType == WifiSecurityType.Wep;
-                    config = new NEHotspotConfiguration(ssid, password, isWep: isWep);
-                }
-
-                config.JoinOnce = false;
-
-                // Hidden network support (iOS 13+)
-                if (options.IsHidden && IsAppleVersionAtLeast(13))
-                    config.Hidden = true;
+                var config = createConfig();
 
                 var tcs = new TaskCompletionSource<NSError>();
                 NEHotspotConfigurationManager.SharedManager.ApplyConfiguration(config, err =>
@@ -213,6 +229,7 @@ namespace MauiWifiManager
         public void Dispose()
         {
             StopMonitoring();
+            _ = ReleaseLocalOnlyAsync();
         }
 
         [Obsolete("Use ScanWifiNetworksAsync(CancellationToken cancellationToken = default) instead.")]
@@ -319,6 +336,127 @@ namespace MauiWifiManager
             {
                 return WifiManagerResponse<bool>.ErrorResponse(WifiErrorCodes.UnknownError, ex.Message);
             }
+        }
+
+        public async Task<WifiManagerResponse<bool>> RequestPermissionsAsync(CancellationToken cancellationToken = default)
+        {
+            if (cancellationToken.IsCancellationRequested)
+                return WifiManagerResponse<bool>.ErrorResponse(WifiErrorCodes.OperationCanceled, "Operation was canceled.");
+
+            var status = await MainThread.InvokeOnMainThreadAsync(Permissions.RequestAsync<Permissions.LocationWhenInUse>);
+            return status == PermissionStatus.Granted
+                ? WifiManagerResponse<bool>.SuccessResponse(true, "Location permission is granted.")
+                : WifiManagerResponse<bool>.ErrorResponse(WifiErrorCodes.PermissionDenied, "Location permission was denied.");
+        }
+
+        public async Task<WifiManagerResponse<bool>> IsMeteredConnectionAsync(CancellationToken cancellationToken = default)
+        {
+            if (cancellationToken.IsCancellationRequested)
+                return WifiManagerResponse<bool>.ErrorResponse(WifiErrorCodes.OperationCanceled, "Operation was canceled.");
+
+            var tcs = new TaskCompletionSource<Network.NWPath>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var monitor = new NWPathMonitor();
+            monitor.SnapshotHandler = path => tcs.TrySetResult(path);
+            monitor.SetQueue(DispatchQueue.DefaultGlobalQueue);
+            monitor.Start();
+            try
+            {
+                var path = await tcs.Task.WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
+                bool metered = path.IsExpensive || path.IsConstrained;
+                return WifiManagerResponse<bool>.SuccessResponse(metered, metered ? "Connection is metered." : "Connection is not metered.");
+            }
+            catch (TimeoutException)
+            {
+                return WifiManagerResponse<bool>.ErrorResponse(WifiErrorCodes.OperationTimeout, "Timed out reading the network path.");
+            }
+            catch (OperationCanceledException)
+            {
+                return WifiManagerResponse<bool>.ErrorResponse(WifiErrorCodes.OperationCanceled, "Operation was canceled.");
+            }
+            finally
+            {
+                monitor.Cancel();
+            }
+        }
+
+        public async Task<WifiManagerResponse<List<string>>> GetSavedNetworksAsync(CancellationToken cancellationToken = default)
+        {
+            if (cancellationToken.IsCancellationRequested)
+                return WifiManagerResponse<List<string>>.ErrorResponse(WifiErrorCodes.OperationCanceled, "Operation was canceled.");
+
+            try
+            {
+                // iOS only exposes networks configured by this app.
+                var ssids = await NEHotspotConfigurationManager.SharedManager.GetConfiguredSsidsAsync();
+                var result = ssids?.ToList() ?? new List<string>();
+                return WifiManagerResponse<List<string>>.SuccessResponse(result, $"Found {result.Count} saved network(s).");
+            }
+            catch (Exception ex)
+            {
+                return WifiManagerResponse<List<string>>.ErrorResponse(WifiErrorCodes.UnknownError, ex.Message);
+            }
+        }
+
+        public async Task<WifiManagerResponse<bool>> ForgetNetworkAsync(string ssid, CancellationToken cancellationToken = default)
+        {
+            var saved = await GetSavedNetworksAsync(cancellationToken);
+            if (saved.ErrorCode != WifiErrorCodes.Success)
+                return WifiManagerResponse<bool>.ErrorResponse(saved.ErrorCode ?? WifiErrorCodes.UnknownError, saved.ErrorMessage ?? string.Empty);
+            if (saved.Data?.Contains(ssid) != true)
+                return WifiManagerResponse<bool>.ErrorResponse(WifiErrorCodes.NetworkUnavailable, "No network with this SSID was configured by this app.");
+
+            NEHotspotConfigurationManager.SharedManager.RemoveConfiguration(ssid);
+            return WifiManagerResponse<bool>.SuccessResponse(true, "Network removed.");
+        }
+
+        public Task<WifiManagerResponse<NetworkData>> ConnectEnterpriseWifiAsync(string ssid, WifiEnterpriseOptions options, CancellationToken cancellationToken = default)
+        {
+            if (options.EapMethod == WifiEapMethod.Pwd)
+                return Task.FromResult(WifiManagerResponse<NetworkData>.ErrorResponse(WifiErrorCodes.UnsupportedHardware, "EAP-PWD is not supported on iOS/Mac Catalyst."));
+
+            return ApplyConfigurationAsync(ssid, () =>
+            {
+                var eap = new NEHotspotEapSettings
+                {
+                    Username = options.Identity,
+                    Password = options.Password,
+                    SupportedEapTypes = new[]
+                    {
+                        options.EapMethod == WifiEapMethod.Ttls ? NEHotspotConfigurationEapType.Ttls : NEHotspotConfigurationEapType.Peap
+                    },
+                    TtlsInnerAuthenticationType = options.Phase2Method == WifiPhase2Method.Pap
+                        ? NEHotspotConfigurationTtlsInnerAuthenticationType.Pap
+                        : NEHotspotConfigurationTtlsInnerAuthenticationType.MSChapv2
+                };
+                if (!string.IsNullOrEmpty(options.AnonymousIdentity))
+                    eap.OuterIdentity = options.AnonymousIdentity;
+                if (!string.IsNullOrEmpty(options.ServerDomain))
+                    eap.TrustedServerNames = new[] { options.ServerDomain };
+
+                var config = new NEHotspotConfiguration(ssid, eap) { JoinOnce = false };
+                if (options.IsHidden)
+                    config.Hidden = true;
+                return config;
+            }, cancellationToken);
+        }
+
+        public async Task<WifiManagerResponse<NetworkData>> ConnectLocalOnlyAsync(string ssid, string password, WifiConnectionOptions options, CancellationToken cancellationToken = default)
+        {
+            // JoinOnce keeps the network out of the saved list and lets iOS leave it when the app goes to the background.
+            // iOS keeps traffic for the access point's own subnet on Wi-Fi even when it has no internet.
+            var response = await ApplyConfigurationAsync(ssid, () => CreateHotspotConfiguration(ssid, password, options, joinOnce: true), cancellationToken);
+            _LocalOnlySsid = response.ErrorCode == WifiErrorCodes.Success ? ssid : null;
+            return response;
+        }
+
+        public Task<WifiManagerResponse<bool>> ReleaseLocalOnlyAsync(CancellationToken cancellationToken = default)
+        {
+            var ssid = Interlocked.Exchange(ref _LocalOnlySsid, null);
+            if (ssid == null)
+                return Task.FromResult(WifiManagerResponse<bool>.SuccessResponse(false, "No local-only network to release."));
+
+            NEHotspotConfigurationManager.SharedManager.RemoveConfiguration(ssid);
+            return Task.FromResult(WifiManagerResponse<bool>.SuccessResponse(true, "Local-only network released."));
         }
 
         private static async Task<bool> OpenSettings()
@@ -489,6 +627,8 @@ namespace MauiWifiManager
                 FrequencyBand = source.FrequencyBand,
                 ChannelNumber = source.ChannelNumber,
                 LinkSpeedMbps = source.LinkSpeedMbps,
+                WifiStandard = source.WifiStandard,
+                ChannelWidthMhz = source.ChannelWidthMhz,
             };
         }
     }

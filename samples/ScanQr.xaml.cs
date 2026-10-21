@@ -1,36 +1,46 @@
 using CommunityToolkit.Maui.Views;
+using MauiWifiManager.Abstractions;
 using ZXing.Net.Maui;
 
 namespace DemoApp;
 
 public partial class ScanQr : Popup
 {
-    public string? ScanResult { get; private set; }
+    public WifiQrCode? Result { get; private set; }
 
-	public ScanQr()
-	{
-		InitializeComponent();
+    public ScanQr()
+    {
+        InitializeComponent();
         barcodeReader.Options = new BarcodeReaderOptions
         {
-            Formats = BarcodeFormats.TwoDimensional,
+            Formats = BarcodeFormat.QrCode,
             AutoRotate = true,
-            Multiple = true
+            Multiple = false
         };
     }
 
-    private async void BarcodesDetected(object sender, BarcodeDetectionEventArgs e)
+    private void BarcodesDetected(object? sender, BarcodeDetectionEventArgs e)
     {
-        var first = e.Results.FirstOrDefault();
-        if (first != null)
+        var code = e.Results.Select(r => WifiQrCode.Parse(r.Value)).FirstOrDefault(c => c != null);
+        MainThread.BeginInvokeOnMainThread(async () =>
         {
-            if (first.Value.StartsWith("WIFI:"))
+            if (code == null)
             {
-                var ssid = first.Value.Split(new[] { "S:" }, StringSplitOptions.None)[1].Split(';')[0];
-                var password = first.Value.Split(new[] { "P:" }, StringSplitOptions.None)[1].Split(';')[0];
-                ScanResult = ssid + ":" + password;
-                barcodeReader.IsDetecting = false;
-                await CloseAsync();
+                hintTxt.Text = "That QR code is not a Wi-Fi network.";
+                return;
             }
-        }
+            if (Result != null)
+                return;
+
+            Result = code;
+            barcodeReader.IsDetecting = false;
+            await CloseAsync();
+        });
+    }
+
+    private async void CancelClicked(object sender, EventArgs e)
+    {
+        barcodeReader.IsDetecting = false;
+        await CloseAsync();
     }
 }

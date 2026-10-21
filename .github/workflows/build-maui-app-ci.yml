@@ -35,3 +35,6 @@ jobs:
 
     - name: Build Demo App ${{ env.CSPROJ_TO_BUILD }}
       run: dotnet build samples\${{ env.CSPROJ_TO_BUILD }} -c ${{ env.BUILD_CONFIGURATION }} -f:net10.0-android
+
+    - name: Run unit tests
+      run: dotnet test tests\MauiWifiManager.Tests\MauiWifiManager.Tests.csproj -c ${{ env.BUILD_CONFIGURATION }}

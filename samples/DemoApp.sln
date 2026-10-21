@@ -7,22 +7,56 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DemoApp", "DemoApp.csproj",
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MauiWifiManager", "..\src\MAUIWifiManager\MauiWifiManager.csproj", "{FF62D77B-5094-472E-878B-385723BFB4B4}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MauiWifiManager.Tests", "..\tests\MauiWifiManager.Tests\MauiWifiManager.Tests.csproj", "{0A831D29-0C06-412B-9436-DFE71A1275CC}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
+		Debug|x64 = Debug|x64
+		Debug|x86 = Debug|x86
 		Release|Any CPU = Release|Any CPU
+		Release|x64 = Release|x64
+		Release|x86 = Release|x86
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
 		{8F2F33EC-3233-42FF-852C-14D7285F29FC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{8F2F33EC-3233-42FF-852C-14D7285F29FC}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{8F2F33EC-3233-42FF-852C-14D7285F29FC}.Debug|Any CPU.Deploy.0 = Debug|Any CPU
+		{8F2F33EC-3233-42FF-852C-14D7285F29FC}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{8F2F33EC-3233-42FF-852C-14D7285F29FC}.Debug|x64.Build.0 = Debug|Any CPU
+		{8F2F33EC-3233-42FF-852C-14D7285F29FC}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{8F2F33EC-3233-42FF-852C-14D7285F29FC}.Debug|x86.Build.0 = Debug|Any CPU
 		{8F2F33EC-3233-42FF-852C-14D7285F29FC}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{8F2F33EC-3233-42FF-852C-14D7285F29FC}.Release|Any CPU.Build.0 = Release|Any CPU
 		{8F2F33EC-3233-42FF-852C-14D7285F29FC}.Release|Any CPU.Deploy.0 = Release|Any CPU
+		{8F2F33EC-3233-42FF-852C-14D7285F29FC}.Release|x64.ActiveCfg = Release|Any CPU
+		{8F2F33EC-3233-42FF-852C-14D7285F29FC}.Release|x64.Build.0 = Release|Any CPU
+		{8F2F33EC-3233-42FF-852C-14D7285F29FC}.Release|x86.ActiveCfg = Release|Any CPU
+		{8F2F33EC-3233-42FF-852C-14D7285F29FC}.Release|x86.Build.0 = Release|Any CPU
 		{FF62D77B-5094-472E-878B-385723BFB4B4}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{FF62D77B-5094-472E-878B-385723BFB4B4}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{FF62D77B-5094-472E-878B-385723BFB4B4}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{FF62D77B-5094-472E-878B-385723BFB4B4}.Debug|x64.Build.0 = Debug|Any CPU
+		{FF62D77B-5094-472E-878B-385723BFB4B4}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{FF62D77B-5094-472E-878B-385723BFB4B4}.Debug|x86.Build.0 = Debug|Any CPU
 		{FF62D77B-5094-472E-878B-385723BFB4B4}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{FF62D77B-5094-472E-878B-385723BFB4B4}.Release|Any CPU.Build.0 = Release|Any CPU
+		{FF62D77B-5094-472E-878B-385723BFB4B4}.Release|x64.ActiveCfg = Release|Any CPU
+		{FF62D77B-5094-472E-878B-385723BFB4B4}.Release|x64.Build.0 = Release|Any CPU
+		{FF62D77B-5094-472E-878B-385723BFB4B4}.Release|x86.ActiveCfg = Release|Any CPU
+		{FF62D77B-5094-472E-878B-385723BFB4B4}.Release|x86.Build.0 = Release|Any CPU
+		{0A831D29-0C06-412B-9436-DFE71A1275CC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0A831D29-0C06-412B-9436-DFE71A1275CC}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0A831D29-0C06-412B-9436-DFE71A1275CC}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{0A831D29-0C06-412B-9436-DFE71A1275CC}.Debug|x64.Build.0 = Debug|Any CPU
+		{0A831D29-0C06-412B-9436-DFE71A1275CC}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{0A831D29-0C06-412B-9436-DFE71A1275CC}.Debug|x86.Build.0 = Debug|Any CPU
+		{0A831D29-0C06-412B-9436-DFE71A1275CC}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0A831D29-0C06-412B-9436-DFE71A1275CC}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0A831D29-0C06-412B-9436-DFE71A1275CC}.Release|x64.ActiveCfg = Release|Any CPU
+		{0A831D29-0C06-412B-9436-DFE71A1275CC}.Release|x64.Build.0 = Release|Any CPU
+		{0A831D29-0C06-412B-9436-DFE71A1275CC}.Release|x86.ActiveCfg = Release|Any CPU
+		{0A831D29-0C06-412B-9436-DFE71A1275CC}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
