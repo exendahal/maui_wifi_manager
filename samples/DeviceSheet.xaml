@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<toolkit:Popup
+    x:Class="DemoApp.DeviceSheet"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
+    Margin="12"
+    Padding="0"
+    WidthRequest="{OnIdiom Phone=-1, Default=480}"
+    BackgroundColor="{AppThemeBinding Light={StaticResource DialogLight}, Dark={StaticResource DialogDark}}"
+    HorizontalOptions="{OnIdiom Phone=Fill, Default=Center}"
+    VerticalOptions="{OnIdiom Phone=End, Default=Center}">
+    <VerticalStackLayout Padding="{OnIdiom Phone='20,22,20,12', Default='24'}">
+            <VerticalStackLayout Spacing="2">
+                <Label
+                    x:Name="titleTxt"
+                    FontFamily="{StaticResource DisplayFont}"
+                    FontSize="20"
+                    LineBreakMode="TailTruncation" />
+                <Label x:Name="summaryTxt" Style="{StaticResource Muted}" />
+            </VerticalStackLayout>
+
+            <!-- Only the details scroll, so the sheet stays as short as its content. -->
+            <ScrollView Margin="0,16,0,0" MaximumHeightRequest="{OnIdiom Phone=420, Default=400}">
+                <Border Padding="16,0" Style="{StaticResource Notice}">
+                    <VerticalStackLayout>
+                        <VerticalStackLayout x:Name="detailsList" />
+                        <HorizontalStackLayout x:Name="loadingRow" Padding="0,12" Spacing="10">
+                            <ActivityIndicator HeightRequest="18" IsRunning="True" WidthRequest="18" />
+                            <Label Style="{StaticResource Muted}" Text="Looking up details…" VerticalOptions="Center" />
+                        </HorizontalStackLayout>
+                    </VerticalStackLayout>
+                </Border>
+            </ScrollView>
+
+            <Label
+                x:Name="privateMacTxt"
+                Margin="4,12,4,0"
+                IsVisible="False"
+                Style="{StaticResource Muted}"
+                Text="This device uses a private (randomized) MAC address, as phones do by default, so the manufacturer can't be told from it." />
+
+            <!-- Phones stack the actions; Windows lays them out side by side like a ContentDialog footer. -->
+            <Grid
+                Margin="0,20,0,0"
+                ColumnDefinitions="{OnIdiom Phone='*', Default='*,*'}"
+                ColumnSpacing="8"
+                RowDefinitions="{OnIdiom Phone='Auto,Auto', Default='Auto'}"
+                RowSpacing="4">
+                <Button
+                    x:Name="openWebBtn"
+                    Clicked="OpenWebClicked"
+                    IsVisible="False"
+                    Text="Open web interface" />
+                <Button
+                    Grid.Row="{OnIdiom Phone=1, Default=0}"
+                    Grid.Column="{OnIdiom Phone=0, Default=1}"
+                    Clicked="CloseClicked"
+                    Style="{OnIdiom Phone={StaticResource TextButton}, Default={StaticResource SecondaryButton}}"
+                    Text="Close" />
+            </Grid>
+    </VerticalStackLayout>
+</toolkit:Popup>

@@ -325,6 +325,132 @@ namespace MauiWifiManager
         }
 
         /// <summary>
+        /// Raised when the device switches between Wi-Fi, mobile data, Ethernet and offline.
+        /// </summary>
+        public static event EventHandler<Abstractions.ConnectionTypeChangedEventArgs>? ConnectionTypeChanged
+        {
+            add => Current.ConnectionTypeChanged += value;
+            remove
+            {
+                if (_Implementation != null && _Implementation.IsValueCreated)
+                {
+                    _Implementation.Value.ConnectionTypeChanged -= value;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Raised whenever the OS finishes a Wi-Fi scan. Supported on Android and Windows.
+        /// </summary>
+        public static event EventHandler<Abstractions.WifiScanResultsEventArgs>? ScanResultsAvailable
+        {
+            add => Current.ScanResultsAvailable += value;
+            remove
+            {
+                if (_Implementation != null && _Implementation.IsValueCreated)
+                {
+                    _Implementation.Value.ScanResultsAvailable -= value;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Lists the kinds of network the device is connected to.
+        /// </summary>
+        public static Task<Abstractions.WifiManagerResponse<List<Abstractions.NetworkConnectionType>>> GetConnectionTypesAsync(CancellationToken cancellationToken = default)
+        {
+            return Current.GetConnectionTypesAsync(cancellationToken);
+        }
+
+        /// <summary>
+        /// Reports whether a Wi-Fi scan can start now, and if not, why. Supported on Android and Windows.
+        /// </summary>
+        public static Task<Abstractions.WifiManagerResponse<Abstractions.WifiScanAvailability>> CanStartScanAsync(CancellationToken cancellationToken = default)
+        {
+            return Current.CanStartScanAsync(cancellationToken);
+        }
+
+        /// <summary>
+        /// Checks internet access by requesting <paramref name="probeUrl"/>.
+        /// </summary>
+        public static Task<Abstractions.WifiManagerResponse<bool>> IsInternetAvailableAsync(Uri probeUrl, CancellationToken cancellationToken = default)
+        {
+            return Current.IsInternetAvailableAsync(probeUrl, cancellationToken);
+        }
+
+        /// <summary>
+        /// Turns Wi-Fi on or off (Android 9 and lower, Windows); opens the Wi-Fi panel on Android 10+.
+        /// </summary>
+        public static Task<Abstractions.WifiManagerResponse<bool>> SetWifiEnabledAsync(bool enabled, CancellationToken cancellationToken = default)
+        {
+            return Current.SetWifiEnabledAsync(enabled, cancellationToken);
+        }
+
+        /// <summary>
+        /// Starts a hotspot and returns its credentials. Supported on Android and Windows.
+        /// </summary>
+        public static Task<Abstractions.WifiManagerResponse<Abstractions.HotspotInfo>> StartHotspotAsync(CancellationToken cancellationToken = default)
+        {
+            return Current.StartHotspotAsync(cancellationToken);
+        }
+
+        /// <summary>
+        /// Stops the hotspot started by <see cref="StartHotspotAsync"/>.
+        /// </summary>
+        public static Task<Abstractions.WifiManagerResponse<bool>> StopHotspotAsync(CancellationToken cancellationToken = default)
+        {
+            return Current.StopHotspotAsync(cancellationToken);
+        }
+
+        /// <summary>
+        /// Lists devices connected to the hotspot. Supported on Windows only.
+        /// </summary>
+        public static Task<Abstractions.WifiManagerResponse<List<Abstractions.HotspotClient>>> GetHotspotClientsAsync(CancellationToken cancellationToken = default)
+        {
+            return Current.GetHotspotClientsAsync(cancellationToken);
+        }
+
+        /// <summary>
+        /// Finds devices on the local network by pinging the subnet.
+        /// </summary>
+        public static Task<Abstractions.WifiManagerResponse<List<Abstractions.LanDevice>>> DiscoverDevicesAsync(CancellationToken cancellationToken = default)
+        {
+            return Current.DiscoverDevicesAsync(cancellationToken);
+        }
+
+        /// <summary>
+        /// Collects everything a device on the local network reveals (names, MAC, manufacturer, model, open ports, ping).
+        /// </summary>
+        public static Task<Abstractions.WifiManagerResponse<Abstractions.LanDeviceDetails>> GetDeviceDetailsAsync(string ipAddress, CancellationToken cancellationToken = default)
+        {
+            return Current.GetDeviceDetailsAsync(ipAddress, cancellationToken);
+        }
+
+        /// <summary>
+        /// Finds services advertised over mDNS/Bonjour.
+        /// </summary>
+        public static Task<Abstractions.WifiManagerResponse<List<Abstractions.NetworkServiceInfo>>> BrowseServicesAsync(string serviceType = "_services._dns-sd._udp", TimeSpan? duration = null, CancellationToken cancellationToken = default)
+        {
+            return Current.BrowseServicesAsync(serviceType, duration, cancellationToken);
+        }
+
+        /// <summary>
+        /// Pings a host and returns round-trip statistics.
+        /// </summary>
+        public static Task<Abstractions.WifiManagerResponse<Abstractions.PingStatistics>> PingAsync(string host, int count = 4, CancellationToken cancellationToken = default)
+        {
+            return Current.PingAsync(host, count, cancellationToken);
+        }
+
+        /// <summary>
+        /// Measures download and upload speed and latency.
+        /// </summary>
+        public static Task<Abstractions.WifiManagerResponse<Abstractions.SpeedTestResult>> MeasureSpeedAsync(Abstractions.SpeedTestOptions? options = null, CancellationToken cancellationToken = default)
+        {
+            return Current.MeasureSpeedAsync(options, cancellationToken);
+        }
+
+        /// <summary>
         /// Dispose of everything
         /// </summary>
         public static void Dispose()

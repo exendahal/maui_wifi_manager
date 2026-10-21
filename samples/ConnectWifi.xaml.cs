@@ -65,7 +65,9 @@ public partial class ConnectWifi : ContentPage, IQueryAttributable
         {
             SecurityType = security,
             IsHidden = hiddenSwitch.IsToggled,
-            Bssid = string.IsNullOrWhiteSpace(bssidEntry.Text) ? null : bssidEntry.Text.Trim()
+            Bssid = string.IsNullOrWhiteSpace(bssidEntry.Text) ? null : bssidEntry.Text.Trim(),
+            IsSsidPrefix = prefixSwitch.IsToggled,
+            Timeout = double.TryParse(timeoutEntry.Text, out var seconds) && seconds > 0 ? TimeSpan.FromSeconds(seconds) : null
         };
 
         connectBtn.IsEnabled = false;

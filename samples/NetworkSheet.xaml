@@ -7,11 +7,11 @@
     x:TypeArguments="x:Boolean"
     Margin="12"
     Padding="0"
-    WidthRequest="{OnPlatform Default=-1, WinUI=480}"
+    WidthRequest="{OnIdiom Phone=-1, Default=480}"
     BackgroundColor="{AppThemeBinding Light={StaticResource DialogLight}, Dark={StaticResource DialogDark}}"
-    HorizontalOptions="{OnPlatform Default=Fill, WinUI=Center}"
-    VerticalOptions="{OnPlatform Default=End, WinUI=Center}">
-    <VerticalStackLayout Padding="{OnPlatform Default='20,22,20,12', WinUI='24'}">
+    HorizontalOptions="{OnIdiom Phone=Fill, Default=Center}"
+    VerticalOptions="{OnIdiom Phone=End, Default=Center}">
+    <VerticalStackLayout Padding="{OnIdiom Phone='20,22,20,12', Default='24'}">
         <VerticalStackLayout Spacing="2">
             <Label
                 x:Name="titleTxt"
@@ -38,16 +38,16 @@
         <!-- Phones stack the actions; Windows lays them out side by side like a ContentDialog footer. -->
         <Grid
             Margin="0,20,0,0"
-            ColumnDefinitions="{OnPlatform Default='*', WinUI='*,*'}"
+            ColumnDefinitions="{OnIdiom Phone='*', Default='*,*'}"
             ColumnSpacing="8"
-            RowDefinitions="{OnPlatform Default='Auto,Auto', WinUI='Auto'}"
+            RowDefinitions="{OnIdiom Phone='Auto,Auto', Default='Auto'}"
             RowSpacing="4">
             <Button Clicked="ConnectClicked" Text="Connect" />
             <Button
-                Grid.Row="{OnPlatform Default=1, WinUI=0}"
-                Grid.Column="{OnPlatform Default=0, WinUI=1}"
+                Grid.Row="{OnIdiom Phone=1, Default=0}"
+                Grid.Column="{OnIdiom Phone=0, Default=1}"
                 Clicked="CloseClicked"
-                Style="{OnPlatform Default={StaticResource TextButton}, WinUI={StaticResource SecondaryButton}}"
+                Style="{OnIdiom Phone={StaticResource TextButton}, Default={StaticResource SecondaryButton}}"
                 Text="Close" />
         </Grid>
     </VerticalStackLayout>

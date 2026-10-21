@@ -11,6 +11,8 @@
 	<ItemGroup>
 		<PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
 		<PackageReference Include="xunit" Version="2.9.3" />
+		<!-- MAUI apps always ship Essentials; the library uses it for connection-type detection. -->
+		<PackageReference Include="Microsoft.Maui.Essentials" Version="10.0.20" />
 		<PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" PrivateAssets="all" />
 	</ItemGroup>
 

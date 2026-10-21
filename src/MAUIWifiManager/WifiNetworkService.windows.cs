@@ -6,6 +6,7 @@ using System.Net.Sockets;
 using System.Runtime.InteropServices;
 using Windows.Devices.Radios;
 using Windows.Devices.WiFi;
+using Windows.Networking.NetworkOperators;
 using Windows.Networking.Connectivity;
 using Windows.Security.Credentials;
 
@@ -28,6 +29,11 @@ namespace MauiWifiManager
         private RadioState? _LastRadioState;
         private CancellationTokenSource? _SignalPollCts;
         private bool _LocalOnlyActive;
+        private EventHandler<WifiScanResultsEventArgs>? _ScanResultsAvailable;
+        private WiFiAdapter? _ScanEventAdapter;
+        // AvailableNetworksChanged only fires on the WiFiAdapter object that ran the scan, so scans and the
+        // ScanResultsAvailable event share one instance. ponytail: not refreshed if the adapter is replaced.
+        private static WiFiAdapter? _SharedAdapter;
 
         private static readonly TimeSpan DefaultScanSessionDuration = TimeSpan.FromSeconds(30);
         private static readonly TimeSpan SignalPollInterval = TimeSpan.FromSeconds(5);
@@ -105,6 +111,30 @@ namespace MauiWifiManager
             }
         }
 
+        public event EventHandler<WifiScanResultsEventArgs>? ScanResultsAvailable
+        {
+            add
+            {
+                bool attach;
+                lock (_MonitorLock)
+                {
+                    attach = _ScanResultsAvailable == null;
+                    _ScanResultsAvailable += value;
+                }
+                if (attach)
+                    _ = AttachScanAdapterAsync();
+            }
+            remove
+            {
+                lock (_MonitorLock)
+                {
+                    _ScanResultsAvailable -= value;
+                    if (_ScanResultsAvailable == null)
+                        DetachScanAdapter();
+                }
+            }
+        }
+
         public WifiNetworkService() { }
 
         [Obsolete("Use ConnectWifiAsync(string ssid, string password, CancellationToken cancellationToken = default) or ConnectWifiAsync(string ssid, string password, string? bssid, CancellationToken cancellationToken = default) instead.")]
@@ -158,19 +188,27 @@ namespace MauiWifiManager
                 return response;
             }
 
-            await adapter.ScanAsync().AsTask(cancellationToken);
-
-            // Find network by SSID (and optionally BSSID)
-            WiFiAvailableNetwork? target = null;
-            foreach (var network in adapter.NetworkReport.AvailableNetworks)
+            // The timeout covers the whole attempt (scan + connect), matching Android and iOS.
+            using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            if (options.Timeout is TimeSpan timeout)
+                timeoutCts.CancelAfter(timeout);
+            try
             {
-                if (network.Ssid == ssid &&
-                    (string.IsNullOrWhiteSpace(options.Bssid) || string.Equals(network.Bssid, options.Bssid, StringComparison.OrdinalIgnoreCase)))
-                {
-                    target = network;
-                    break;
-                }
+                await adapter.ScanAsync().AsTask(timeoutCts.Token);
             }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                return WifiManagerResponse<NetworkData>.ErrorResponse(WifiErrorCodes.OperationTimeout, "Timed out connecting to the network.");
+            }
+
+            // Find network by SSID or SSID prefix (and optionally BSSID); with a prefix, take the strongest match.
+            WiFiAvailableNetwork? target = adapter.NetworkReport.AvailableNetworks
+                .Where(network => (options.IsSsidPrefix ? network.Ssid.StartsWith(ssid, StringComparison.Ordinal) : network.Ssid == ssid)
+                    && (string.IsNullOrWhiteSpace(options.Bssid) || string.Equals(network.Bssid, options.Bssid, StringComparison.OrdinalIgnoreCase)))
+                .OrderByDescending(network => network.NetworkRssiInDecibelMilliwatts)
+                .FirstOrDefault();
+            if (target != null && options.IsSsidPrefix)
+                ssid = target.Ssid;
 
             // For hidden networks, fall back to empty-SSID entries matched by BSSID
             if (target == null && options.IsHidden)
@@ -196,6 +234,7 @@ namespace MauiWifiManager
                 response.ErrorCode = WifiErrorCodes.NoConnection;
                 response.ErrorMessage = options.IsHidden
                     ? "Hidden network not found in scan results."
+                    : options.IsSsidPrefix ? $"No network starting with \"{ssid}\" was found."
                     : (string.IsNullOrWhiteSpace(options.Bssid)
                         ? "The specified network was not found."
                         : "The specified SSID/BSSID network was not found.");
@@ -204,25 +243,43 @@ namespace MauiWifiManager
 
             // Use 4-param overload when connecting to a hidden network so Windows passes SSID explicitly
             WiFiConnectionResult status;
-            if (options.IsHidden || string.IsNullOrEmpty(target.Ssid))
-                status = await adapter.ConnectAsync(target, reconnectionKind, credential, ssid).AsTask(cancellationToken);
-            else
-                status = await adapter.ConnectAsync(target, reconnectionKind, credential).AsTask(cancellationToken);
+            try
+            {
+                if (options.IsHidden || string.IsNullOrEmpty(target.Ssid))
+                    status = await adapter.ConnectAsync(target, reconnectionKind, credential, ssid).AsTask(timeoutCts.Token);
+                else
+                    status = await adapter.ConnectAsync(target, reconnectionKind, credential).AsTask(timeoutCts.Token);
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                return WifiManagerResponse<NetworkData>.ErrorResponse(WifiErrorCodes.OperationTimeout, "Timed out connecting to the network.");
+            }
 
             if (status.ConnectionStatus == WiFiConnectionStatus.Success)
             {
                 Debug.WriteLine("Connected successfully to the network.");
+                // Right after joining, a network without internet (e.g. a device's setup AP) can still report
+                // connectivity level None, so give its profile a few seconds to appear.
                 var networkData = await GetNetworkInfoAsync(cancellationToken);
-                if (networkData.ErrorCode == WifiErrorCodes.Success)
+                for (int attempt = 0; attempt < 10 && networkData.ErrorCode != WifiErrorCodes.Success; attempt++)
                 {
-                    response.ErrorCode = WifiErrorCodes.Success;
-                    response.Data = networkData.Data;
+                    await Task.Delay(500, cancellationToken);
+                    networkData = await GetNetworkInfoAsync(cancellationToken);
                 }
-                else
-                {
-                    response.ErrorCode = WifiErrorCodes.UnknownError;
-                    response.ErrorMessage = "Connected but failed to retrieve network info.";
-                }
+                response.ErrorCode = WifiErrorCodes.Success;
+                response.Data = networkData.ErrorCode == WifiErrorCodes.Success
+                    ? networkData.Data
+                    : new NetworkData
+                    {
+                        StatusId = (int)WifiErrorCodes.Success,
+                        Ssid = target.Ssid.Length > 0 ? target.Ssid : ssid,
+                        Bssid = target.Bssid,
+                        SignalStrength = target.SignalBars,
+                        RssiDbm = (int)target.NetworkRssiInDecibelMilliwatts,
+                        NativeObject = target
+                    };
+                if (networkData.ErrorCode != WifiErrorCodes.Success)
+                    response.ErrorMessage = "Connected; detailed network info is not available yet.";
             }
             else
             {
@@ -354,6 +411,7 @@ namespace MauiWifiManager
             {
                 DetachRadio();
                 StopSignalPolling();
+                DetachScanAdapter();
             }
         }
 
@@ -373,28 +431,30 @@ namespace MauiWifiManager
                 var accessStatus = await WiFiAdapter.RequestAccessAsync();
                 if (accessStatus == WiFiAccessStatus.Allowed)
                 {
-                    var result = await WiFiAdapter.FindAllAdaptersAsync();
-                    if (result.Count > 0)
+                    var wifiAdapter = await GetSharedAdapterAsync();
+                    if (wifiAdapter != null)
                     {
-                        var wifiAdapter = result[0];
                         Debug.WriteLine("Wi-Fi Scan started.");
-                        await wifiAdapter.ScanAsync().AsTask(cancellationToken);
-
-                        foreach (var network in wifiAdapter.NetworkReport.AvailableNetworks)
+                        Exception? scanError = null;
+                        try
                         {
-                            int freqMHz = (int)(network.ChannelCenterFrequencyInKilohertz / 1000);
-                            wifiNetworks.Add(new NetworkData
-                            {
-                                Ssid = network.Ssid,
-                                Bssid = network.Bssid,
-                                SignalStrength = network.SignalBars,
-                                SecurityType = network.PhyKind,
-                                FrequencyBand = freqMHz > 0 ? GetBandFromFrequencyMHz(freqMHz) : WifiFrequencyBand.Unknown,
-                                ChannelNumber = freqMHz > 0 ? GetChannelFromFrequencyMHz(freqMHz) : null,
-                                RssiDbm = (int)network.NetworkRssiInDecibelMilliwatts,
-                                WifiStandard = GetWifiStandard(network.PhyKind),
-                                NativeObject = network
-                            });
+                            await wifiAdapter.ScanAsync().AsTask(cancellationToken);
+                        }
+                        catch (Exception ex) when (ex is not OperationCanceledException)
+                        {
+                            // Some drivers intermittently abort or time out a scan; the adapter still has its last report.
+                            scanError = ex;
+                        }
+
+                        wifiNetworks.AddRange(wifiAdapter.NetworkReport.AvailableNetworks.Select(ToNetworkData));
+                        if (scanError != null)
+                        {
+                            response.ErrorCode = wifiNetworks.Count > 0 ? WifiErrorCodes.Success : WifiErrorCodes.UnknownError;
+                            response.ErrorMessage = wifiNetworks.Count > 0
+                                ? $"Windows did not complete a new scan (0x{scanError.HResult:X8}), so these are the previous results."
+                                : $"Error while scanning Wi-Fi: {scanError.Message} (0x{scanError.HResult:X8})";
+                            response.Data = wifiNetworks.Count > 0 ? wifiNetworks : null;
+                            return response;
                         }
                     }
                     Debug.WriteLine("Wi-Fi Scan complete.");
@@ -656,6 +716,216 @@ namespace MauiWifiManager
                 adapters[0].Disconnect(); // Windows then reconnects to its preferred network.
             return WifiManagerResponse<bool>.SuccessResponse(true, "Local-only network released.");
         }
+
+        private static NetworkData ToNetworkData(WiFiAvailableNetwork network)
+        {
+            int freqMHz = (int)(network.ChannelCenterFrequencyInKilohertz / 1000);
+            return new NetworkData
+            {
+                Ssid = network.Ssid,
+                Bssid = network.Bssid,
+                SignalStrength = network.SignalBars,
+                SecurityType = network.PhyKind,
+                FrequencyBand = freqMHz > 0 ? GetBandFromFrequencyMHz(freqMHz) : WifiFrequencyBand.Unknown,
+                ChannelNumber = freqMHz > 0 ? GetChannelFromFrequencyMHz(freqMHz) : null,
+                RssiDbm = (int)network.NetworkRssiInDecibelMilliwatts,
+                WifiStandard = GetWifiStandard(network.PhyKind),
+                NativeObject = network
+            };
+        }
+
+        public async Task<WifiManagerResponse<WifiScanAvailability>> CanStartScanAsync(CancellationToken cancellationToken = default)
+        {
+            if (cancellationToken.IsCancellationRequested)
+                return WifiManagerResponse<WifiScanAvailability>.ErrorResponse(WifiErrorCodes.OperationCanceled, "Operation was canceled.");
+
+            try
+            {
+                if (await WiFiAdapter.RequestAccessAsync() != WiFiAccessStatus.Allowed)
+                    return WifiManagerResponse<WifiScanAvailability>.SuccessResponse(WifiScanAvailability.PermissionDenied, "Wi-Fi access is not allowed for this app.");
+
+                var radio = await GetWifiRadioAsync();
+                if (radio == null)
+                    return WifiManagerResponse<WifiScanAvailability>.ErrorResponse(WifiErrorCodes.UnsupportedHardware, "No Wi-Fi radio found.");
+                if (radio.State != RadioState.On)
+                    return WifiManagerResponse<WifiScanAvailability>.SuccessResponse(WifiScanAvailability.WifiDisabled, "Wi-Fi is turned off.");
+
+                // Windows does not throttle app-initiated scans.
+                return WifiManagerResponse<WifiScanAvailability>.SuccessResponse(WifiScanAvailability.Ready, "A scan can start now.");
+            }
+            catch (Exception ex)
+            {
+                return WifiManagerResponse<WifiScanAvailability>.ErrorResponse(WifiErrorCodes.UnknownError, ex.Message);
+            }
+        }
+
+        private async Task AttachScanAdapterAsync()
+        {
+            WiFiAdapter? adapter;
+            try
+            {
+                if (await WiFiAdapter.RequestAccessAsync() != WiFiAccessStatus.Allowed) return;
+                adapter = await GetSharedAdapterAsync();
+            }
+            catch { return; }
+            if (adapter == null) return;
+
+            lock (_MonitorLock)
+            {
+                if (_ScanResultsAvailable == null || _ScanEventAdapter != null) return;
+                _ScanEventAdapter = adapter;
+                adapter.AvailableNetworksChanged += OnAvailableNetworksChanged;
+            }
+        }
+
+        private static async Task<WiFiAdapter?> GetSharedAdapterAsync()
+        {
+            if (_SharedAdapter != null)
+                return _SharedAdapter;
+            var adapters = await WiFiAdapter.FindAllAdaptersAsync();
+            return _SharedAdapter ??= adapters.FirstOrDefault();
+        }
+
+        private void DetachScanAdapter()
+        {
+            if (_ScanEventAdapter == null) return;
+            _ScanEventAdapter.AvailableNetworksChanged -= OnAvailableNetworksChanged;
+            _ScanEventAdapter = null;
+        }
+
+        private void OnAvailableNetworksChanged(WiFiAdapter sender, object args)
+        {
+            var networks = sender.NetworkReport.AvailableNetworks.Select(ToNetworkData).ToList();
+            _ScanResultsAvailable?.Invoke(this, new WifiScanResultsEventArgs(networks, isFresh: true));
+        }
+
+        public async Task<WifiManagerResponse<bool>> SetWifiEnabledAsync(bool enabled, CancellationToken cancellationToken = default)
+        {
+            if (cancellationToken.IsCancellationRequested)
+                return WifiManagerResponse<bool>.ErrorResponse(WifiErrorCodes.OperationCanceled, "Operation was canceled.");
+
+            try
+            {
+                if (await Radio.RequestAccessAsync() != RadioAccessStatus.Allowed)
+                    return WifiManagerResponse<bool>.ErrorResponse(WifiErrorCodes.PermissionDenied, "Radio access is not allowed for this app.");
+
+                var radio = await GetWifiRadioAsync();
+                if (radio == null)
+                    return WifiManagerResponse<bool>.ErrorResponse(WifiErrorCodes.UnsupportedHardware, "No Wi-Fi radio found.");
+
+                var wanted = enabled ? RadioState.On : RadioState.Off;
+                if (radio.State == wanted)
+                    return WifiManagerResponse<bool>.SuccessResponse(true, $"Wi-Fi is already {(enabled ? "on" : "off")}.");
+
+                var result = await radio.SetStateAsync(wanted);
+                return result == RadioAccessStatus.Allowed
+                    ? WifiManagerResponse<bool>.SuccessResponse(true, $"Wi-Fi turned {(enabled ? "on" : "off")}.")
+                    : WifiManagerResponse<bool>.ErrorResponse(WifiErrorCodes.PermissionDenied, $"Windows refused to change the Wi-Fi state: {result}.");
+            }
+            catch (Exception ex)
+            {
+                return WifiManagerResponse<bool>.ErrorResponse(WifiErrorCodes.UnknownError, ex.Message);
+            }
+        }
+
+        public async Task<WifiManagerResponse<HotspotInfo>> StartHotspotAsync(CancellationToken cancellationToken = default)
+        {
+            if (cancellationToken.IsCancellationRequested)
+                return WifiManagerResponse<HotspotInfo>.ErrorResponse(WifiErrorCodes.OperationCanceled, "Operation was canceled.");
+
+            try
+            {
+                var profile = NetworkInformation.GetInternetConnectionProfile();
+                if (profile == null)
+                    return WifiManagerResponse<HotspotInfo>.ErrorResponse(WifiErrorCodes.NoConnection, "Mobile Hotspot shares an internet connection, and none is active.");
+
+                var capability = NetworkOperatorTetheringManager.GetTetheringCapabilityFromConnectionProfile(profile);
+                if (capability != TetheringCapability.Enabled)
+                    return WifiManagerResponse<HotspotInfo>.ErrorResponse(WifiErrorCodes.UnsupportedHardware, $"Mobile Hotspot is not available: {capability}.");
+
+                var manager = NetworkOperatorTetheringManager.CreateFromConnectionProfile(profile);
+                if (manager.TetheringOperationalState != TetheringOperationalState.On)
+                {
+                    var result = await manager.StartTetheringAsync().AsTask(cancellationToken);
+                    if (result.Status != TetheringOperationStatus.Success)
+                        return WifiManagerResponse<HotspotInfo>.ErrorResponse(WifiErrorCodes.UnknownError,
+                            $"Mobile Hotspot did not start: {result.Status}. {result.AdditionalErrorMessage}".Trim());
+                }
+
+                var config = manager.GetCurrentAccessPointConfiguration();
+                var info = new HotspotInfo { Ssid = config.Ssid, Password = config.Passphrase, IsLocalOnly = false };
+                return WifiManagerResponse<HotspotInfo>.SuccessResponse(info, "Mobile Hotspot is on.");
+            }
+            catch (OperationCanceledException)
+            {
+                return WifiManagerResponse<HotspotInfo>.ErrorResponse(WifiErrorCodes.OperationCanceled, "Operation was canceled.");
+            }
+            catch (Exception ex)
+            {
+                return WifiManagerResponse<HotspotInfo>.ErrorResponse(WifiErrorCodes.UnknownError, ex.Message);
+            }
+        }
+
+        public async Task<WifiManagerResponse<bool>> StopHotspotAsync(CancellationToken cancellationToken = default)
+        {
+            try
+            {
+                var manager = GetTetheringManager();
+                if (manager == null || manager.TetheringOperationalState != TetheringOperationalState.On)
+                    return WifiManagerResponse<bool>.SuccessResponse(false, "Mobile Hotspot is not running.");
+
+                var result = await manager.StopTetheringAsync().AsTask(cancellationToken);
+                return result.Status == TetheringOperationStatus.Success
+                    ? WifiManagerResponse<bool>.SuccessResponse(true, "Mobile Hotspot stopped.")
+                    : WifiManagerResponse<bool>.ErrorResponse(WifiErrorCodes.UnknownError, $"Mobile Hotspot did not stop: {result.Status}.");
+            }
+            catch (Exception ex)
+            {
+                return WifiManagerResponse<bool>.ErrorResponse(WifiErrorCodes.UnknownError, ex.Message);
+            }
+        }
+
+        public Task<WifiManagerResponse<List<HotspotClient>>> GetHotspotClientsAsync(CancellationToken cancellationToken = default)
+        {
+            try
+            {
+                var manager = GetTetheringManager();
+                if (manager == null || manager.TetheringOperationalState != TetheringOperationalState.On)
+                    return Task.FromResult(WifiManagerResponse<List<HotspotClient>>.ErrorResponse(WifiErrorCodes.NoConnection, "Mobile Hotspot is not running."));
+
+                var clients = manager.GetTetheringClients()
+                    .Select(c => new HotspotClient { MacAddress = c.MacAddress, HostName = c.HostNames.FirstOrDefault()?.DisplayName })
+                    .ToList();
+                return Task.FromResult(WifiManagerResponse<List<HotspotClient>>.SuccessResponse(clients, $"{clients.Count} device(s) connected."));
+            }
+            catch (Exception ex)
+            {
+                return Task.FromResult(WifiManagerResponse<List<HotspotClient>>.ErrorResponse(WifiErrorCodes.UnknownError, ex.Message));
+            }
+        }
+
+        private static NetworkOperatorTetheringManager? GetTetheringManager()
+        {
+            var profile = NetworkInformation.GetInternetConnectionProfile();
+            return profile == null ? null : NetworkOperatorTetheringManager.CreateFromConnectionProfile(profile);
+        }
+
+        public async Task<WifiManagerResponse<LanDeviceDetails>> GetDeviceDetailsAsync(string ipAddress, CancellationToken cancellationToken = default)
+        {
+            var response = await DeviceProbe.GetDetailsAsync(ipAddress, cancellationToken);
+            // The probe just talked to the device, so the ARP table has its MAC even when NetBIOS did not report one.
+            if (response.Data is { MacAddress: null } details && IPAddress.TryParse(ipAddress, out var ip) && ip.AddressFamily == AddressFamily.InterNetwork)
+            {
+                var mac = new byte[6];
+                uint length = (uint)mac.Length;
+                if (SendARP(BitConverter.ToUInt32(ip.GetAddressBytes(), 0), 0, mac, ref length) == 0 && length == 6)
+                    response.Data = details with { MacAddress = string.Join(":", mac.Select(b => b.ToString("X2"))) };
+            }
+            return response;
+        }
+
+        [DllImport("iphlpapi.dll")]
+        private static extern int SendARP(uint destIp, uint srcIp, byte[] macAddress, ref uint physicalAddressLength);
 
         private static async Task<Radio?> GetWifiRadioAsync()
         {
