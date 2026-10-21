@@ -1473,6 +1473,45 @@ namespace MauiWifiManager
         private static string? GetLegacySoftApSsid(SoftApConfiguration config) => config.Ssid;
 #pragma warning restore CA1422
 
+        public Task<WifiManagerResponse<List<LanDevice>>> DiscoverDevicesAsync(CancellationToken cancellationToken = default)
+        {
+            // While the app is bound to a local-only network (ConnectLocalOnlyAsync), its pings go out on that
+            // network, so sweep its subnet instead of the default network's.
+            if (OperatingSystem.IsAndroidVersionAtLeast(23)
+                && _Context.GetSystemService(Context.ConnectivityService) is ConnectivityManager connectivityManager
+                && connectivityManager.BoundNetworkForProcess is Network bound
+                && connectivityManager.GetLinkProperties(bound)?.LinkAddresses.FirstOrDefault(la => la.Address is Java.Net.Inet4Address) is LinkAddress link
+                && link.Address?.GetAddress() is { Length: 4 } bytes)
+                return NetworkTools.DiscoverDevicesAsync(cancellationToken, (new IPAddress(bytes), link.PrefixLength));
+            return NetworkTools.DiscoverDevicesAsync(cancellationToken);
+        }
+
+        public async Task<WifiManagerResponse<List<NetworkServiceInfo>>> BrowseServicesAsync(string serviceType = "_services._dns-sd._udp", TimeSpan? duration = null, CancellationToken cancellationToken = default)
+        {
+            // Android drops incoming multicast unless an app holds a multicast lock.
+            WifiManager.MulticastLock? multicastLock = null;
+            try
+            {
+                multicastLock = (_Context.GetSystemService(Context.WifiService) as WifiManager)?.CreateMulticastLock("MauiWifiManager.mdns");
+                multicastLock?.SetReferenceCounted(false);
+                multicastLock?.Acquire();
+            }
+            catch (Java.Lang.SecurityException)
+            {
+                multicastLock = null; // CHANGE_WIFI_MULTICAST_STATE missing; only answers sent directly to us will arrive.
+            }
+
+            try
+            {
+                return await NetworkTools.BrowseServicesAsync(serviceType, duration ?? NetworkTools.DefaultBrowseDuration, cancellationToken);
+            }
+            finally
+            {
+                if (multicastLock?.IsHeld == true)
+                    multicastLock.Release();
+            }
+        }
+
         private static int? GetChannelWidthMhz(int channelWidth) => channelWidth switch
         {
             0 => 20,

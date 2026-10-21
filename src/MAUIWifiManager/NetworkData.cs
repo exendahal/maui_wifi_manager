@@ -361,6 +361,106 @@ namespace MauiWifiManager.Abstractions
     }
 
     /// <summary>
+    /// A device that answered on the local network.
+    /// </summary>
+    public sealed class LanDevice
+    {
+        /// <summary>IPv4 address.</summary>
+        public string IpAddress { get; init; } = string.Empty;
+
+        /// <summary>Host name from reverse DNS, when available.</summary>
+        public string? HostName { get; init; }
+
+        /// <summary>Ping round-trip time in milliseconds.</summary>
+        public long RoundTripMs { get; init; }
+    }
+
+    /// <summary>
+    /// A service advertised over mDNS/Bonjour, such as a printer or Chromecast.
+    /// </summary>
+    public sealed class NetworkServiceInfo
+    {
+        /// <summary>Instance name, e.g. <c>Living Room TV</c>.</summary>
+        public string Name { get; init; } = string.Empty;
+
+        /// <summary>Service type, e.g. <c>_googlecast._tcp</c>.</summary>
+        public string ServiceType { get; init; } = string.Empty;
+
+        /// <summary>Host name, e.g. <c>tv.local</c>.</summary>
+        public string? HostName { get; init; }
+
+        /// <summary>IPv4 address, when the responder included it.</summary>
+        public string? IpAddress { get; init; }
+
+        /// <summary>Port.</summary>
+        public int Port { get; init; }
+
+        /// <summary>TXT record key/value pairs.</summary>
+        public IReadOnlyDictionary<string, string> Properties { get; init; } = new Dictionary<string, string>();
+    }
+
+    /// <summary>
+    /// Result of <see cref="IWifiNetworkService.PingAsync"/>.
+    /// </summary>
+    public sealed class PingStatistics
+    {
+        /// <summary>Host that was pinged.</summary>
+        public string Host { get; init; } = string.Empty;
+
+        /// <summary>Echo requests sent.</summary>
+        public int Sent { get; init; }
+
+        /// <summary>Replies received.</summary>
+        public int Received { get; init; }
+
+        /// <summary>Fastest reply in milliseconds, or <see langword="null"/> when nothing replied.</summary>
+        public long? MinMs { get; init; }
+
+        /// <summary>Average reply time in milliseconds, or <see langword="null"/> when nothing replied.</summary>
+        public double? AverageMs { get; init; }
+
+        /// <summary>Slowest reply in milliseconds, or <see langword="null"/> when nothing replied.</summary>
+        public long? MaxMs { get; init; }
+
+        /// <summary>Percentage of requests without a reply.</summary>
+        public double PacketLossPercent => Sent == 0 ? 0 : 100.0 * (Sent - Received) / Sent;
+    }
+
+    /// <summary>
+    /// Endpoints and sizes used by <see cref="IWifiNetworkService.MeasureSpeedAsync"/>.
+    /// Defaults to Cloudflare's public speed test endpoints.
+    /// </summary>
+    public sealed class SpeedTestOptions
+    {
+        /// <summary>URL that returns a large response to download.</summary>
+        public Uri DownloadUrl { get; set; } = new("https://speed.cloudflare.com/__down?bytes=25000000");
+
+        /// <summary>URL that accepts a POST body, or <see langword="null"/> to skip the upload test.</summary>
+        public Uri? UploadUrl { get; set; } = new("https://speed.cloudflare.com/__up");
+
+        /// <summary>Upload size in bytes.</summary>
+        public int UploadBytes { get; set; } = 5_000_000;
+
+        /// <summary>Stops each direction early after this long and measures what was transferred.</summary>
+        public TimeSpan MaxDurationPerDirection { get; set; } = TimeSpan.FromSeconds(10);
+    }
+
+    /// <summary>
+    /// Result of <see cref="IWifiNetworkService.MeasureSpeedAsync"/>.
+    /// </summary>
+    public sealed class SpeedTestResult
+    {
+        /// <summary>Download speed in megabits per second.</summary>
+        public double DownloadMbps { get; init; }
+
+        /// <summary>Upload speed in megabits per second, or <see langword="null"/> when skipped.</summary>
+        public double? UploadMbps { get; init; }
+
+        /// <summary>Time to first byte of a tiny request in milliseconds.</summary>
+        public double LatencyMs { get; init; }
+    }
+
+    /// <summary>
     /// Represents information about a Wi-Fi network or the currently connected network.
     /// </summary>
     public class NetworkData

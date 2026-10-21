@@ -265,6 +265,35 @@ namespace MauiWifiManager
         Task<WifiManagerResponse<List<HotspotClient>>> GetHotspotClientsAsync(CancellationToken cancellationToken = default)
             => Task.FromResult(NotSupported<List<HotspotClient>>(nameof(GetHotspotClientsAsync)));
 
+        /// <summary>
+        /// Finds devices on the local network by pinging every address in the subnet (at most the /24 around this device),
+        /// then looking up their host names. Devices that ignore ping are not found.
+        /// </summary>
+        Task<WifiManagerResponse<List<LanDevice>>> DiscoverDevicesAsync(CancellationToken cancellationToken = default)
+            => NetworkTools.DiscoverDevicesAsync(cancellationToken);
+
+        /// <summary>
+        /// Finds services advertised over mDNS/Bonjour, e.g. <c>_http._tcp</c>, <c>_ipp._tcp</c> or <c>_googlecast._tcp</c>.
+        /// The default <c>_services._dns-sd._udp</c> lists the service types present on the network.
+        /// Android needs the CHANGE_WIFI_MULTICAST_STATE permission; iOS requires the multicast networking
+        /// entitlement and NSLocalNetworkUsageDescription.
+        /// </summary>
+        Task<WifiManagerResponse<List<NetworkServiceInfo>>> BrowseServicesAsync(string serviceType = "_services._dns-sd._udp", TimeSpan? duration = null, CancellationToken cancellationToken = default)
+            => NetworkTools.BrowseServicesAsync(serviceType, duration ?? NetworkTools.DefaultBrowseDuration, cancellationToken);
+
+        /// <summary>
+        /// Pings a host and returns min/average/max round-trip times and packet loss.
+        /// </summary>
+        Task<WifiManagerResponse<PingStatistics>> PingAsync(string host, int count = 4, CancellationToken cancellationToken = default)
+            => NetworkTools.PingAsync(host, count, cancellationToken);
+
+        /// <summary>
+        /// Measures download and upload speed and latency. Uses Cloudflare's public speed test endpoints unless
+        /// <paramref name="options"/> points elsewhere. Transfers up to about 30 MB.
+        /// </summary>
+        Task<WifiManagerResponse<SpeedTestResult>> MeasureSpeedAsync(SpeedTestOptions? options = null, CancellationToken cancellationToken = default)
+            => NetworkTools.MeasureSpeedAsync(options ?? new SpeedTestOptions(), cancellationToken);
+
         private static WifiManagerResponse<T> NotSupported<T>(string operation)
             => WifiManagerResponse<T>.ErrorResponse(WifiErrorCodes.UnsupportedHardware, $"{operation} is not supported on this platform.");
     }

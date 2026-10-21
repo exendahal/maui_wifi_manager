@@ -411,6 +411,38 @@ namespace MauiWifiManager
         }
 
         /// <summary>
+        /// Finds devices on the local network by pinging the subnet.
+        /// </summary>
+        public static Task<Abstractions.WifiManagerResponse<List<Abstractions.LanDevice>>> DiscoverDevicesAsync(CancellationToken cancellationToken = default)
+        {
+            return Current.DiscoverDevicesAsync(cancellationToken);
+        }
+
+        /// <summary>
+        /// Finds services advertised over mDNS/Bonjour.
+        /// </summary>
+        public static Task<Abstractions.WifiManagerResponse<List<Abstractions.NetworkServiceInfo>>> BrowseServicesAsync(string serviceType = "_services._dns-sd._udp", TimeSpan? duration = null, CancellationToken cancellationToken = default)
+        {
+            return Current.BrowseServicesAsync(serviceType, duration, cancellationToken);
+        }
+
+        /// <summary>
+        /// Pings a host and returns round-trip statistics.
+        /// </summary>
+        public static Task<Abstractions.WifiManagerResponse<Abstractions.PingStatistics>> PingAsync(string host, int count = 4, CancellationToken cancellationToken = default)
+        {
+            return Current.PingAsync(host, count, cancellationToken);
+        }
+
+        /// <summary>
+        /// Measures download and upload speed and latency.
+        /// </summary>
+        public static Task<Abstractions.WifiManagerResponse<Abstractions.SpeedTestResult>> MeasureSpeedAsync(Abstractions.SpeedTestOptions? options = null, CancellationToken cancellationToken = default)
+        {
+            return Current.MeasureSpeedAsync(options, cancellationToken);
+        }
+
+        /// <summary>
         /// Dispose of everything
         /// </summary>
         public static void Dispose()
