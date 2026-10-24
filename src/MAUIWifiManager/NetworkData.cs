@@ -624,6 +624,12 @@ namespace MauiWifiManager.Abstractions
         /// <summary>URL that returns a large response to download.</summary>
         public Uri DownloadUrl { get; set; } = new("https://speed.cloudflare.com/__down?bytes=25000000");
 
+        /// <summary>
+        /// URL with a tiny response, timed to measure latency. When <see langword="null"/>, a one-byte range of
+        /// <see cref="DownloadUrl"/> is requested instead, which only works if that server honours ranges.
+        /// </summary>
+        public Uri? LatencyUrl { get; set; } = new("https://speed.cloudflare.com/__down?bytes=0");
+
         /// <summary>URL that accepts a POST body, or <see langword="null"/> to skip the upload test.</summary>
         public Uri? UploadUrl { get; set; } = new("https://speed.cloudflare.com/__up");
 

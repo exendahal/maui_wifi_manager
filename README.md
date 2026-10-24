@@ -664,6 +664,7 @@ await CrossWifiManager.Current.WakeOnLanAsync("AA:BB:CC:DD:EE:FF", broadcastAddr
 - `LookupDnsAsync` supports A, AAAA, CNAME, MX, TXT and NS. `NameNotFound` is true when the name does not exist (NXDOMAIN). Android does not expose the system DNS server to .NET, so there it asks 1.1.1.1 unless you pass `server`.
 - `CheckPortsAsync` treats a port as open when a TCP connection succeeds within 800 ms. `Service` names well-known ports.
 - `WakeOnLanAsync` only sends the packet; the target must have Wake-on-LAN enabled and be on the same network.
+- The speed test's latency is the fastest of three requests to `SpeedTestOptions.LatencyUrl`, minus the server's own processing time from its `Server-Timing` header.
 - Ping, speed test, device discovery, mDNS, traceroute, DNS lookup, port check and Wake-on-LAN are shared .NET code. They also work for custom `IWifiNetworkService` implementations.
 
 ---

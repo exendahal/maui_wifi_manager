@@ -144,6 +144,17 @@ public class NetworkDiagnosticsTests
         Assert.NotEqual(WifiErrorCodes.Success, result.ErrorCode);
     }
 
+    [Fact]
+    public void ServerTimeMs_SumsDurationsAndIgnoresEntriesWithout()
+    {
+        using var response = new HttpResponseMessage();
+        response.Headers.TryAddWithoutValidation("Server-Timing", "cfSpeedEdge;dur=6, cfSpeedWorker;dur=27.5");
+        response.Headers.TryAddWithoutValidation("Server-Timing", "cfL4;desc=\"?proto=TCP&rtt=91481\"");
+
+        Assert.Equal(33.5, NetworkTools.ServerTimeMs(response));
+        Assert.Equal(0, NetworkTools.ServerTimeMs(new HttpResponseMessage()));
+    }
+
     /// <summary>A DNS response for "www.example.com" (type A) with the given rcode and answer records.</summary>
     private static byte[] Response(byte rcode, int answerCount, params byte[][] answers)
     {
