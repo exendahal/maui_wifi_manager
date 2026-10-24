@@ -1,4 +1,4 @@
-"""Rebuilds src/MAUIWifiManager/Resources/oui.tsv.gz from the IEEE MA-L registry.
+"""Rebuilds src/WifiManager.MacVendors/Resources/oui.tsv.gz (the WifiManager.MacVendors package) from the IEEE MA-L registry.
 
 Usage:
     python tools/update_oui.py              # downloads the registry
@@ -19,7 +19,7 @@ from pathlib import Path
 
 # Plain HTTP: the HTTPS endpoint rejects scripted downloads.
 SOURCE = "http://standards-oui.ieee.org/oui/oui.csv"
-OUTPUT = Path(__file__).resolve().parent.parent / "src" / "MAUIWifiManager" / "Resources" / "oui.tsv.gz"
+OUTPUT = Path(__file__).resolve().parent.parent / "src" / "WifiManager.MacVendors" / "Resources" / "oui.tsv.gz"
 
 LEGAL_SUFFIX = re.compile(
     r"[\s,.]+(co\.?,?\s*ltd\.?|co\.?|ltd\.?|limited|inc\.?|incorporated|corp\.?|corporation|corporate|"

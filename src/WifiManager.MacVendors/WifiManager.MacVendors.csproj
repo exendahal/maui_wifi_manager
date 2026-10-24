@@ -35,12 +35,9 @@
 		<InternalsVisibleTo Include="WifiManager.MacVendors.Tests" />
 	</ItemGroup>
 
-	<!--
-		The registry file is shared with WifiManager.Maui, which still bundles it; it moves here when
-		that package switches to this one. Regenerate it with tools/update_oui.py.
-	-->
+	<!-- Regenerate with tools/update_oui.py. -->
 	<ItemGroup>
-		<EmbeddedResource Include="..\MAUIWifiManager\Resources\oui.tsv.gz" LogicalName="WifiManager.MacVendors.oui.tsv.gz" />
+		<EmbeddedResource Include="Resources\oui.tsv.gz" LogicalName="WifiManager.MacVendors.oui.tsv.gz" />
 		<None Include="README.md" Pack="true" PackagePath="\" />
 		<None Include="..\MAUIWifiManager\images\icon.png" Pack="true" PackagePath="\" />
 	</ItemGroup>

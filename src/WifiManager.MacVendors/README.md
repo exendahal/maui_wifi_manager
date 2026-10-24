@@ -47,6 +47,19 @@ Every common MAC format works:
 - **Coverage.** The registry is IEEE's MA-L (large block) list, which covers the vast majority of
   consumer devices. The smaller MA-M and MA-S blocks are not included.
 
+## With WifiManager.Maui
+
+[WifiManager.Maui](https://www.nuget.org/packages/WifiManager.Maui) does not bundle the registry, to
+stay small. Plug this package in once at startup to fill its `MacVendor.Lookup` and the `Vendor`
+properties of `LanDeviceDetails` and `HotspotClient`:
+
+```csharp
+using MauiWifiManager.Abstractions; // MacVendor
+using WifiManager.MacVendors;       // MacVendorRegistry
+
+MacVendor.SetLookup(MacVendorRegistry.Lookup);
+```
+
 ## Updating the registry
 
 The data comes from IEEE's public registry. Maintainers refresh it with:

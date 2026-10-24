@@ -188,82 +188,29 @@ namespace MauiWifiManager.Abstractions
     }
 
     /// <summary>
-    /// Looks up the manufacturer of a network adapter from its MAC address, using the IEEE MA-L registry
-    /// bundled with the library (about 40,000 prefixes, 340 KB compressed). Works offline.
+    /// Names the manufacturer of a network adapter from its MAC address. The registry behind it is not part
+    /// of this package, to keep it small: add <c>WifiManager.MacVendors</c> and call
+    /// <c>MacVendor.SetLookup(MacVendorRegistry.Lookup)</c> once at startup, or plug in your own lookup.
+    /// Until then <see cref="Lookup"/> returns <see langword="null"/>, and so do the <c>Vendor</c> properties.
     /// </summary>
     public static class MacVendor
     {
-        private const string ResourceName = "MauiWifiManager.oui.tsv.gz";
-
-        // Read on first use (tens of milliseconds), on whichever thread asks first.
-        private static readonly Lazy<Dictionary<int, string>> Table = new(Load);
+        private static Func<string, string?>? _Lookup;
 
         /// <summary>
-        /// The manufacturer for a MAC address such as <c>3C:CD:57:73:6E:E2</c>, <c>3c-cd-57-73-6e-e2</c> or
-        /// <c>3CCD57736EE2</c>, e.g. <c>Xiaomi Mobile Software</c>. Returns <see langword="null"/> for unknown
-        /// prefixes, malformed input and private (randomized) addresses, which carry no manufacturer.
+        /// Sets the function that names a MAC address's manufacturer, e.g. <c>MacVendorRegistry.Lookup</c>
+        /// from <c>WifiManager.MacVendors</c>. Pass <see langword="null"/> to turn lookups off.
         /// </summary>
-        public static string? Lookup(string? macAddress)
-        {
-            if (!TryGetPrefix(macAddress, out var prefix))
-                return null;
+        public static void SetLookup(Func<string, string?>? lookup) => Volatile.Write(ref _Lookup, lookup);
 
-            // Locally administered addresses (phones' private MACs) are not assigned by IEEE.
-            if (((prefix >> 16) & 0x02) != 0)
-                return null;
+        /// <summary>Whether a lookup has been set, so manufacturer names can be found.</summary>
+        public static bool IsAvailable => Volatile.Read(ref _Lookup) != null;
 
-            return Table.Value.TryGetValue(prefix, out var vendor) ? vendor : null;
-        }
-
-        /// <summary>The first three bytes of a 6-byte MAC address, or false when it is not one.</summary>
-        internal static bool TryGetPrefix(string? macAddress, out int prefix)
-        {
-            prefix = 0;
-            if (macAddress == null)
-                return false;
-
-            var digits = 0;
-            foreach (var c in macAddress)
-            {
-                if (c is ':' or '-' or '.')
-                    continue;
-                var value = c switch
-                {
-                    >= '0' and <= '9' => c - '0',
-                    >= 'a' and <= 'f' => c - 'a' + 10,
-                    >= 'A' and <= 'F' => c - 'A' + 10,
-                    _ => -1
-                };
-                if (value < 0)
-                    return false;
-                if (digits < 6)
-                    prefix = (prefix << 4) | value;
-                digits++;
-            }
-            return digits == 12;
-        }
-
-        private static Dictionary<int, string> Load()
-        {
-            var table = new Dictionary<int, string>(40_000);
-            using var stream = typeof(MacVendor).Assembly.GetManifestResourceStream(ResourceName);
-            if (stream == null)
-                return table;
-
-            using var reader = new StreamReader(new GZipStream(stream, CompressionMode.Decompress));
-            // Thousands of prefixes share a maker (Apple has 1,500); keep one copy of each name.
-            var names = new Dictionary<string, string>(StringComparer.Ordinal);
-            while (reader.ReadLine() is { } line)
-            {
-                if (line.Length < 8 || line[6] != '\t'
-                    || !int.TryParse(line.AsSpan(0, 6), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var prefix))
-                    continue;
-                var name = line[7..];
-                if (!names.TryGetValue(name, out var shared))
-                    names[name] = shared = name;
-                table[prefix] = shared;
-            }
-            return table;
-        }
+        /// <summary>
+        /// The manufacturer for a MAC address such as <c>3C:CD:57:73:6E:E2</c>, e.g. <c>Xiaomi Mobile Software</c>,
+        /// or <see langword="null"/> when it is unknown, private (randomized) or no lookup is set.
+        /// </summary>
+        public static string? Lookup(string? macAddress) =>
+            macAddress == null ? null : Volatile.Read(ref _Lookup)?.Invoke(macAddress);
     }
 }
