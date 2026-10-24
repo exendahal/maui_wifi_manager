@@ -617,6 +617,10 @@ var devices = await CrossWifiManager.Current.DiscoverDevicesAsync();
 foreach (var device in devices.Data ?? [])
     Debug.WriteLine($"{device.IpAddress} {device.HostName}");
 
+// Or show each device as soon as it answers, instead of waiting for the whole sweep
+var live = new Progress<LanDevice>(device => Debug.WriteLine($"found {device.IpAddress}"));
+await CrossWifiManager.Current.DiscoverDevicesAsync(live);
+
 // Everything one device reveals: names, MAC, manufacturer/model, open ports, web page title, ping (about 3 s)
 var details = await CrossWifiManager.Current.GetDeviceDetailsAsync("192.168.1.1");
 Debug.WriteLine($"{details.Data?.HttpTitle} {details.Data?.MacAddress} ports: {string.Join(", ", details.Data?.OpenPorts ?? [])}");

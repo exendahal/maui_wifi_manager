@@ -201,21 +201,35 @@ namespace MauiWifiManager
         /// from <see cref="BlockingProbeThreads"/> dedicated threads; Android uses it to avoid <see cref="Ping"/>,
         /// which there launches a <c>ping</c> process for every address.
         /// </param>
+        /// <param name="progress">Optional; receives each device as soon as it has answered and its name is looked up.</param>
         public static Task<WifiManagerResponse<List<LanDevice>>> DiscoverDevicesAsync(CancellationToken cancellationToken,
-            (IPAddress Address, int PrefixLength)? subnet = null, Func<IPAddress, TimeSpan, long?>? blockingProbe = null) =>
-            Task.Run(() => DiscoverDevicesCoreAsync(cancellationToken, subnet, blockingProbe));
+            (IPAddress Address, int PrefixLength)? subnet = null, Func<IPAddress, TimeSpan, long?>? blockingProbe = null,
+            IProgress<LanDevice>? progress = null) =>
+            Task.Run(() => DiscoverDevicesCoreAsync(cancellationToken, subnet, blockingProbe, progress));
 
         private const int BlockingProbeThreads = 32;
 
         private static async Task<WifiManagerResponse<List<LanDevice>>> DiscoverDevicesCoreAsync(CancellationToken cancellationToken,
-            (IPAddress Address, int PrefixLength)? subnet, Func<IPAddress, TimeSpan, long?>? blockingProbe)
+            (IPAddress Address, int PrefixLength)? subnet, Func<IPAddress, TimeSpan, long?>? blockingProbe, IProgress<LanDevice>? progress)
         {
             var local = subnet ?? GetLocalIpv4();
             if (local == null)
                 return WifiManagerResponse<List<LanDevice>>.ErrorResponse(WifiErrorCodes.NoConnection, "No active IPv4 network.");
 
             var hosts = GetSweepHosts(local.Value.Address, local.Value.PrefixLength);
-            var found = new System.Collections.Concurrent.ConcurrentBag<(IPAddress Address, long Ms)>();
+            // Each answer is resolved (reverse DNS) and reported right away, so a caller can show devices while the sweep runs.
+            var found = new System.Collections.Concurrent.ConcurrentBag<Task<LanDevice>>();
+            async Task<LanDevice> ResolveAsync(IPAddress address, long ms)
+            {
+                var device = new LanDevice
+                {
+                    IpAddress = address.ToString(),
+                    HostName = await TryReverseLookupAsync(address, cancellationToken).ConfigureAwait(false),
+                    RoundTripMs = ms
+                };
+                progress?.Report(device);
+                return device;
+            }
             using var gate = new SemaphoreSlim(SweepConcurrency);
             try
             {
@@ -227,7 +241,7 @@ namespace MauiWifiManager
                     {
                         while (!cancellationToken.IsCancellationRequested && queue.TryDequeue(out var host))
                             if (blockingProbe(host, SweepPingTimeout) is long ms)
-                                found.Add((host, ms));
+                                found.Add(ResolveAsync(host, ms));
                     }, cancellationToken, TaskCreationOptions.LongRunning, TaskScheduler.Default))).ConfigureAwait(false);
                     cancellationToken.ThrowIfCancellationRequested();
                 }
@@ -239,7 +253,7 @@ namespace MauiWifiManager
                         using var ping = new Ping();
                         var reply = await ping.SendPingAsync(host, SweepPingTimeout, cancellationToken: cancellationToken).ConfigureAwait(false);
                         if (reply.Status == IPStatus.Success)
-                            found.Add((host, reply.RoundtripTime));
+                            found.Add(ResolveAsync(host, reply.RoundtripTime));
                     }
                     catch (PingException) { }
                     finally
@@ -248,12 +262,7 @@ namespace MauiWifiManager
                     }
                 })).ConfigureAwait(false);
 
-                var devices = await Task.WhenAll(found.Select(async f => new LanDevice
-                {
-                    IpAddress = f.Address.ToString(),
-                    HostName = await TryReverseLookupAsync(f.Address, cancellationToken).ConfigureAwait(false),
-                    RoundTripMs = f.Ms
-                })).ConfigureAwait(false);
+                var devices = await Task.WhenAll(found).ConfigureAwait(false);
                 var sorted = devices.OrderBy(d => IPAddress.Parse(d.IpAddress).GetAddressBytes()[3]).ToList();
                 return WifiManagerResponse<List<LanDevice>>.SuccessResponse(sorted, $"Found {sorted.Count} device(s) on {hosts.Count} addresses.");
             }
