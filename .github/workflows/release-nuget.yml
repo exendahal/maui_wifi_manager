@@ -4,6 +4,11 @@ name: Create a (Pre)release on NuGet
 #   WifiManager.Maui        10.3.0, 10.3.0-beta, 10.3.0-beta1, 10.3.0-preview1
 #   WifiManager.MacVendors  1.0.0-MacVendors, 1.0.0-beta-MacVendors, 1.0.0-beta1-MacVendors, 1.0.0-preview1-MacVendors
 # The package version is the tag without its "-MacVendors" ending.
+#
+# Publishing uses NuGet trusted publishing: each job swaps a short-lived GitHub OIDC token for a
+# temporary NuGet API key (NuGet/login), so no long-lived key is stored in the repository. It needs
+# a trusted publishing policy on nuget.org for this repository and this workflow file, and the
+# NUGET_USER secret set to the nuget.org account name (the profile name, not the email address).
 
 on:
   push:
@@ -21,6 +26,10 @@ jobs:
   release-nuget:
     if: ${{ !endsWith(github.ref_name, '-MacVendors') }}
     runs-on: windows-latest
+
+    permissions:
+      contents: read
+      id-token: write
 
     steps:
       - uses: actions/checkout@v3
@@ -61,14 +70,24 @@ jobs:
       - name: Pack
         run: dotnet pack src\MAUIWifiManager\MauiWifiManager.csproj -c Release /p:Version=${{ steps.get_version.outputs.version }} --no-build --output .
 
+      - name: NuGet login
+        uses: NuGet/login@v1
+        id: login
+        with:
+          user: ${{ secrets.NUGET_USER }}
+
       - name: Push
-        run: dotnet nuget push "*.nupkg" -s https://api.nuget.org/v3/index.json -k ${{ secrets.NUGET_API_KEY }} --skip-duplicate
+        run: dotnet nuget push "*.nupkg" -s https://api.nuget.org/v3/index.json -k ${{ steps.login.outputs.NUGET_API_KEY }} --skip-duplicate
 
   # WifiManager.MacVendors targets .NET Standard 2.0 with no dependencies, so it needs no MAUI
   # workload and builds on Linux.
   release-macvendors:
     if: ${{ endsWith(github.ref_name, '-MacVendors') }}
     runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      id-token: write
 
     steps:
       - uses: actions/checkout@v3
@@ -101,5 +120,11 @@ jobs:
       - name: Pack
         run: dotnet pack src/WifiManager.MacVendors/WifiManager.MacVendors.csproj -c Release /p:Version=${{ steps.get_version.outputs.version }} --no-build --output .
 
+      - name: NuGet login
+        uses: NuGet/login@v1
+        id: login
+        with:
+          user: ${{ secrets.NUGET_USER }}
+
       - name: Push
-        run: dotnet nuget push "*.nupkg" -s https://api.nuget.org/v3/index.json -k ${{ secrets.NUGET_API_KEY }} --skip-duplicate
+        run: dotnet nuget push "*.nupkg" -s https://api.nuget.org/v3/index.json -k ${{ steps.login.outputs.NUGET_API_KEY }} --skip-duplicate
