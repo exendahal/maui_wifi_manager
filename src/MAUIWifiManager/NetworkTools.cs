@@ -85,17 +85,21 @@ namespace MauiWifiManager
             return WifiManagerResponse<PingStatistics>.SuccessResponse(stats, $"{stats.Received}/{stats.Sent} replies.");
         }
 
-        public static Task<WifiManagerResponse<SpeedTestResult>> MeasureSpeedAsync(SpeedTestOptions options, CancellationToken cancellationToken) =>
-            Task.Run(() => MeasureSpeedCoreAsync(options, cancellationToken));
+        private static readonly TimeSpan SpeedProgressInterval = TimeSpan.FromMilliseconds(200);
 
-        private static async Task<WifiManagerResponse<SpeedTestResult>> MeasureSpeedCoreAsync(SpeedTestOptions options, CancellationToken cancellationToken)
+        public static Task<WifiManagerResponse<SpeedTestResult>> MeasureSpeedAsync(SpeedTestOptions options, CancellationToken cancellationToken,
+            IProgress<SpeedTestProgress>? progress = null) =>
+            Task.Run(() => MeasureSpeedCoreAsync(options, progress, cancellationToken));
+
+        internal static async Task<WifiManagerResponse<SpeedTestResult>> MeasureSpeedCoreAsync(SpeedTestOptions options, IProgress<SpeedTestProgress>? progress,
+            CancellationToken cancellationToken)
         {
             try
             {
                 using var client = new HttpClient { Timeout = Timeout.InfiniteTimeSpan };
 
-                var (download, latency) = await MeasureDownloadAsync(client, options, cancellationToken).ConfigureAwait(false);
-                double? upload = options.UploadUrl == null ? null : await MeasureUploadAsync(client, options, cancellationToken).ConfigureAwait(false);
+                var (download, latency) = await MeasureDownloadAsync(client, options, progress, cancellationToken).ConfigureAwait(false);
+                double? upload = options.UploadUrl == null ? null : await MeasureUploadAsync(client, options, progress, cancellationToken).ConfigureAwait(false);
 
                 var result = new SpeedTestResult { DownloadMbps = download, UploadMbps = upload, LatencyMs = latency };
                 return WifiManagerResponse<SpeedTestResult>.SuccessResponse(result, "Speed test complete.");
@@ -114,8 +118,10 @@ namespace MauiWifiManager
         /// Returns throughput plus latency: the fastest time to first byte of a tiny request, measured after
         /// a warm-up request so DNS and the TLS handshake are not counted.
         /// </summary>
-        private static async Task<(double Mbps, double LatencyMs)> MeasureDownloadAsync(HttpClient client, SpeedTestOptions options, CancellationToken cancellationToken)
+        private static async Task<(double Mbps, double LatencyMs)> MeasureDownloadAsync(HttpClient client, SpeedTestOptions options,
+            IProgress<SpeedTestProgress>? progress, CancellationToken cancellationToken)
         {
+            progress?.Report(new SpeedTestProgress { Phase = SpeedTestPhase.Latency });
             double latency = double.MaxValue;
             for (int i = 0; i < 4; i++)
             {
@@ -135,25 +141,68 @@ namespace MauiWifiManager
                     await response.Content.CopyToAsync(Stream.Null, cancellationToken).ConfigureAwait(false);
             }
 
+            double latencyMs = Math.Round(latency, 1);
+            progress?.Report(new SpeedTestProgress { Phase = SpeedTestPhase.Latency, Fraction = 1, LatencyMs = latencyMs });
+
             using var limit = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             limit.CancelAfter(options.MaxDurationPerDirection);
             var buffer = new byte[81920];
             long total = 0;
+            long expected = 0;
             var sw = Stopwatch.StartNew();
-            try
+
+            async Task ReadAsync()
             {
-                using var response = await client.GetAsync(options.DownloadUrl, HttpCompletionOption.ResponseHeadersRead, limit.Token).ConfigureAwait(false);
-                response.EnsureSuccessStatusCode();
-                using var stream = await response.Content.ReadAsStreamAsync(limit.Token).ConfigureAwait(false);
-                int read;
-                while ((read = await stream.ReadAsync(buffer, limit.Token).ConfigureAwait(false)) > 0)
-                    total += read;
+                try
+                {
+                    using var response = await client.GetAsync(options.DownloadUrl, HttpCompletionOption.ResponseHeadersRead, limit.Token).ConfigureAwait(false);
+                    response.EnsureSuccessStatusCode();
+                    Interlocked.Exchange(ref expected, response.Content.Headers.ContentLength ?? 0);
+                    using var stream = await response.Content.ReadAsStreamAsync(limit.Token).ConfigureAwait(false);
+                    int read;
+                    while ((read = await stream.ReadAsync(buffer, limit.Token).ConfigureAwait(false)) > 0)
+                        Interlocked.Add(ref total, read);
+                }
+                catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+                {
+                    // Hit the time limit: measure what arrived so far.
+                }
             }
-            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+
+            await ReportWhileAsync(ReadAsync(), progress,
+                () => Snapshot(SpeedTestPhase.Download, Interlocked.Read(ref total), Interlocked.Read(ref expected), sw.Elapsed, options, latencyMs))
+                .ConfigureAwait(false);
+            return (ToMbps(total, sw.Elapsed), latencyMs);
+        }
+
+        /// <summary>
+        /// Awaits <paramref name="work"/>, reporting a snapshot every <see cref="SpeedProgressInterval"/> while it runs.
+        /// </summary>
+        private static async Task ReportWhileAsync(Task work, IProgress<SpeedTestProgress>? progress, Func<SpeedTestProgress> snapshot)
+        {
+            while (progress != null && !work.IsCompleted)
             {
-                // Hit the time limit: measure what arrived so far.
+                await Task.WhenAny(work, Task.Delay(SpeedProgressInterval)).ConfigureAwait(false);
+                progress.Report(snapshot());
             }
-            return (ToMbps(total, sw.Elapsed), Math.Round(latency, 1));
+            await work.ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// Speed so far, and how far through the phase: by bytes when the size is known, otherwise by time.
+        /// </summary>
+        internal static SpeedTestProgress Snapshot(SpeedTestPhase phase, long bytes, long expectedBytes, TimeSpan elapsed, SpeedTestOptions options,
+            double? latencyMs)
+        {
+            double byTime = elapsed / options.MaxDurationPerDirection;
+            double byBytes = expectedBytes > 0 ? (double)bytes / expectedBytes : 0;
+            return new SpeedTestProgress
+            {
+                Phase = phase,
+                Mbps = ToMbps(bytes, elapsed),
+                Fraction = Math.Clamp(Math.Max(byTime, byBytes), 0, 1),
+                LatencyMs = latencyMs
+            };
         }
 
         /// <summary>
@@ -172,20 +221,29 @@ namespace MauiWifiManager
             return total;
         }
 
-        private static async Task<double> MeasureUploadAsync(HttpClient client, SpeedTestOptions options, CancellationToken cancellationToken)
+        private static async Task<double> MeasureUploadAsync(HttpClient client, SpeedTestOptions options, IProgress<SpeedTestProgress>? progress,
+            CancellationToken cancellationToken)
         {
             using var limit = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             limit.CancelAfter(options.MaxDurationPerDirection);
             var content = new CountingContent(new byte[options.UploadBytes]);
             var sw = Stopwatch.StartNew();
-            try
+
+            async Task PostAsync()
             {
-                using var response = await client.PostAsync(options.UploadUrl, content, limit.Token).ConfigureAwait(false);
-                response.EnsureSuccessStatusCode();
+                try
+                {
+                    using var response = await client.PostAsync(options.UploadUrl, content, limit.Token).ConfigureAwait(false);
+                    response.EnsureSuccessStatusCode();
+                }
+                catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+                {
+                }
             }
-            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
-            {
-            }
+
+            await ReportWhileAsync(PostAsync(), progress,
+                () => Snapshot(SpeedTestPhase.Upload, Interlocked.Read(ref content.BytesSent), options.UploadBytes, sw.Elapsed, options, null))
+                .ConfigureAwait(false);
             return ToMbps(content.BytesSent, sw.Elapsed);
         }
 
