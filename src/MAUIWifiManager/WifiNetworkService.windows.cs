@@ -340,7 +340,7 @@ namespace MauiWifiManager
                 networkData.SignalStrength = profile.GetSignalBars();
 
                 if (profile.NetworkSecuritySettings != null)
-                    networkData.SecurityType = GetSecurityType(profile.NetworkSecuritySettings.NetworkAuthenticationType);
+                    networkData.SecurityType = GetSecurityType(profile.NetworkSecuritySettings.NetworkAuthenticationType, profile.NetworkSecuritySettings.NetworkEncryptionType);
 
                 var networkInterface = NetworkInterface.GetAllNetworkInterfaces()
                     .FirstOrDefault(n => n.NetworkInterfaceType == NetworkInterfaceType.Wireless80211
@@ -725,7 +725,7 @@ namespace MauiWifiManager
                 Ssid = network.Ssid,
                 Bssid = network.Bssid,
                 SignalStrength = network.SignalBars,
-                SecurityType = network.PhyKind,
+                SecurityType = GetSecurityType(network.SecuritySettings.NetworkAuthenticationType, network.SecuritySettings.NetworkEncryptionType),
                 FrequencyBand = freqMHz > 0 ? GetBandFromFrequencyMHz(freqMHz) : WifiFrequencyBand.Unknown,
                 ChannelNumber = freqMHz > 0 ? GetChannelFromFrequencyMHz(freqMHz) : null,
                 RssiDbm = (int)network.NetworkRssiInDecibelMilliwatts,
@@ -1187,16 +1187,22 @@ namespace MauiWifiManager
             return null;
         }
 
-        private string GetSecurityType(NetworkAuthenticationType authType)
+        private static string GetSecurityType(NetworkAuthenticationType authType, NetworkEncryptionType encryptionType)
         {
             return authType switch
             {
+                NetworkAuthenticationType.Wpa3Sae => "WPA3-SAE",
+                NetworkAuthenticationType.Wpa3 => "WPA3-Enterprise",
+                NetworkAuthenticationType.Owe => "OWE (Enhanced Open)",
                 NetworkAuthenticationType.RsnaPsk => "WPA2-PSK",
                 NetworkAuthenticationType.Rsna => "WPA2-Enterprise",
                 NetworkAuthenticationType.WpaPsk => "WPA-PSK",
                 NetworkAuthenticationType.Wpa => "WPA-Enterprise",
+                NetworkAuthenticationType.SharedKey80211 => "WEP",
+                // Open authentication with WEP encryption is still WEP, not an open network.
+                NetworkAuthenticationType.Open80211 when encryptionType == NetworkEncryptionType.Wep => "WEP",
                 NetworkAuthenticationType.Open80211 => "Open (No Security)",
-                _ => "Unknown or WPA3"
+                _ => "Unknown"
             };
         }
 
