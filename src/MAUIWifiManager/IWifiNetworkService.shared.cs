@@ -308,6 +308,36 @@ namespace MauiWifiManager
         Task<WifiManagerResponse<SpeedTestResult>> MeasureSpeedAsync(SpeedTestOptions? options = null, CancellationToken cancellationToken = default)
             => NetworkTools.MeasureSpeedAsync(options ?? new SpeedTestOptions(), cancellationToken);
 
+        /// <summary>
+        /// Traces the route to <paramref name="host"/> one hop at a time, reporting each hop to <paramref name="progress"/>
+        /// as it answers. A hop that does not answer has a null <see cref="TracerouteHop.Address"/>.
+        /// </summary>
+        Task<WifiManagerResponse<List<TracerouteHop>>> TracerouteAsync(string host, int maxHops = 30, IProgress<TracerouteHop>? progress = null,
+            CancellationToken cancellationToken = default)
+            => NetworkDiagnostics.TracerouteAsync(host, maxHops, progress, cancellationToken);
+
+        /// <summary>
+        /// Queries a DNS server directly for one record type. <paramref name="server"/> is an IP address; when omitted the
+        /// system's DNS server is used, or 1.1.1.1 where the platform does not expose it.
+        /// </summary>
+        Task<WifiManagerResponse<DnsLookupResult>> LookupDnsAsync(string name, DnsRecordType type = DnsRecordType.A, string? server = null,
+            CancellationToken cancellationToken = default)
+            => NetworkDiagnostics.LookupDnsAsync(name, type, server, cancellationToken);
+
+        /// <summary>
+        /// Checks which TCP ports accept a connection on <paramref name="host"/>, reporting each result as it completes.
+        /// </summary>
+        Task<WifiManagerResponse<List<PortCheckResult>>> CheckPortsAsync(string host, IEnumerable<int> ports, IProgress<PortCheckResult>? progress = null,
+            CancellationToken cancellationToken = default)
+            => NetworkDiagnostics.CheckPortsAsync(host, ports, progress, cancellationToken);
+
+        /// <summary>
+        /// Sends a Wake-on-LAN magic packet for <paramref name="macAddress"/> to the limited broadcast address and, when given,
+        /// to <paramref name="broadcastAddress"/>. Success means the packet was sent; the device does not reply.
+        /// </summary>
+        Task<WifiManagerResponse<bool>> WakeOnLanAsync(string macAddress, string? broadcastAddress = null, CancellationToken cancellationToken = default)
+            => NetworkDiagnostics.WakeOnLanAsync(macAddress, broadcastAddress, cancellationToken);
+
         private static WifiManagerResponse<T> NotSupported<T>(string operation)
             => WifiManagerResponse<T>.ErrorResponse(WifiErrorCodes.UnsupportedHardware, $"{operation} is not supported on this platform.");
     }

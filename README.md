@@ -634,6 +634,24 @@ var types = await CrossWifiManager.Current.BrowseServicesAsync();
 var printers = await CrossWifiManager.Current.BrowseServicesAsync("_ipp._tcp");
 foreach (var printer in printers.Data ?? [])
     Debug.WriteLine($"{printer.Name} at {printer.IpAddress}:{printer.Port}");
+
+// Traceroute, with each hop as it answers
+var hops = new Progress<TracerouteHop>(hop =>
+    Debug.WriteLine($"{hop.Hop}  {hop.Address ?? "*"}  {hop.HostName}  {hop.RoundTripMs} ms"));
+var route = await CrossWifiManager.Current.TracerouteAsync("one.one.one.one", maxHops: 30, progress: hops);
+
+// DNS lookup straight against a server (the system's by default)
+var mx = await CrossWifiManager.Current.LookupDnsAsync("example.com", DnsRecordType.Mx, server: "8.8.8.8");
+foreach (var record in mx.Data?.Records ?? [])
+    Debug.WriteLine($"{record.Type} {record.Value} (TTL {record.TimeToLiveSeconds} s)");
+
+// Which TCP ports are open
+var ports = await CrossWifiManager.Current.CheckPortsAsync("192.168.1.1", [22, 80, 443, 8080]);
+foreach (var port in ports.Data ?? [])
+    Debug.WriteLine($"{port.Port} {port.Service} {(port.IsOpen ? "open" : "closed")}");
+
+// Wake a sleeping computer
+await CrossWifiManager.Current.WakeOnLanAsync("AA:BB:CC:DD:EE:FF", broadcastAddress: "192.168.1.255");
 ```
 
 **Notes:**
@@ -642,7 +660,12 @@ foreach (var printer in printers.Data ?? [])
 - MAC addresses come from the ARP table on Windows. Android 10+ and iOS hide it, so there the MAC is only known when the device answers NetBIOS. `IsRandomizedMac` tells you when a device (typically a phone) uses a private address.
 - `Vendor` (on `LanDeviceDetails` and `HotspotClient`) and `MacVendor.Lookup` name the adapter's manufacturer from the bundled IEEE MA-L registry (about 40,000 prefixes, 340 KB). It works offline and returns `null` for private addresses. The table loads on first use, so call it off the UI thread the first time. Regenerate it with `python tools/update_oui.py`.
 - Android blocks plain `http://` requests by default, which stops the web page title and UPnP lookups. To allow them, add `android:usesCleartextTraffic="true"` to the `<application>` element in `AndroidManifest.xml`, or allow cleartext only for local addresses with a [network security config](https://developer.android.com/privacy-and-security/security-config).
-- Ping, speed test, device discovery and mDNS are shared .NET code. They also work for custom `IWifiNetworkService` implementations.
+- `TracerouteAsync` sends pings with increasing TTL. Routers that drop ICMP show as hops with a null `Address`. On Android .NET has no raw sockets and runs the system `ping` per hop, so intermediate hop times are approximate (the process start is measured and subtracted); the final hop's time is exact.
+- `LookupDnsAsync` supports A, AAAA, CNAME, MX, TXT and NS. `NameNotFound` is true when the name does not exist (NXDOMAIN). Android does not expose the system DNS server to .NET, so there it asks 1.1.1.1 unless you pass `server`.
+- `CheckPortsAsync` treats a port as open when a TCP connection succeeds within 800 ms. `Service` names well-known ports.
+- `WakeOnLanAsync` only sends the packet; the target must have Wake-on-LAN enabled and be on the same network.
+- The speed test's latency is the fastest of three requests to `SpeedTestOptions.LatencyUrl`, minus the server's own processing time from its `Server-Timing` header.
+- Ping, speed test, device discovery, mDNS, traceroute, DNS lookup, port check and Wake-on-LAN are shared .NET code. They also work for custom `IWifiNetworkService` implementations.
 
 ---
 
@@ -685,6 +708,7 @@ foreach (var printer in printers.Data ?? [])
 | Local Network Device Discovery       | ✅          | ✅          | ✅          | Devices must answer ping                                  |
 | Device Details (name, MAC, model, ports) | ✅*     | ✅*         | ✅          | *MAC only via NetBIOS on Android 10+ and iOS              |
 | MAC Manufacturer Lookup              | ✅          | ✅          | ✅          | Offline, IEEE MA-L registry                               |
+| Traceroute / DNS / Port Check / Wake-on-LAN | ✅      | ✅          | ✅          | Shared .NET code                                          |
 | mDNS / Bonjour Browsing              | ✅          | ✅*         | ✅          | *Needs Apple's multicast entitlement                      |
 | Broadcast Address / Prefix Length    | ✅          | ✅          | ✅          |                                                           |
 

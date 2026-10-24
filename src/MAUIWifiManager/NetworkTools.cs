@@ -111,21 +111,28 @@ namespace MauiWifiManager
         }
 
         /// <summary>
-        /// Returns throughput plus latency: the fastest time to first byte of a one-byte ranged request,
-        /// measured after a warm-up request so DNS and the TLS handshake are not counted.
+        /// Returns throughput plus latency: the fastest time to first byte of a tiny request, measured after
+        /// a warm-up request so DNS and the TLS handshake are not counted.
         /// </summary>
         private static async Task<(double Mbps, double LatencyMs)> MeasureDownloadAsync(HttpClient client, SpeedTestOptions options, CancellationToken cancellationToken)
         {
             double latency = double.MaxValue;
             for (int i = 0; i < 4; i++)
             {
-                using var request = new HttpRequestMessage(HttpMethod.Get, options.DownloadUrl);
-                request.Headers.Range = new System.Net.Http.Headers.RangeHeaderValue(0, 0);
+                using var request = new HttpRequestMessage(HttpMethod.Get, options.LatencyUrl ?? options.DownloadUrl);
+                if (options.LatencyUrl == null)
+                    request.Headers.Range = new System.Net.Http.Headers.RangeHeaderValue(0, 0);
                 var probe = Stopwatch.StartNew();
                 using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
                 response.EnsureSuccessStatusCode();
                 if (i > 0)
-                    latency = Math.Min(latency, probe.Elapsed.TotalMilliseconds);
+                    latency = Math.Min(latency, Math.Max(0, probe.Elapsed.TotalMilliseconds - ServerTimeMs(response)));
+
+                // Drained so the connection goes back to the pool: a connection dropped with its body
+                // unread makes the next probe pay for a new TLS handshake. Only the tiny probe; a
+                // download URL that ignored the range would be the whole file.
+                if (options.LatencyUrl != null)
+                    await response.Content.CopyToAsync(Stream.Null, cancellationToken).ConfigureAwait(false);
             }
 
             using var limit = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -147,6 +154,22 @@ namespace MauiWifiManager
                 // Hit the time limit: measure what arrived so far.
             }
             return (ToMbps(total, sw.Elapsed), Math.Round(latency, 1));
+        }
+
+        /// <summary>
+        /// Time the server says it spent on the request (the <c>dur</c> values of its Server-Timing headers),
+        /// so latency is the network's share of the wait rather than the server's.
+        /// </summary>
+        internal static double ServerTimeMs(HttpResponseMessage response)
+        {
+            if (!response.Headers.TryGetValues("Server-Timing", out var values))
+                return 0;
+            double total = 0;
+            foreach (var value in values)
+                foreach (System.Text.RegularExpressions.Match match in System.Text.RegularExpressions.Regex.Matches(value, @"dur=([0-9.]+)"))
+                    if (double.TryParse(match.Groups[1].Value, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var ms))
+                        total += ms;
+            return total;
         }
 
         private static async Task<double> MeasureUploadAsync(HttpClient client, SpeedTestOptions options, CancellationToken cancellationToken)
@@ -272,7 +295,7 @@ namespace MauiWifiManager
             }
         }
 
-        private static async Task<string?> TryReverseLookupAsync(IPAddress address, CancellationToken cancellationToken)
+        internal static async Task<string?> TryReverseLookupAsync(IPAddress address, CancellationToken cancellationToken)
         {
             try
             {

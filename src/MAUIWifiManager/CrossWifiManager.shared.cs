@@ -459,6 +459,42 @@ namespace MauiWifiManager
         }
 
         /// <summary>
+        /// Traces the route to a host, reporting each hop as it answers.
+        /// </summary>
+        public static Task<Abstractions.WifiManagerResponse<List<Abstractions.TracerouteHop>>> TracerouteAsync(string host, int maxHops = 30,
+            IProgress<Abstractions.TracerouteHop>? progress = null, CancellationToken cancellationToken = default)
+        {
+            return Current.TracerouteAsync(host, maxHops, progress, cancellationToken);
+        }
+
+        /// <summary>
+        /// Queries a DNS server for one record type.
+        /// </summary>
+        public static Task<Abstractions.WifiManagerResponse<Abstractions.DnsLookupResult>> LookupDnsAsync(string name,
+            Abstractions.DnsRecordType type = Abstractions.DnsRecordType.A, string? server = null, CancellationToken cancellationToken = default)
+        {
+            return Current.LookupDnsAsync(name, type, server, cancellationToken);
+        }
+
+        /// <summary>
+        /// Checks which TCP ports accept a connection on a host.
+        /// </summary>
+        public static Task<Abstractions.WifiManagerResponse<List<Abstractions.PortCheckResult>>> CheckPortsAsync(string host, IEnumerable<int> ports,
+            IProgress<Abstractions.PortCheckResult>? progress = null, CancellationToken cancellationToken = default)
+        {
+            return Current.CheckPortsAsync(host, ports, progress, cancellationToken);
+        }
+
+        /// <summary>
+        /// Sends a Wake-on-LAN magic packet.
+        /// </summary>
+        public static Task<Abstractions.WifiManagerResponse<bool>> WakeOnLanAsync(string macAddress, string? broadcastAddress = null,
+            CancellationToken cancellationToken = default)
+        {
+            return Current.WakeOnLanAsync(macAddress, broadcastAddress, cancellationToken);
+        }
+
+        /// <summary>
         /// Dispose of everything
         /// </summary>
         public static void Dispose()
