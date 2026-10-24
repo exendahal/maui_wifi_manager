@@ -594,6 +594,39 @@ await CrossWifiManager.Current.StopHotspotAsync();
 
 ---
 
+### MAC Manufacturer Lookup
+
+Naming a device's manufacturer from its MAC address needs the IEEE MA-L registry (about 40,000
+prefixes). It ships as a separate package, [`WifiManager.MacVendors`](https://www.nuget.org/packages/WifiManager.MacVendors),
+so `WifiManager.Maui` stays small for apps that don't use it. The data package has no dependencies and
+works on any .NET platform, MAUI or not.
+
+```xml
+<PackageReference Include="WifiManager.MacVendors" Version="1.0.0" />
+```
+
+Plug it in once at startup:
+
+```csharp
+using MauiWifiManager.Abstractions;
+using WifiManager.MacVendors;
+
+builder.UseMauiWifiManager();
+MacVendor.SetLookup(MacVendorRegistry.Lookup);
+
+MacVendor.Lookup("3C:CD:57:73:6E:E2");       // "Xiaomi Mobile Software"
+details.Data?.Vendor;                        // filled in for LanDeviceDetails and HotspotClient
+```
+
+Outside MAUI, use the registry directly: `MacVendorRegistry.Lookup("3C:CD:57:73:6E:E2")`.
+
+**Notes:**
+- Private (randomized) addresses, unknown prefixes and malformed input return `null`.
+- The registry (337 KB) loads on the first lookup, in tens of milliseconds, so make that first call off the UI thread.
+- To use your own copy or another source, pass any `Func<string, string?>` to `MacVendor.SetLookup`.
+- Maintainers: refresh the registry from IEEE with `python tools/update_oui.py`; it rewrites
+  `src/WifiManager.MacVendors/Resources/oui.tsv.gz`, which is also in the repository for anyone who wants the raw data.
+
 ### Network Diagnostics
 
 ```csharp
@@ -626,7 +659,7 @@ var details = await CrossWifiManager.Current.GetDeviceDetailsAsync("192.168.1.1"
 Debug.WriteLine($"{details.Data?.HttpTitle} {details.Data?.MacAddress} ports: {string.Join(", ", details.Data?.OpenPorts ?? [])}");
 Debug.WriteLine($"made by {details.Data?.Vendor}"); // e.g. "Espressif", from the MAC address
 
-// Manufacturer of any MAC address, offline
+// Manufacturer of any MAC address, offline (needs WifiManager.MacVendors, see below)
 string? vendor = MacVendor.Lookup("3C:CD:57:73:6E:E2"); // "Xiaomi Mobile Software"
 
 // mDNS / Bonjour: list service types, then the devices for one type
@@ -658,8 +691,7 @@ await CrossWifiManager.Current.WakeOnLanAsync("AA:BB:CC:DD:EE:FF", broadcastAddr
 - Device discovery only finds devices that answer ping, and on larger networks it covers only the /24 around this device.
 - `GetDeviceDetailsAsync` combines reverse DNS, NetBIOS (computer name and MAC), UPnP (manufacturer and model), a check of common ports (`LanDeviceDetails.KnownPorts`), the device's web page title and ping. Devices only reveal what they answer to, so many fields can be empty.
 - MAC addresses come from the ARP table on Windows. Android 10+ and iOS hide it, so there the MAC is only known when the device answers NetBIOS. `IsRandomizedMac` tells you when a device (typically a phone) uses a private address.
-- `Vendor` (on `LanDeviceDetails` and `HotspotClient`) and `MacVendor.Lookup` name the adapter's manufacturer from the bundled IEEE MA-L registry (about 40,000 prefixes, 340 KB). It works offline and returns `null` for private addresses. The table loads on first use, so call it off the UI thread the first time. Regenerate it with `python tools/update_oui.py`.
-- The same registry is also published on its own as [`WifiManager.MacVendors`](https://www.nuget.org/packages/WifiManager.MacVendors), a dependency-free .NET Standard 2.0 package for any .NET app, MAUI or not: `MacVendorRegistry.Lookup("3C:CD:57:73:6E:E2")`.
+- `Vendor` (on `LanDeviceDetails` and `HotspotClient`) and `MacVendor.Lookup` name the adapter's manufacturer. The registry behind them is **not** in this package, so apps that don't need it don't carry it; see [MAC Manufacturer Lookup](#mac-manufacturer-lookup). Without it they return `null`.
 - Android blocks plain `http://` requests by default, which stops the web page title and UPnP lookups. To allow them, add `android:usesCleartextTraffic="true"` to the `<application>` element in `AndroidManifest.xml`, or allow cleartext only for local addresses with a [network security config](https://developer.android.com/privacy-and-security/security-config).
 - `TracerouteAsync` sends pings with increasing TTL. Routers that drop ICMP show as hops with a null `Address`. On Android .NET has no raw sockets and runs the system `ping` per hop, so intermediate hop times are approximate (the process start is measured and subtracted); the final hop's time is exact.
 - `LookupDnsAsync` supports A, AAAA, CNAME, MX, TXT and NS. `NameNotFound` is true when the name does not exist (NXDOMAIN). Android does not expose the system DNS server to .NET, so there it asks 1.1.1.1 unless you pass `server`.
@@ -708,7 +740,7 @@ await CrossWifiManager.Current.WakeOnLanAsync("AA:BB:CC:DD:EE:FF", broadcastAddr
 | Ping / Speed Test                    | ✅          | ✅          | ✅          |                                                           |
 | Local Network Device Discovery       | ✅          | ✅          | ✅          | Devices must answer ping                                  |
 | Device Details (name, MAC, model, ports) | ✅*     | ✅*         | ✅          | *MAC only via NetBIOS on Android 10+ and iOS              |
-| MAC Manufacturer Lookup              | ✅          | ✅          | ✅          | Offline, IEEE MA-L registry                               |
+| MAC Manufacturer Lookup              | ✅          | ✅          | ✅          | Opt-in: `WifiManager.MacVendors` package                  |
 | Traceroute / DNS / Port Check / Wake-on-LAN | ✅      | ✅          | ✅          | Shared .NET code                                          |
 | mDNS / Bonjour Browsing              | ✅          | ✅*         | ✅          | *Needs Apple's multicast entitlement                      |
 | Broadcast Address / Prefix Length    | ✅          | ✅          | ✅          |                                                           |
