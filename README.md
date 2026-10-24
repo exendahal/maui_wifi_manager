@@ -624,6 +624,10 @@ await CrossWifiManager.Current.DiscoverDevicesAsync(live);
 // Everything one device reveals: names, MAC, manufacturer/model, open ports, web page title, ping (about 3 s)
 var details = await CrossWifiManager.Current.GetDeviceDetailsAsync("192.168.1.1");
 Debug.WriteLine($"{details.Data?.HttpTitle} {details.Data?.MacAddress} ports: {string.Join(", ", details.Data?.OpenPorts ?? [])}");
+Debug.WriteLine($"made by {details.Data?.Vendor}"); // e.g. "Espressif", from the MAC address
+
+// Manufacturer of any MAC address, offline
+string? vendor = MacVendor.Lookup("3C:CD:57:73:6E:E2"); // "Xiaomi Mobile Software"
 
 // mDNS / Bonjour: list service types, then the devices for one type
 var types = await CrossWifiManager.Current.BrowseServicesAsync();
@@ -636,6 +640,7 @@ foreach (var printer in printers.Data ?? [])
 - Device discovery only finds devices that answer ping, and on larger networks it covers only the /24 around this device.
 - `GetDeviceDetailsAsync` combines reverse DNS, NetBIOS (computer name and MAC), UPnP (manufacturer and model), a check of common ports (`LanDeviceDetails.KnownPorts`), the device's web page title and ping. Devices only reveal what they answer to, so many fields can be empty.
 - MAC addresses come from the ARP table on Windows. Android 10+ and iOS hide it, so there the MAC is only known when the device answers NetBIOS. `IsRandomizedMac` tells you when a device (typically a phone) uses a private address.
+- `Vendor` (on `LanDeviceDetails` and `HotspotClient`) and `MacVendor.Lookup` name the adapter's manufacturer from the bundled IEEE MA-L registry (about 40,000 prefixes, 340 KB). It works offline and returns `null` for private addresses. The table loads on first use, so call it off the UI thread the first time. Regenerate it with `python tools/update_oui.py`.
 - Android blocks plain `http://` requests by default, which stops the web page title and UPnP lookups. To allow them, add `android:usesCleartextTraffic="true"` to the `<application>` element in `AndroidManifest.xml`, or allow cleartext only for local addresses with a [network security config](https://developer.android.com/privacy-and-security/security-config).
 - Ping, speed test, device discovery and mDNS are shared .NET code. They also work for custom `IWifiNetworkService` implementations.
 
@@ -679,6 +684,7 @@ foreach (var printer in printers.Data ?? [])
 | Ping / Speed Test                    | ✅          | ✅          | ✅          |                                                           |
 | Local Network Device Discovery       | ✅          | ✅          | ✅          | Devices must answer ping                                  |
 | Device Details (name, MAC, model, ports) | ✅*     | ✅*         | ✅          | *MAC only via NetBIOS on Android 10+ and iOS              |
+| MAC Manufacturer Lookup              | ✅          | ✅          | ✅          | Offline, IEEE MA-L registry                               |
 | mDNS / Bonjour Browsing              | ✅          | ✅*         | ✅          | *Needs Apple's multicast entitlement                      |
 | Broadcast Address / Prefix Length    | ✅          | ✅          | ✅          |                                                           |
 
