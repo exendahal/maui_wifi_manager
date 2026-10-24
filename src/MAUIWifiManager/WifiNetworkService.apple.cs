@@ -59,20 +59,24 @@ namespace MauiWifiManager
 
         public Task<WifiManagerResponse<NetworkData>> ConnectWifiAsync(string ssid, string password, WifiConnectionOptions options, CancellationToken cancellationToken = default)
         {
-            return ApplyConfigurationAsync(ssid, () => CreateHotspotConfiguration(ssid, password, options, joinOnce: false), cancellationToken);
+            return ApplyConfigurationAsync(ssid, () => CreateHotspotConfiguration(ssid, password, options, joinOnce: false), cancellationToken, options.Timeout);
         }
 
         private static NEHotspotConfiguration CreateHotspotConfiguration(string ssid, string password, WifiConnectionOptions options, bool joinOnce)
         {
             NEHotspotConfiguration config;
+            // With ssidIsPrefix iOS 13+ joins the first visible network whose SSID starts with the prefix.
+            bool isPrefix = options.IsSsidPrefix && IsAppleVersionAtLeast(13);
             if (options.SecurityType == WifiSecurityType.Open || string.IsNullOrEmpty(password))
             {
-                config = new NEHotspotConfiguration(ssid);
+                config = isPrefix ? new NEHotspotConfiguration(ssid, ssidIsPrefix: true) : new NEHotspotConfiguration(ssid);
             }
             else
             {
                 bool isWep = options.SecurityType == WifiSecurityType.Wep;
-                config = new NEHotspotConfiguration(ssid, password, isWep: isWep);
+                config = isPrefix
+                    ? new NEHotspotConfiguration(ssid, password, isWep: isWep, ssidIsPrefix: true)
+                    : new NEHotspotConfiguration(ssid, password, isWep: isWep);
             }
 
             config.JoinOnce = joinOnce;
@@ -84,7 +88,7 @@ namespace MauiWifiManager
             return config;
         }
 
-        private async Task<WifiManagerResponse<NetworkData>> ApplyConfigurationAsync(string ssid, Func<NEHotspotConfiguration> createConfig, CancellationToken cancellationToken)
+        private async Task<WifiManagerResponse<NetworkData>> ApplyConfigurationAsync(string ssid, Func<NEHotspotConfiguration> createConfig, CancellationToken cancellationToken, TimeSpan? timeout = null)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -100,7 +104,7 @@ namespace MauiWifiManager
                     tcs.TrySetResult(err);
                 });
 
-                var error = await tcs.Task.WaitAsync(cancellationToken);
+                var error = await tcs.Task.WaitAsync(timeout ?? Timeout.InfiniteTimeSpan, cancellationToken);
 
                 if (error == null)
                 {
@@ -118,6 +122,10 @@ namespace MauiWifiManager
                     Debug.WriteLine($"Connection failed: {error.LocalizedDescription}");
                     return WifiManagerResponse<NetworkData>.ErrorResponse(WifiErrorCodes.NetworkUnavailable, $"Failed to connect: {error.LocalizedDescription}");
                 }
+            }
+            catch (TimeoutException)
+            {
+                return WifiManagerResponse<NetworkData>.ErrorResponse(WifiErrorCodes.OperationTimeout, "Timed out connecting to the network.");
             }
             catch (Exception ex)
             {
@@ -444,8 +452,9 @@ namespace MauiWifiManager
         {
             // JoinOnce keeps the network out of the saved list and lets iOS leave it when the app goes to the background.
             // iOS keeps traffic for the access point's own subnet on Wi-Fi even when it has no internet.
-            var response = await ApplyConfigurationAsync(ssid, () => CreateHotspotConfiguration(ssid, password, options, joinOnce: true), cancellationToken);
-            _LocalOnlySsid = response.ErrorCode == WifiErrorCodes.Success ? ssid : null;
+            var response = await ApplyConfigurationAsync(ssid, () => CreateHotspotConfiguration(ssid, password, options, joinOnce: true), cancellationToken, options.Timeout);
+            // With a prefix the joined network's real SSID is what has to be removed later.
+            _LocalOnlySsid = response.ErrorCode == WifiErrorCodes.Success ? response.Data?.Ssid ?? ssid : null;
             return response;
         }
 

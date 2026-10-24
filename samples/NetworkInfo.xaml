@@ -6,7 +6,7 @@
     Title="Connection">
     <RefreshView x:Name="refreshView" Refreshing="OnRefreshing">
         <ScrollView>
-            <VerticalStackLayout Padding="{OnPlatform Default='20,16,20,32', WinUI='40,28,40,40'}">
+            <VerticalStackLayout Padding="{OnIdiom Phone='20,16,20,32', Default='40,28,40,40'}">
                 <Label Style="{StaticResource PageTitle}" Text="Connection" />
 
                 <Border

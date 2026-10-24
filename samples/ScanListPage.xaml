@@ -5,7 +5,7 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
     xmlns:local="clr-namespace:DemoApp"
     Title="Networks">
-    <Grid Padding="{OnPlatform Default='20,16,20,0', WinUI='40,28,40,0'}" RowDefinitions="Auto,Auto,*">
+    <Grid Padding="{OnIdiom Phone='20,16,20,0', Default='40,28,40,0'}" RowDefinitions="Auto,Auto,*">
         <Grid ColumnDefinitions="*,Auto">
             <VerticalStackLayout Spacing="2">
                 <Label Style="{StaticResource PageTitle}" Text="Networks" />
@@ -24,7 +24,7 @@
             <HorizontalStackLayout
                 Grid.Column="1"
                 Spacing="8"
-                VerticalOptions="{OnPlatform Default=Start, WinUI=Center}">
+                VerticalOptions="{OnIdiom Phone=Start, Default=Center}">
                 <!-- Pull to refresh is a touch gesture, so Windows gets an explicit button for the one-off scan. -->
                 <Button
                     Clicked="RefreshClicked"
@@ -34,7 +34,7 @@
                 <Button
                     x:Name="scanBtn"
                     Clicked="ScanClicked"
-                    Style="{OnPlatform Default={StaticResource TextButton}, WinUI={StaticResource BaseButton}}" />
+                    Style="{OnIdiom Phone={StaticResource TextButton}, Default={StaticResource BaseButton}}" />
             </HorizontalStackLayout>
         </Grid>
 

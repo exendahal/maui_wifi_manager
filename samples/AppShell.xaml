@@ -7,9 +7,9 @@
     xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
     Title="Wi-Fi Manager"
     FlyoutBackgroundColor="Transparent"
-    FlyoutBehavior="{OnPlatform Default=Disabled, WinUI=Locked}"
+    FlyoutBehavior="{OnIdiom Phone=Disabled, Default=Locked}"
     FlyoutWidth="280"
-    Shell.TabBarIsVisible="{OnPlatform Default=True, WinUI=False}">
+    Shell.TabBarIsVisible="{OnIdiom Phone=True, Default=False}">
     <!-- Phones show the three pages as bottom tabs; Windows shows them in a left navigation pane. -->
     <Shell.Behaviors>
         <toolkit:StatusBarBehavior StatusBarColor="{AppThemeBinding Light={StaticResource BackgroundLight}, Dark={StaticResource BackgroundDark}}" StatusBarStyle="{AppThemeBinding Light=DarkContent, Dark=LightContent}" />
@@ -33,6 +33,12 @@
             ContentTemplate="{DataTemplate local:ConnectWifi}"
             Icon="tab_connect.png"
             Route="connect" />
+        <ShellContent
+            x:Name="analyzerItem"
+            Title="Analyzer"
+            ContentTemplate="{DataTemplate local:AnalyzerPage}"
+            Icon="tab_analyzer.png"
+            Route="analyzer" />
         <ShellContent
             x:Name="toolsItem"
             Title="Tools"

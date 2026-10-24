@@ -204,6 +204,103 @@ namespace MauiWifiManager
         Task<WifiManagerResponse<bool>> ReleaseLocalOnlyAsync(CancellationToken cancellationToken = default)
             => Task.FromResult(NotSupported<bool>(nameof(ReleaseLocalOnlyAsync)));
 
+        /// <summary>
+        /// Raised when the device switches between Wi-Fi, mobile data, Ethernet and offline, or gains or loses internet access.
+        /// </summary>
+        event EventHandler<ConnectionTypeChangedEventArgs>? ConnectionTypeChanged
+        {
+            add => ConnectionMonitor.Add(this, value);
+            remove => ConnectionMonitor.Remove(value);
+        }
+
+        /// <summary>
+        /// Lists the kinds of network the device is connected to (Wi-Fi, mobile data, Ethernet, Bluetooth); empty when offline.
+        /// </summary>
+        Task<WifiManagerResponse<List<NetworkConnectionType>>> GetConnectionTypesAsync(CancellationToken cancellationToken = default)
+            => Task.FromResult(ConnectionMonitor.GetConnectionTypes());
+
+        /// <summary>
+        /// Reports whether a Wi-Fi scan can start now, and if not, why (Wi-Fi off, permission, location off, throttled).
+        /// Supported on Android and Windows.
+        /// </summary>
+        Task<WifiManagerResponse<WifiScanAvailability>> CanStartScanAsync(CancellationToken cancellationToken = default)
+            => Task.FromResult(NotSupported<WifiScanAvailability>(nameof(CanStartScanAsync)));
+
+        /// <summary>
+        /// Raised whenever the OS finishes a Wi-Fi scan, including scans the system or other apps started.
+        /// Listening costs no scan quota. Supported on Android and Windows.
+        /// </summary>
+        event EventHandler<WifiScanResultsEventArgs>? ScanResultsAvailable { add { } remove { } }
+
+        /// <summary>
+        /// Checks internet access by requesting <paramref name="probeUrl"/>; any 2xx response counts as available.
+        /// Use this where the OS check is unreliable, e.g. networks that block the default probe servers.
+        /// </summary>
+        Task<WifiManagerResponse<bool>> IsInternetAvailableAsync(Uri probeUrl, CancellationToken cancellationToken = default)
+            => NetworkTools.ProbeInternetAsync(probeUrl, cancellationToken);
+
+        /// <summary>
+        /// Turns Wi-Fi on or off. Android 10+ does not allow apps to do this, so it opens the system Wi-Fi panel instead and
+        /// returns <see langword="false"/> in <see cref="WifiManagerResponse{T}.Data"/>. Supported on Android and Windows.
+        /// </summary>
+        Task<WifiManagerResponse<bool>> SetWifiEnabledAsync(bool enabled, CancellationToken cancellationToken = default)
+            => Task.FromResult(NotSupported<bool>(nameof(SetWifiEnabledAsync)));
+
+        /// <summary>
+        /// Starts a hotspot and returns its credentials. Android starts a local-only hotspot (devices connect to this phone,
+        /// no internet sharing); Windows turns on Mobile Hotspot and shares the current connection.
+        /// </summary>
+        Task<WifiManagerResponse<HotspotInfo>> StartHotspotAsync(CancellationToken cancellationToken = default)
+            => Task.FromResult(NotSupported<HotspotInfo>(nameof(StartHotspotAsync)));
+
+        /// <summary>
+        /// Stops the hotspot started by <see cref="StartHotspotAsync"/>.
+        /// </summary>
+        Task<WifiManagerResponse<bool>> StopHotspotAsync(CancellationToken cancellationToken = default)
+            => Task.FromResult(NotSupported<bool>(nameof(StopHotspotAsync)));
+
+        /// <summary>
+        /// Lists devices connected to the hotspot. Supported on Windows only.
+        /// </summary>
+        Task<WifiManagerResponse<List<HotspotClient>>> GetHotspotClientsAsync(CancellationToken cancellationToken = default)
+            => Task.FromResult(NotSupported<List<HotspotClient>>(nameof(GetHotspotClientsAsync)));
+
+        /// <summary>
+        /// Finds devices on the local network by pinging every address in the subnet (at most the /24 around this device),
+        /// then looking up their host names. Devices that ignore ping are not found.
+        /// </summary>
+        Task<WifiManagerResponse<List<LanDevice>>> DiscoverDevicesAsync(CancellationToken cancellationToken = default)
+            => NetworkTools.DiscoverDevicesAsync(cancellationToken);
+
+        /// <summary>
+        /// Collects what a device on the local network reveals: host name, NetBIOS name, MAC address (Windows, or NetBIOS),
+        /// UPnP manufacturer and model, open well-known ports, its web page title, and ping times. Takes about 3 seconds.
+        /// </summary>
+        Task<WifiManagerResponse<LanDeviceDetails>> GetDeviceDetailsAsync(string ipAddress, CancellationToken cancellationToken = default)
+            => DeviceProbe.GetDetailsAsync(ipAddress, cancellationToken);
+
+        /// <summary>
+        /// Finds services advertised over mDNS/Bonjour, e.g. <c>_http._tcp</c>, <c>_ipp._tcp</c> or <c>_googlecast._tcp</c>.
+        /// The default <c>_services._dns-sd._udp</c> lists the service types present on the network.
+        /// Android needs the CHANGE_WIFI_MULTICAST_STATE permission; iOS requires the multicast networking
+        /// entitlement and NSLocalNetworkUsageDescription.
+        /// </summary>
+        Task<WifiManagerResponse<List<NetworkServiceInfo>>> BrowseServicesAsync(string serviceType = "_services._dns-sd._udp", TimeSpan? duration = null, CancellationToken cancellationToken = default)
+            => NetworkTools.BrowseServicesAsync(serviceType, duration ?? NetworkTools.DefaultBrowseDuration, cancellationToken);
+
+        /// <summary>
+        /// Pings a host and returns min/average/max round-trip times and packet loss.
+        /// </summary>
+        Task<WifiManagerResponse<PingStatistics>> PingAsync(string host, int count = 4, CancellationToken cancellationToken = default)
+            => NetworkTools.PingAsync(host, count, cancellationToken);
+
+        /// <summary>
+        /// Measures download and upload speed and latency. Uses Cloudflare's public speed test endpoints unless
+        /// <paramref name="options"/> points elsewhere. Transfers up to about 30 MB.
+        /// </summary>
+        Task<WifiManagerResponse<SpeedTestResult>> MeasureSpeedAsync(SpeedTestOptions? options = null, CancellationToken cancellationToken = default)
+            => NetworkTools.MeasureSpeedAsync(options ?? new SpeedTestOptions(), cancellationToken);
+
         private static WifiManagerResponse<T> NotSupported<T>(string operation)
             => WifiManagerResponse<T>.ErrorResponse(WifiErrorCodes.UnsupportedHardware, $"{operation} is not supported on this platform.");
     }

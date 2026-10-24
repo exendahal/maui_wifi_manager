@@ -5,7 +5,7 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
     Title="Connect">
     <ScrollView>
-        <VerticalStackLayout Padding="{OnPlatform Default='20,16,20,32', WinUI='40,28,40,40'}">
+        <VerticalStackLayout Padding="{OnIdiom Phone='20,16,20,32', Default='40,28,40,40'}">
             <Label Style="{StaticResource PageTitle}" Text="Connect" />
             <Label Style="{StaticResource Muted}" Text="Join a network by name, or fill the form from a Wi-Fi QR code." />
 
@@ -80,13 +80,33 @@
                             Grid.Column="1"
                             Placeholder="Any access point" />
                     </Grid>
+                    <BoxView Style="{StaticResource Divider}" />
+                    <Grid ColumnDefinitions="*,Auto" Style="{StaticResource FieldRow}">
+                        <VerticalStackLayout Spacing="2" VerticalOptions="Center">
+                            <Label Text="Name is a prefix" />
+                            <Label Style="{StaticResource Muted}" Text="Join the strongest network whose name starts with it." />
+                        </VerticalStackLayout>
+                        <Switch
+                            x:Name="prefixSwitch"
+                            Grid.Column="1"
+                            VerticalOptions="Center" />
+                    </Grid>
+                    <BoxView Style="{StaticResource Divider}" />
+                    <Grid ColumnDefinitions="96,*" Style="{StaticResource FieldRow}">
+                        <Label Style="{StaticResource FieldLabel}" Text="Timeout (s)" />
+                        <Entry
+                            x:Name="timeoutEntry"
+                            Grid.Column="1"
+                            Keyboard="Numeric"
+                            Placeholder="Platform default" />
+                    </Grid>
                 </VerticalStackLayout>
             </Border>
 
             <Button
                 x:Name="connectBtn"
                 Margin="0,24,0,0"
-                HorizontalOptions="{OnPlatform Default=Fill, WinUI=Start}"
+                HorizontalOptions="{OnIdiom Phone=Fill, Default=Start}"
                 Clicked="ConnectClicked"
                 Text="Connect" />
 

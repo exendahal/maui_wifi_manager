@@ -51,7 +51,44 @@ public class WifiNetworkServiceTests
         { "ConnectEnterpriseWifiAsync", async s => (await s.ConnectEnterpriseWifiAsync("ssid", new WifiEnterpriseOptions())).ErrorCode },
         { "ConnectLocalOnlyAsync", async s => (await s.ConnectLocalOnlyAsync("ssid", "pw", new WifiConnectionOptions())).ErrorCode },
         { "ReleaseLocalOnlyAsync", async s => (await s.ReleaseLocalOnlyAsync()).ErrorCode },
+        { "CanStartScanAsync", async s => (await s.CanStartScanAsync()).ErrorCode },
+        { "SetWifiEnabledAsync", async s => (await s.SetWifiEnabledAsync(true)).ErrorCode },
+        { "StartHotspotAsync", async s => (await s.StartHotspotAsync()).ErrorCode },
+        { "StopHotspotAsync", async s => (await s.StopHotspotAsync()).ErrorCode },
+        { "GetHotspotClientsAsync", async s => (await s.GetHotspotClientsAsync()).ErrorCode },
     };
+
+    [Fact]
+    public void NewOptions_DefaultToPreviousBehavior()
+    {
+        var options = new WifiConnectionOptions();
+
+        Assert.False(options.IsSsidPrefix);
+        Assert.Null(options.Timeout);
+    }
+
+    [Fact]
+    public void ScanResultsEvent_DefaultIsNoOp()
+    {
+        IWifiNetworkService legacy = new LegacyImplementation();
+        EventHandler<WifiScanResultsEventArgs> handler = (_, _) => { };
+
+        legacy.ScanResultsAvailable += handler;
+        legacy.ScanResultsAvailable -= handler;
+    }
+
+    [Fact]
+    public async Task SharedTools_WorkThroughLegacyImplementation()
+    {
+        // Ping, speed test, discovery and mDNS have shared default implementations, so even
+        // a custom IWifiNetworkService written for 10.0.x gets them.
+        IWifiNetworkService legacy = new LegacyImplementation();
+
+        var ping = await legacy.PingAsync("127.0.0.1", 1);
+
+        Assert.Equal(WifiErrorCodes.Success, ping.ErrorCode);
+        Assert.Equal(1, ping.Data!.Received);
+    }
 
     [Theory]
     [MemberData(nameof(NewMethods))]

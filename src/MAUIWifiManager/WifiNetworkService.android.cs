@@ -37,12 +37,20 @@ namespace MauiWifiManager
         private IntentReceiver? _WifiStateReceiver;
         private IntentReceiver? _RssiReceiver;
         private ConnectivityManager.NetworkCallback? _LocalOnlyCallback;
+        private EventHandler<WifiScanResultsEventArgs>? _ScanResultsAvailable;
+        private IntentReceiver? _ScanResultsReceiver;
+        private WifiManager.LocalOnlyHotspotReservation? _HotspotReservation;
+        // Times of scans this app started, to tell when Android's 4-per-2-minutes quota is used up.
+        private static readonly Queue<DateTime> _ScanRequests = new();
         // Android 10 has no API to read back suggestions, so the ones added in this process are kept to support removal.
         [SupportedOSPlatform("android29.0")]
         private static readonly Dictionary<string, WifiNetworkSuggestion> _AddedSuggestions = new();
 
         private static readonly TimeSpan DefaultScanSessionDuration = TimeSpan.FromSeconds(30);
         private static readonly TimeSpan ConnectTimeout = TimeSpan.FromSeconds(30);
+        private static readonly TimeSpan ScanQuotaWindow = TimeSpan.FromMinutes(2);
+        private const int ScanQuota = 4;
+        private static readonly TimeSpan HotspotStartTimeout = TimeSpan.FromSeconds(15);
         private static readonly TimeSpan ScanResultsTimeout = TimeSpan.FromSeconds(10);
         private static readonly TimeSpan FreshScanInterval = TimeSpan.FromSeconds(30);
 
@@ -112,6 +120,27 @@ namespace MauiWifiManager
             }
         }
 
+        public event EventHandler<WifiScanResultsEventArgs>? ScanResultsAvailable
+        {
+            add
+            {
+                lock (_MonitorLock)
+                {
+                    _ScanResultsAvailable += value;
+                    _ScanResultsReceiver ??= RegisterIntentReceiver(WifiManager.ScanResultsAvailableAction, OnScanResultsIntent);
+                }
+            }
+            remove
+            {
+                lock (_MonitorLock)
+                {
+                    _ScanResultsAvailable -= value;
+                    if (_ScanResultsAvailable == null)
+                        UnregisterIntentReceiver(ref _ScanResultsReceiver);
+                }
+            }
+        }
+
         public WifiNetworkService() { }
 
         public static void CheckInit(Context context)
@@ -161,6 +190,14 @@ namespace MauiWifiManager
                 response.ErrorCode = WifiErrorCodes.UnsupportedHardware;
                 response.ErrorMessage = "Wi-Fi Manager is unavailable. Please ensure the device has Wi-Fi capability.";
                 return response;
+            }
+
+            if (options.IsSsidPrefix)
+            {
+                var resolved = await ResolveSsidPrefixAsync(ssid, cancellationToken);
+                if (resolved == null)
+                    return WifiManagerResponse<NetworkData>.ErrorResponse(WifiErrorCodes.NetworkUnavailable, $"No network starting with \"{ssid}\" was found.");
+                ssid = resolved;
             }
 
             try
@@ -515,16 +552,21 @@ namespace MauiWifiManager
         public async Task<WifiManagerResponse<List<NetworkData>>> ScanWifiNetworksAsync(CancellationToken cancellationToken = default)
         {
             CheckInit(_Context);
+            bool fresh = true;
             try
             {
                 if (_Context.GetSystemService(Context.WifiService) is WifiManager { IsWifiEnabled: true } wifiManager)
-                    await RequestFreshScanAsync(wifiManager, cancellationToken);
+                    fresh = await RequestFreshScanAsync(wifiManager, cancellationToken);
             }
             catch (System.OperationCanceledException)
             {
                 return CreateCanceledResponse<List<NetworkData>>(nameof(ScanWifiNetworks));
             }
-            return ScanWifiNetworksInternal(cancellationToken);
+            var response = ScanWifiNetworksInternal(cancellationToken);
+            // Still a success so existing callers keep working; the message tells them the list may be old.
+            if (!fresh && response.ErrorCode == WifiErrorCodes.Success)
+                response.ErrorMessage = "Android did not run a new scan (throttled or not allowed), so these are the previous results. Check CanStartScanAsync for the reason.";
+            return response;
         }
 
         /// <summary>
@@ -532,7 +574,7 @@ namespace MauiWifiManager
         /// reading ScanResults right after it returns the previous (cached) list.
         /// When the OS throttles the request (4 per 2 min in foreground) the cached results are used as-is.
         /// </summary>
-        private static async Task RequestFreshScanAsync(WifiManager wifiManager, CancellationToken cancellationToken)
+        private static async Task<bool> RequestFreshScanAsync(WifiManager wifiManager, CancellationToken cancellationToken)
         {
             var scanCompleted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             var receiver = new WifiScanReceiver(() => scanCompleted.TrySetResult());
@@ -546,11 +588,16 @@ namespace MauiWifiManager
             {
 #pragma warning disable CA1422 // Deprecated in API 28 but still the only way to request a scan.
                 if (!wifiManager.StartScan())
-                    return;
+                    return false;
 #pragma warning restore CA1422
+                lock (_ScanRequests) _ScanRequests.Enqueue(DateTime.UtcNow);
                 await scanCompleted.Task.WaitAsync(ScanResultsTimeout, cancellationToken);
+                return true;
             }
-            catch (TimeoutException) { }
+            catch (TimeoutException)
+            {
+                return false;
+            }
             finally
             {
                 _Context.UnregisterReceiver(receiver);
@@ -758,12 +805,7 @@ namespace MauiWifiManager
                 }
 
                 // SSIDs and scan results stay hidden while location services are off, even with the permission granted.
-                var locationManager = _Context.GetSystemService(Context.LocationService) as Android.Locations.LocationManager;
-                bool locationOn = OperatingSystem.IsAndroidVersionAtLeast(28)
-                    ? locationManager?.IsLocationEnabled == true
-                    : locationManager?.IsProviderEnabled(Android.Locations.LocationManager.GpsProvider) == true
-                      || locationManager?.IsProviderEnabled(Android.Locations.LocationManager.NetworkProvider) == true;
-                if (!locationOn)
+                if (!IsLocationEnabled())
                     return WifiManagerResponse<bool>.ErrorResponse(WifiErrorCodes.PermissionDenied, "Location services are turned off. Turn them on to scan and read Wi-Fi details.");
 
                 return WifiManagerResponse<bool>.SuccessResponse(true, "All Wi-Fi permissions are granted.");
@@ -856,24 +898,32 @@ namespace MauiWifiManager
             }
         }
 
-        public Task<WifiManagerResponse<bool>> AddNetworkSuggestionAsync(string ssid, string password, WifiConnectionOptions options, CancellationToken cancellationToken = default)
+        public async Task<WifiManagerResponse<bool>> AddNetworkSuggestionAsync(string ssid, string password, WifiConnectionOptions options, CancellationToken cancellationToken = default)
         {
             if (cancellationToken.IsCancellationRequested)
-                return Task.FromResult(CreateCanceledResponse<bool>(nameof(AddNetworkSuggestionAsync)));
+                return CreateCanceledResponse<bool>(nameof(AddNetworkSuggestionAsync));
 
             if (!OperatingSystem.IsAndroidVersionAtLeast(29))
-                return Task.FromResult(WifiManagerResponse<bool>.ErrorResponse(WifiErrorCodes.UnsupportedHardware, "Network suggestions require Android 10 (API 29) or later."));
+                return WifiManagerResponse<bool>.ErrorResponse(WifiErrorCodes.UnsupportedHardware, "Network suggestions require Android 10 (API 29) or later.");
 
             if (_Context.GetSystemService(Context.WifiService) is not WifiManager wifiManager)
-                return Task.FromResult(WifiManagerResponse<bool>.ErrorResponse(WifiErrorCodes.UnsupportedHardware, "Wi-Fi Manager is unavailable. Please ensure the device has Wi-Fi capability."));
+                return WifiManagerResponse<bool>.ErrorResponse(WifiErrorCodes.UnsupportedHardware, "Wi-Fi Manager is unavailable. Please ensure the device has Wi-Fi capability.");
+
+            if (options.IsSsidPrefix)
+            {
+                var resolved = await ResolveSsidPrefixAsync(ssid, cancellationToken);
+                if (resolved == null)
+                    return WifiManagerResponse<bool>.ErrorResponse(WifiErrorCodes.NetworkUnavailable, $"No network starting with \"{ssid}\" was found.");
+                ssid = resolved;
+            }
 
             try
             {
-                return Task.FromResult(SaveSuggestion(wifiManager, ssid, CreateSuggestionBuilder(ssid, password, options).Build()));
+                return SaveSuggestion(wifiManager, ssid, CreateSuggestionBuilder(ssid, password, options).Build());
             }
             catch (Exception ex)
             {
-                return Task.FromResult(WifiManagerResponse<bool>.ErrorResponse(WifiErrorCodes.UnknownError, $"Error while adding network suggestion: {ex.Message}"));
+                return WifiManagerResponse<bool>.ErrorResponse(WifiErrorCodes.UnknownError, $"Error while adding network suggestion: {ex.Message}");
             }
         }
 
@@ -949,6 +999,14 @@ namespace MauiWifiManager
             if (_Context.GetSystemService(Context.ConnectivityService) is not ConnectivityManager connectivityManager)
                 return WifiManagerResponse<NetworkData>.ErrorResponse(WifiErrorCodes.UnsupportedHardware, "Connectivity service is not available on this device.");
 
+            if (options.IsSsidPrefix)
+            {
+                var resolved = await ResolveSsidPrefixAsync(ssid, cancellationToken);
+                if (resolved == null)
+                    return WifiManagerResponse<NetworkData>.ErrorResponse(WifiErrorCodes.NetworkUnavailable, $"No network starting with \"{ssid}\" was found.");
+                ssid = resolved;
+            }
+
             await ReleaseLocalOnlyAsync();
 
             try
@@ -984,19 +1042,23 @@ namespace MauiWifiManager
                 connectivityManager.RequestNetwork(requestBuilder.Build()!, callback);
 
                 Network? network;
+                bool timedOut = false;
                 try
                 {
-                    network = await tcs.Task.WaitAsync(ConnectTimeout, cancellationToken);
+                    network = await tcs.Task.WaitAsync(options.Timeout ?? ConnectTimeout, cancellationToken);
                 }
                 catch (TimeoutException)
                 {
                     network = null;
+                    timedOut = true;
                 }
 
                 if (network == null)
                 {
                     await ReleaseLocalOnlyAsync();
-                    return WifiManagerResponse<NetworkData>.ErrorResponse(WifiErrorCodes.NetworkUnavailable, "The network was not found or the user declined the connection request.");
+                    return timedOut
+                        ? WifiManagerResponse<NetworkData>.ErrorResponse(WifiErrorCodes.OperationTimeout, "Timed out waiting for the network; it may be out of range or the user has not approved the request.")
+                        : WifiManagerResponse<NetworkData>.ErrorResponse(WifiErrorCodes.NetworkUnavailable, "The network was not found or the user declined the connection request.");
                 }
 
                 var networkData = new NetworkData { StatusId = (int)WifiErrorCodes.Success, Ssid = ssid };
@@ -1220,6 +1282,254 @@ namespace MauiWifiManager
             _SignalStrengthChanged?.Invoke(this, new WifiSignalChangedEventArgs(rssi, WifiSignal.GetSignalLevel(rssi), WifiSignal.GetSignalPercentage(rssi)));
         }
 
+        public Task<WifiManagerResponse<WifiScanAvailability>> CanStartScanAsync(CancellationToken cancellationToken = default)
+        {
+            if (cancellationToken.IsCancellationRequested)
+                return Task.FromResult(CreateCanceledResponse<WifiScanAvailability>(nameof(CanStartScanAsync)));
+
+            if (_Context.GetSystemService(Context.WifiService) is not WifiManager wifiManager)
+                return Task.FromResult(WifiManagerResponse<WifiScanAvailability>.ErrorResponse(WifiErrorCodes.UnsupportedHardware, "Wi-Fi Manager is unavailable. Please ensure the device has Wi-Fi capability."));
+
+            var (state, message) =
+                !wifiManager.IsWifiEnabled ? (WifiScanAvailability.WifiDisabled, "Wi-Fi is turned off.")
+                : !HasScanPermission() ? (WifiScanAvailability.PermissionDenied, "Location (or nearby Wi-Fi devices) permission is not granted.")
+                : !IsLocationEnabled() ? (WifiScanAvailability.LocationServicesDisabled, "Location services are turned off.")
+                : IsScanQuotaUsed(wifiManager) ? (WifiScanAvailability.Throttled, "This app used its 4 scans in the last 2 minutes; Android will return cached results.")
+                : (WifiScanAvailability.Ready, "A scan can start now.");
+            return Task.FromResult(WifiManagerResponse<WifiScanAvailability>.SuccessResponse(state, message));
+        }
+
+        private static bool HasScanPermission()
+        {
+            if (!OperatingSystem.IsAndroidVersionAtLeast(23))
+                return true;
+            if (_Context.CheckSelfPermission(Android.Manifest.Permission.AccessFineLocation) == Android.Content.PM.Permission.Granted)
+                return true;
+            return OperatingSystem.IsAndroidVersionAtLeast(33)
+                && _Context.CheckSelfPermission(Android.Manifest.Permission.NearbyWifiDevices) == Android.Content.PM.Permission.Granted;
+        }
+
+        private static bool IsLocationEnabled()
+        {
+            var locationManager = _Context.GetSystemService(Context.LocationService) as Android.Locations.LocationManager;
+            return OperatingSystem.IsAndroidVersionAtLeast(28)
+                ? locationManager?.IsLocationEnabled == true
+                : locationManager?.IsProviderEnabled(Android.Locations.LocationManager.GpsProvider) == true
+                  || locationManager?.IsProviderEnabled(Android.Locations.LocationManager.NetworkProvider) == true;
+        }
+
+        /// <summary>
+        /// Android 9+ allows 4 foreground scans per 2 minutes. Only scans started by this app are counted,
+        /// which is the quota Android applies per app.
+        /// </summary>
+        private static bool IsScanQuotaUsed(WifiManager wifiManager)
+        {
+            if (!OperatingSystem.IsAndroidVersionAtLeast(28))
+                return false;
+            if (OperatingSystem.IsAndroidVersionAtLeast(30) && !wifiManager.IsScanThrottleEnabled)
+                return false; // Throttling turned off in developer options.
+            lock (_ScanRequests)
+            {
+                while (_ScanRequests.Count > 0 && DateTime.UtcNow - _ScanRequests.Peek() > ScanQuotaWindow)
+                    _ScanRequests.Dequeue();
+                return _ScanRequests.Count >= ScanQuota;
+            }
+        }
+
+        private void OnScanResultsIntent(BroadcastReceiver receiver, Intent intent)
+        {
+            bool fresh = !OperatingSystem.IsAndroidVersionAtLeast(23) || intent.GetBooleanExtra(WifiManager.ExtraResultsUpdated, true);
+            var scan = ScanWifiNetworksInternal();
+            if (scan.ErrorCode == WifiErrorCodes.Success && scan.Data != null)
+                _ScanResultsAvailable?.Invoke(this, new WifiScanResultsEventArgs(scan.Data, fresh));
+        }
+
+        /// <summary>Scans and returns the strongest network whose SSID starts with <paramref name="prefix"/>.</summary>
+        private async Task<string?> ResolveSsidPrefixAsync(string prefix, CancellationToken cancellationToken)
+        {
+            var scan = await ScanWifiNetworksAsync(cancellationToken);
+            return scan.Data?
+                .Where(n => n.Ssid?.StartsWith(prefix, StringComparison.Ordinal) == true)
+                .OrderByDescending(n => n.RssiDbm ?? int.MinValue)
+                .FirstOrDefault()?.Ssid;
+        }
+
+        public async Task<WifiManagerResponse<bool>> SetWifiEnabledAsync(bool enabled, CancellationToken cancellationToken = default)
+        {
+            if (cancellationToken.IsCancellationRequested)
+                return CreateCanceledResponse<bool>(nameof(SetWifiEnabledAsync));
+
+            if (_Context.GetSystemService(Context.WifiService) is not WifiManager wifiManager)
+                return WifiManagerResponse<bool>.ErrorResponse(WifiErrorCodes.UnsupportedHardware, "Wi-Fi Manager is unavailable. Please ensure the device has Wi-Fi capability.");
+
+            if (wifiManager.IsWifiEnabled == enabled)
+                return WifiManagerResponse<bool>.SuccessResponse(true, $"Wi-Fi is already {(enabled ? "on" : "off")}.");
+
+            if (!OperatingSystem.IsAndroidVersionAtLeast(29))
+            {
+#pragma warning disable CA1422 // Deprecated in API 29; still works on older versions.
+                bool changed = wifiManager.SetWifiEnabled(enabled);
+#pragma warning restore CA1422
+                return changed
+                    ? WifiManagerResponse<bool>.SuccessResponse(true, $"Wi-Fi turned {(enabled ? "on" : "off")}.")
+                    : WifiManagerResponse<bool>.ErrorResponse(WifiErrorCodes.UnknownError, "Android refused to change the Wi-Fi state.");
+            }
+
+            await OpenWifiSetting();
+            return WifiManagerResponse<bool>.SuccessResponse(false, "Android 10+ does not let apps switch Wi-Fi, so the Wi-Fi panel was opened for the user.");
+        }
+
+        public async Task<WifiManagerResponse<HotspotInfo>> StartHotspotAsync(CancellationToken cancellationToken = default)
+        {
+            if (cancellationToken.IsCancellationRequested)
+                return CreateCanceledResponse<HotspotInfo>(nameof(StartHotspotAsync));
+
+            if (!OperatingSystem.IsAndroidVersionAtLeast(26))
+                return WifiManagerResponse<HotspotInfo>.ErrorResponse(WifiErrorCodes.UnsupportedHardware, "A local-only hotspot requires Android 8.0 (API 26) or later.");
+
+            if (_Context.GetSystemService(Context.WifiService) is not WifiManager wifiManager)
+                return WifiManagerResponse<HotspotInfo>.ErrorResponse(WifiErrorCodes.UnsupportedHardware, "Wi-Fi Manager is unavailable. Please ensure the device has Wi-Fi capability.");
+
+            if (_HotspotReservation is { } running)
+                return WifiManagerResponse<HotspotInfo>.SuccessResponse(ReadHotspotInfo(running), "Hotspot is already running.");
+
+            var tcs = new TaskCompletionSource<WifiManagerResponse<HotspotInfo>>(TaskCreationOptions.RunContinuationsAsynchronously);
+#pragma warning disable CA1416 // Callbacks run after the API 26 check above.
+            var callback = new HotspotCallback
+            {
+                Started = reservation =>
+                {
+                    _HotspotReservation = reservation;
+                    tcs.TrySetResult(WifiManagerResponse<HotspotInfo>.SuccessResponse(ReadHotspotInfo(reservation), "Hotspot started."));
+                },
+                // LocalOnlyHotspotCallback.ERROR_* codes.
+                Failed = reason => tcs.TrySetResult(WifiManagerResponse<HotspotInfo>.ErrorResponse(WifiErrorCodes.UnknownError, reason switch
+                {
+                    1 => "No channel is available for the hotspot.",
+                    3 => "Turn off the regular (tethering) hotspot first.",
+                    4 => "Tethering is not allowed on this device.",
+                    _ => "Android could not start the hotspot."
+                })),
+                Stopped = () => _HotspotReservation = null
+            };
+#pragma warning restore CA1416
+
+            try
+            {
+                wifiManager.StartLocalOnlyHotspot(callback, new Handler(Looper.MainLooper!));
+                return await tcs.Task.WaitAsync(HotspotStartTimeout, cancellationToken);
+            }
+            catch (Java.Lang.SecurityException ex)
+            {
+                return WifiManagerResponse<HotspotInfo>.ErrorResponse(WifiErrorCodes.PermissionDenied, $"Missing permission: {ex.Message}");
+            }
+            catch (Java.Lang.IllegalStateException ex)
+            {
+                return WifiManagerResponse<HotspotInfo>.ErrorResponse(WifiErrorCodes.UnknownError, ex.Message ?? "A hotspot request is already in progress.");
+            }
+            catch (TimeoutException)
+            {
+                return WifiManagerResponse<HotspotInfo>.ErrorResponse(WifiErrorCodes.OperationTimeout, "Timed out starting the hotspot.");
+            }
+            catch (System.OperationCanceledException)
+            {
+                return CreateCanceledResponse<HotspotInfo>(nameof(StartHotspotAsync));
+            }
+        }
+
+        public Task<WifiManagerResponse<bool>> StopHotspotAsync(CancellationToken cancellationToken = default)
+        {
+            if (!OperatingSystem.IsAndroidVersionAtLeast(26))
+                return Task.FromResult(WifiManagerResponse<bool>.SuccessResponse(false, "No hotspot is running."));
+            var reservation = Interlocked.Exchange(ref _HotspotReservation, null);
+            if (reservation == null)
+                return Task.FromResult(WifiManagerResponse<bool>.SuccessResponse(false, "No hotspot is running."));
+            reservation.Close();
+            return Task.FromResult(WifiManagerResponse<bool>.SuccessResponse(true, "Hotspot stopped."));
+        }
+
+        [SupportedOSPlatform("android26.0")]
+        private static HotspotInfo ReadHotspotInfo(WifiManager.LocalOnlyHotspotReservation reservation)
+        {
+            string? ssid, password;
+            if (OperatingSystem.IsAndroidVersionAtLeast(30))
+            {
+                var config = reservation.SoftApConfiguration;
+                ssid = OperatingSystem.IsAndroidVersionAtLeast(33) ? config.WifiSsid?.ToString() : GetLegacySoftApSsid(config);
+                password = config.Passphrase;
+            }
+            else
+            {
+#pragma warning disable CA1422 // Replaced by SoftApConfiguration in API 30.
+                ssid = reservation.WifiConfiguration?.Ssid;
+                password = reservation.WifiConfiguration?.PreSharedKey;
+#pragma warning restore CA1422
+            }
+            return new HotspotInfo { Ssid = ssid?.Trim(_TrimChars), Password = password?.Trim(_TrimChars), IsLocalOnly = true };
+        }
+
+        [SupportedOSPlatform("android30.0")]
+#pragma warning disable CA1422 // SoftApConfiguration.Ssid is replaced by WifiSsid in API 33.
+        private static string? GetLegacySoftApSsid(SoftApConfiguration config) => config.Ssid;
+#pragma warning restore CA1422
+
+        public Task<WifiManagerResponse<List<LanDevice>>> DiscoverDevicesAsync(CancellationToken cancellationToken = default)
+        {
+            // While the app is bound to a local-only network (ConnectLocalOnlyAsync), its pings go out on that
+            // network, so sweep its subnet instead of the default network's.
+            if (OperatingSystem.IsAndroidVersionAtLeast(23)
+                && _Context.GetSystemService(Context.ConnectivityService) is ConnectivityManager connectivityManager
+                && connectivityManager.BoundNetworkForProcess is Network bound
+                && connectivityManager.GetLinkProperties(bound)?.LinkAddresses.FirstOrDefault(la => la.Address is Java.Net.Inet4Address) is LinkAddress link
+                && link.Address?.GetAddress() is { Length: 4 } bytes)
+                return NetworkTools.DiscoverDevicesAsync(cancellationToken, (new IPAddress(bytes), link.PrefixLength), IsReachable);
+            return NetworkTools.DiscoverDevicesAsync(cancellationToken, blockingProbe: IsReachable);
+        }
+
+        /// <summary>
+        /// ICMP echo through Android's ping sockets via InetAddress.isReachable. System.Net.Ping launches a
+        /// <c>ping</c> process per address on Android, which for a 254-address sweep is slow and can freeze the app.
+        /// </summary>
+        private static long? IsReachable(IPAddress address, TimeSpan timeout)
+        {
+            try
+            {
+                using var target = Java.Net.InetAddress.GetByAddress(address.GetAddressBytes());
+                var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+                return target != null && target.IsReachable((int)timeout.TotalMilliseconds) ? stopwatch.ElapsedMilliseconds : null;
+            }
+            catch (Java.IO.IOException)
+            {
+                return null;
+            }
+        }
+
+        public async Task<WifiManagerResponse<List<NetworkServiceInfo>>> BrowseServicesAsync(string serviceType = "_services._dns-sd._udp", TimeSpan? duration = null, CancellationToken cancellationToken = default)
+        {
+            // Android drops incoming multicast unless an app holds a multicast lock.
+            WifiManager.MulticastLock? multicastLock = null;
+            try
+            {
+                multicastLock = (_Context.GetSystemService(Context.WifiService) as WifiManager)?.CreateMulticastLock("MauiWifiManager.mdns");
+                multicastLock?.SetReferenceCounted(false);
+                multicastLock?.Acquire();
+            }
+            catch (Java.Lang.SecurityException)
+            {
+                multicastLock = null; // CHANGE_WIFI_MULTICAST_STATE missing; only answers sent directly to us will arrive.
+            }
+
+            try
+            {
+                return await NetworkTools.BrowseServicesAsync(serviceType, duration ?? NetworkTools.DefaultBrowseDuration, cancellationToken);
+            }
+            finally
+            {
+                if (multicastLock?.IsHeld == true)
+                    multicastLock.Release();
+            }
+        }
+
         private static int? GetChannelWidthMhz(int channelWidth) => channelWidth switch
         {
             0 => 20,
@@ -1355,7 +1665,7 @@ namespace MauiWifiManager
                     if (networkRequest != null)
                         connectivityManager?.RegisterNetworkCallback(networkRequest, networkCallback);
 
-                    var timeoutTask = Task.Delay(TimeSpan.FromSeconds(30));
+                    var timeoutTask = Task.Delay(options.Timeout ?? ConnectTimeout);
                     var networkTask = tcs.Task.WaitAsync(cancellationToken);
                     var completedTask = await Task.WhenAny(networkTask, timeoutTask);
                     if (completedTask == timeoutTask)
@@ -1459,7 +1769,15 @@ namespace MauiWifiManager
                         _Requested = true;
                     }
 
-                    networkData = await tcs.Task.WaitAsync(cancellationToken);
+                    try
+                    {
+                        networkData = await tcs.Task.WaitAsync(options.Timeout ?? Timeout.InfiniteTimeSpan, cancellationToken);
+                    }
+                    catch (TimeoutException)
+                    {
+                        UnregisterNetworkCallback(networkCallback);
+                        return WifiManagerResponse<NetworkData>.ErrorResponse(WifiErrorCodes.OperationTimeout, "Timed out waiting for the Wi-Fi connection.");
+                    }
                     if (networkData != null && networkData.StatusId == 1)
                     {
                         response.ErrorCode = WifiErrorCodes.Success;
@@ -1510,7 +1828,9 @@ namespace MauiWifiManager
             {
                 UnregisterIntentReceiver(ref _WifiStateReceiver);
                 UnregisterIntentReceiver(ref _RssiReceiver);
+                UnregisterIntentReceiver(ref _ScanResultsReceiver);
             }
+            _ = StopHotspotAsync();
         }
 
         private async Task RunScanSessionAsync(CancellationToken cancellationToken)
@@ -1756,6 +2076,24 @@ namespace MauiWifiManager
                 ChannelWidthMhz = source.ChannelWidthMhz,
             };
         }
+    }
+
+    [SupportedOSPlatform("android26.0")]
+    internal sealed class HotspotCallback : WifiManager.LocalOnlyHotspotCallback
+    {
+        public Action<WifiManager.LocalOnlyHotspotReservation>? Started { get; init; }
+        public Action<int>? Failed { get; init; }
+        public Action? Stopped { get; init; }
+
+        public override void OnStarted(WifiManager.LocalOnlyHotspotReservation? reservation)
+        {
+            if (reservation != null)
+                Started?.Invoke(reservation);
+        }
+
+        public override void OnFailed([GeneratedEnum] LocalOnlyHotspotCallbackErrorCode reason) => Failed?.Invoke((int)reason);
+
+        public override void OnStopped() => Stopped?.Invoke();
     }
 
     internal sealed class IntentReceiver : BroadcastReceiver
