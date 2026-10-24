@@ -519,6 +519,103 @@ namespace MauiWifiManager.Abstractions
     }
 
     /// <summary>
+    /// One hop on the way to a host, from <see cref="IWifiNetworkService.TracerouteAsync"/>.
+    /// </summary>
+    public sealed class TracerouteHop
+    {
+        /// <summary>Hop number, starting at 1 (usually the router).</summary>
+        public int Hop { get; init; }
+
+        /// <summary>Address that answered at this hop, or <see langword="null"/> when nothing answered in time.</summary>
+        public string? Address { get; init; }
+
+        /// <summary>Reverse DNS name of the address, when it has one.</summary>
+        public string? HostName { get; init; }
+
+        /// <summary>Round trip to this hop in milliseconds, or <see langword="null"/> when nothing answered.</summary>
+        public long? RoundTripMs { get; init; }
+
+        /// <summary><see langword="true"/> for the final hop, the host itself.</summary>
+        public bool IsDestination { get; init; }
+    }
+
+    /// <summary>
+    /// DNS record types that <see cref="IWifiNetworkService.LookupDnsAsync"/> can query.
+    /// </summary>
+    public enum DnsRecordType
+    {
+        /// <summary>IPv4 address.</summary>
+        A = 1,
+        /// <summary>Name server.</summary>
+        Ns = 2,
+        /// <summary>Alias for another name.</summary>
+        Cname = 5,
+        /// <summary>Mail server, with its preference.</summary>
+        Mx = 15,
+        /// <summary>Free text, e.g. SPF or domain verification.</summary>
+        Txt = 16,
+        /// <summary>IPv6 address.</summary>
+        Aaaa = 28,
+    }
+
+    /// <summary>
+    /// One record in a DNS answer.
+    /// </summary>
+    public sealed class DnsRecord
+    {
+        /// <summary>The record's type.</summary>
+        public DnsRecordType Type { get; init; }
+
+        /// <summary>The name the record belongs to.</summary>
+        public string Name { get; init; } = string.Empty;
+
+        /// <summary>The record's value: an address, a name, <c>"10 mail.example.com"</c> for MX, or the text for TXT.</summary>
+        public string Value { get; init; } = string.Empty;
+
+        /// <summary>How long resolvers may cache the record, in seconds.</summary>
+        public int TimeToLiveSeconds { get; init; }
+    }
+
+    /// <summary>
+    /// The answer to a DNS query.
+    /// </summary>
+    public sealed class DnsLookupResult
+    {
+        /// <summary>The name that was looked up.</summary>
+        public string Name { get; init; } = string.Empty;
+
+        /// <summary>The record type that was asked for.</summary>
+        public DnsRecordType Type { get; init; }
+
+        /// <summary>The DNS server that answered.</summary>
+        public string Server { get; init; } = string.Empty;
+
+        /// <summary>Records of the asked-for type, plus any CNAME records the server followed to reach them.</summary>
+        public List<DnsRecord> Records { get; init; } = new();
+
+        /// <summary><see langword="true"/> when the server says the name does not exist (NXDOMAIN).</summary>
+        public bool NameNotFound { get; init; }
+
+        /// <summary>Time the server took to answer, in milliseconds.</summary>
+        public long ElapsedMs { get; init; }
+    }
+
+    /// <summary>
+    /// Whether one TCP port accepted a connection, from <see cref="IWifiNetworkService.CheckPortsAsync"/>.
+    /// </summary>
+    public sealed class PortCheckResult
+    {
+        /// <summary>The port.</summary>
+        public int Port { get; init; }
+
+        /// <summary><see langword="true"/> when the port accepted a connection.</summary>
+        public bool IsOpen { get; init; }
+
+        /// <summary>What the port is usually used for, from <see cref="LanDeviceDetails.KnownPorts"/>, when known.</summary>
+        public string? Service { get; init; }
+    }
+
+    /// <summary>
     /// Endpoints and sizes used by <see cref="IWifiNetworkService.MeasureSpeedAsync"/>.
     /// Defaults to Cloudflare's public speed test endpoints.
     /// </summary>

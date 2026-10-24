@@ -272,7 +272,7 @@ namespace MauiWifiManager
             }
         }
 
-        private static async Task<string?> TryReverseLookupAsync(IPAddress address, CancellationToken cancellationToken)
+        internal static async Task<string?> TryReverseLookupAsync(IPAddress address, CancellationToken cancellationToken)
         {
             try
             {
