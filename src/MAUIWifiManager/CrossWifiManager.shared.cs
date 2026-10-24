@@ -419,6 +419,14 @@ namespace MauiWifiManager
         }
 
         /// <summary>
+        /// Finds devices on the local network, reporting each one to <paramref name="progress"/> as soon as it answers.
+        /// </summary>
+        public static Task<Abstractions.WifiManagerResponse<List<Abstractions.LanDevice>>> DiscoverDevicesAsync(IProgress<Abstractions.LanDevice> progress, CancellationToken cancellationToken = default)
+        {
+            return Current.DiscoverDevicesAsync(progress, cancellationToken);
+        }
+
+        /// <summary>
         /// Collects everything a device on the local network reveals (names, MAC, manufacturer, model, open ports, ping).
         /// </summary>
         public static Task<Abstractions.WifiManagerResponse<Abstractions.LanDeviceDetails>> GetDeviceDetailsAsync(string ipAddress, CancellationToken cancellationToken = default)

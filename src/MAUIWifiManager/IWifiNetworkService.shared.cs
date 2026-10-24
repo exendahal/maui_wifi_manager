@@ -273,6 +273,13 @@ namespace MauiWifiManager
             => NetworkTools.DiscoverDevicesAsync(cancellationToken);
 
         /// <summary>
+        /// Same as <see cref="DiscoverDevicesAsync(CancellationToken)"/>, but reports each device to <paramref name="progress"/>
+        /// as soon as it answers, so a list can fill in while the sweep runs. The returned list holds every device found.
+        /// </summary>
+        Task<WifiManagerResponse<List<LanDevice>>> DiscoverDevicesAsync(IProgress<LanDevice> progress, CancellationToken cancellationToken = default)
+            => NetworkTools.DiscoverDevicesAsync(cancellationToken, progress: progress);
+
+        /// <summary>
         /// Collects what a device on the local network reveals: host name, NetBIOS name, MAC address (Windows, or NetBIOS),
         /// UPnP manufacturer and model, open well-known ports, its web page title, and ping times. Takes about 3 seconds.
         /// </summary>

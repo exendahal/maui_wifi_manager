@@ -358,6 +358,9 @@ namespace MauiWifiManager.Abstractions
 
         /// <summary>Host name, when the device reports one.</summary>
         public string? HostName { get; init; }
+
+        /// <summary>Manufacturer of the device's network adapter, from the MAC address; null when unknown or private.</summary>
+        public string? Vendor => MacVendor.Lookup(MacAddress);
     }
 
     /// <summary>
@@ -403,6 +406,12 @@ namespace MauiWifiManager.Abstractions
         public bool? IsRandomizedMac => MacAddress is { Length: >= 2 } mac && int.TryParse(mac[..2], System.Globalization.NumberStyles.HexNumber, null, out var first)
             ? (first & 0x02) != 0
             : null;
+
+        /// <summary>
+        /// Manufacturer of the network adapter, from the MAC address (see <see cref="MacVendor"/>), e.g. <c>Espressif</c>.
+        /// Null when the MAC is unknown or private.
+        /// </summary>
+        public string? Vendor => MacVendor.Lookup(MacAddress);
 
         /// <summary>Friendly name from the device's UPnP description, e.g. <c>Living Room TV</c>.</summary>
         public string? FriendlyName { get; init; }

@@ -1,3 +1,5 @@
+using System.Globalization;
+using System.IO.Compression;
 using System.Text;
 
 namespace MauiWifiManager.Abstractions
@@ -182,6 +184,86 @@ namespace MauiWifiManager.Abstractions
                 .ThenBy(u => u.FrequencyBand)
                 .ThenBy(u => u.ChannelNumber)
                 .ToList();
+        }
+    }
+
+    /// <summary>
+    /// Looks up the manufacturer of a network adapter from its MAC address, using the IEEE MA-L registry
+    /// bundled with the library (about 40,000 prefixes, 340 KB compressed). Works offline.
+    /// </summary>
+    public static class MacVendor
+    {
+        private const string ResourceName = "MauiWifiManager.oui.tsv.gz";
+
+        // Read on first use (tens of milliseconds), on whichever thread asks first.
+        private static readonly Lazy<Dictionary<int, string>> Table = new(Load);
+
+        /// <summary>
+        /// The manufacturer for a MAC address such as <c>3C:CD:57:73:6E:E2</c>, <c>3c-cd-57-73-6e-e2</c> or
+        /// <c>3CCD57736EE2</c>, e.g. <c>Xiaomi Mobile Software</c>. Returns <see langword="null"/> for unknown
+        /// prefixes, malformed input and private (randomized) addresses, which carry no manufacturer.
+        /// </summary>
+        public static string? Lookup(string? macAddress)
+        {
+            if (!TryGetPrefix(macAddress, out var prefix))
+                return null;
+
+            // Locally administered addresses (phones' private MACs) are not assigned by IEEE.
+            if (((prefix >> 16) & 0x02) != 0)
+                return null;
+
+            return Table.Value.TryGetValue(prefix, out var vendor) ? vendor : null;
+        }
+
+        /// <summary>The first three bytes of a 6-byte MAC address, or false when it is not one.</summary>
+        internal static bool TryGetPrefix(string? macAddress, out int prefix)
+        {
+            prefix = 0;
+            if (macAddress == null)
+                return false;
+
+            var digits = 0;
+            foreach (var c in macAddress)
+            {
+                if (c is ':' or '-' or '.')
+                    continue;
+                var value = c switch
+                {
+                    >= '0' and <= '9' => c - '0',
+                    >= 'a' and <= 'f' => c - 'a' + 10,
+                    >= 'A' and <= 'F' => c - 'A' + 10,
+                    _ => -1
+                };
+                if (value < 0)
+                    return false;
+                if (digits < 6)
+                    prefix = (prefix << 4) | value;
+                digits++;
+            }
+            return digits == 12;
+        }
+
+        private static Dictionary<int, string> Load()
+        {
+            var table = new Dictionary<int, string>(40_000);
+            using var stream = typeof(MacVendor).Assembly.GetManifestResourceStream(ResourceName);
+            if (stream == null)
+                return table;
+
+            using var reader = new StreamReader(new GZipStream(stream, CompressionMode.Decompress));
+            // Thousands of prefixes share a maker (Apple has 1,500); keep one copy of each name.
+            var names = new Dictionary<string, string>(StringComparer.Ordinal);
+            while (reader.ReadLine() is { } line)
+            {
+                if (line.Length < 8 || line[6] != '\t'
+                    || !int.TryParse(line.AsSpan(0, 6), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var prefix))
+                    continue;
+                var name = line[7..];
+                if (!names.TryGetValue(name, out var shared))
+                    names[name] = shared = name;
+                table[prefix] = shared;
+            }
+            return table;
         }
     }
 }
