@@ -459,6 +459,15 @@ namespace MauiWifiManager
         }
 
         /// <summary>
+        /// Measures download and upload speed and latency, reporting progress a few times a second.
+        /// </summary>
+        public static Task<Abstractions.WifiManagerResponse<Abstractions.SpeedTestResult>> MeasureSpeedAsync(Abstractions.SpeedTestOptions? options,
+            IProgress<Abstractions.SpeedTestProgress>? progress, CancellationToken cancellationToken = default)
+        {
+            return Current.MeasureSpeedAsync(options, progress, cancellationToken);
+        }
+
+        /// <summary>
         /// Traces the route to a host, reporting each hop as it answers.
         /// </summary>
         public static Task<Abstractions.WifiManagerResponse<List<Abstractions.TracerouteHop>>> TracerouteAsync(string host, int maxHops = 30,

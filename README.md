@@ -605,6 +605,10 @@ Debug.WriteLine($"avg {ping.Data?.AverageMs} ms, loss {ping.Data?.PacketLossPerc
 var speed = await CrossWifiManager.Current.MeasureSpeedAsync();
 Debug.WriteLine($"down {speed.Data?.DownloadMbps} Mbps, up {speed.Data?.UploadMbps} Mbps");
 
+// Follow it live, e.g. to drive a meter (about five reports a second)
+var live = new Progress<SpeedTestProgress>(p => Debug.WriteLine($"{p.Phase} {p.Mbps:0} Mbps ({p.Fraction:P0})"));
+await CrossWifiManager.Current.MeasureSpeedAsync(null, live);
+
 // Your own endpoints
 var custom = await CrossWifiManager.Current.MeasureSpeedAsync(new SpeedTestOptions
 {

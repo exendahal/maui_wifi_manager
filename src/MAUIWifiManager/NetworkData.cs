@@ -616,7 +616,7 @@ namespace MauiWifiManager.Abstractions
     }
 
     /// <summary>
-    /// Endpoints and sizes used by <see cref="IWifiNetworkService.MeasureSpeedAsync"/>.
+    /// Endpoints and sizes used by <see cref="IWifiNetworkService.MeasureSpeedAsync(SpeedTestOptions?, CancellationToken)"/>.
     /// Defaults to Cloudflare's public speed test endpoints.
     /// </summary>
     public sealed class SpeedTestOptions
@@ -641,7 +641,38 @@ namespace MauiWifiManager.Abstractions
     }
 
     /// <summary>
-    /// Result of <see cref="IWifiNetworkService.MeasureSpeedAsync"/>.
+    /// Which part of a speed test is running.
+    /// </summary>
+    public enum SpeedTestPhase
+    {
+        /// <summary>Timing small requests to measure latency.</summary>
+        Latency,
+        /// <summary>Measuring download speed.</summary>
+        Download,
+        /// <summary>Measuring upload speed.</summary>
+        Upload
+    }
+
+    /// <summary>
+    /// A speed test in progress, reported a few times a second so a meter can follow it live.
+    /// </summary>
+    public sealed class SpeedTestProgress
+    {
+        /// <summary>The part of the test running.</summary>
+        public SpeedTestPhase Phase { get; init; }
+
+        /// <summary>Average speed so far in this phase, in megabits per second. 0 during <see cref="SpeedTestPhase.Latency"/>.</summary>
+        public double Mbps { get; init; }
+
+        /// <summary>How far through this phase the test is, from 0 to 1.</summary>
+        public double Fraction { get; init; }
+
+        /// <summary>The measured latency, once known.</summary>
+        public double? LatencyMs { get; init; }
+    }
+
+    /// <summary>
+    /// Result of <see cref="IWifiNetworkService.MeasureSpeedAsync(SpeedTestOptions?, CancellationToken)"/>.
     /// </summary>
     public sealed class SpeedTestResult
     {

@@ -309,6 +309,14 @@ namespace MauiWifiManager
             => NetworkTools.MeasureSpeedAsync(options ?? new SpeedTestOptions(), cancellationToken);
 
         /// <summary>
+        /// Same as <see cref="MeasureSpeedAsync(SpeedTestOptions?, CancellationToken)"/>, but reports the phase and the speed so
+        /// far to <paramref name="progress"/> about five times a second, so a meter can follow the test live.
+        /// </summary>
+        Task<WifiManagerResponse<SpeedTestResult>> MeasureSpeedAsync(SpeedTestOptions? options, IProgress<SpeedTestProgress>? progress,
+            CancellationToken cancellationToken = default)
+            => NetworkTools.MeasureSpeedAsync(options ?? new SpeedTestOptions(), cancellationToken, progress);
+
+        /// <summary>
         /// Traces the route to <paramref name="host"/> one hop at a time, reporting each hop to <paramref name="progress"/>
         /// as it answers. A hop that does not answer has a null <see cref="TracerouteHop.Address"/>.
         /// </summary>
