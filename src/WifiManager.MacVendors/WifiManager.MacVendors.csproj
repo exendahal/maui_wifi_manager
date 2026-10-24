@@ -1,0 +1,48 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<!--
+		The IEEE MA-L registry and its lookup, with no dependencies, so any .NET app can use it:
+		.NET Framework 4.6.1+, .NET 5 to 10, MAUI, WPF, WinForms, ASP.NET, Unity and Xamarin.
+		One target framework, so the data ships once rather than once per platform.
+
+		Released with a tag ending in -MacVendors, e.g. 1.0.0-MacVendors (see release-nuget.yml).
+	-->
+	<PropertyGroup>
+		<TargetFramework>netstandard2.0</TargetFramework>
+		<LangVersion>latest</LangVersion>
+		<Nullable>enable</Nullable>
+
+		<AssemblyName>WifiManager.MacVendors</AssemblyName>
+		<RootNamespace>WifiManager.MacVendors</RootNamespace>
+		<PackageId>WifiManager.MacVendors</PackageId>
+		<Version>1.0.0</Version>
+
+		<Title>MAC address vendor lookup (IEEE OUI registry)</Title>
+		<Description>Names the manufacturer of a network adapter from its MAC address, offline, using the IEEE MA-L registry (about 40,000 prefixes). No dependencies; works on any .NET platform: .NET Framework 4.6.1+, .NET 5 to 10, MAUI, WPF, WinForms, ASP.NET, Unity and Xamarin.</Description>
+		<PackageTags>mac;oui;vendor;manufacturer;ieee;network;wifi;maui</PackageTags>
+		<PackageLicenseExpression>MIT</PackageLicenseExpression>
+		<PackageProjectUrl>https://github.com/exendahal/maui_wifi_manager</PackageProjectUrl>
+		<RepositoryUrl>https://github.com/exendahal/maui_wifi_manager</RepositoryUrl>
+		<PackageIcon>icon.png</PackageIcon>
+		<PackageReadmeFile>README.md</PackageReadmeFile>
+		<Owners>exendahal</Owners>
+		<Authors>exendahal</Authors>
+		<Copyright>Santosh Dahal</Copyright>
+		<IsPackable>True</IsPackable>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<InternalsVisibleTo Include="WifiManager.MacVendors.Tests" />
+	</ItemGroup>
+
+	<!--
+		The registry file is shared with WifiManager.Maui, which still bundles it; it moves here when
+		that package switches to this one. Regenerate it with tools/update_oui.py.
+	-->
+	<ItemGroup>
+		<EmbeddedResource Include="..\MAUIWifiManager\Resources\oui.tsv.gz" LogicalName="WifiManager.MacVendors.oui.tsv.gz" />
+		<None Include="README.md" Pack="true" PackagePath="\" />
+		<None Include="..\MAUIWifiManager\images\icon.png" Pack="true" PackagePath="\" />
+	</ItemGroup>
+
+</Project>
