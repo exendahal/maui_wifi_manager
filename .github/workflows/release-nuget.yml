@@ -1,5 +1,10 @@
 name: Create a (Pre)release on NuGet
 
+# One workflow, two packages, chosen by the tag:
+#   WifiManager.Maui        10.3.0, 10.3.0-beta, 10.3.0-beta1, 10.3.0-preview1
+#   WifiManager.MacVendors  1.0.0-MacVendors, 1.0.0-beta-MacVendors, 1.0.0-beta1-MacVendors, 1.0.0-preview1-MacVendors
+# The package version is the tag without its "-MacVendors" ending.
+
 on:
   push:
     tags:
@@ -7,9 +12,14 @@ on:
       - "[0-9]+.[0-9]+.[0-9]+-beta"
       - "[0-9]+.[0-9]+.[0-9]+-beta[0-9]+"
       - "[0-9]+.[0-9]+.[0-9]+-preview[0-9]+"
+      - "[0-9]+.[0-9]+.[0-9]+-MacVendors"
+      - "[0-9]+.[0-9]+.[0-9]+-beta-MacVendors"
+      - "[0-9]+.[0-9]+.[0-9]+-beta[0-9]+-MacVendors"
+      - "[0-9]+.[0-9]+.[0-9]+-preview[0-9]+-MacVendors"
 
 jobs:
   release-nuget:
+    if: ${{ !endsWith(github.ref_name, '-MacVendors') }}
     runs-on: windows-latest
 
     steps:
@@ -50,6 +60,46 @@ jobs:
 
       - name: Pack
         run: dotnet pack src\MAUIWifiManager\MauiWifiManager.csproj -c Release /p:Version=${{ steps.get_version.outputs.version }} --no-build --output .
+
+      - name: Push
+        run: dotnet nuget push "*.nupkg" -s https://api.nuget.org/v3/index.json -k ${{ secrets.NUGET_API_KEY }} --skip-duplicate
+
+  # WifiManager.MacVendors targets .NET Standard 2.0 with no dependencies, so it needs no MAUI
+  # workload and builds on Linux.
+  release-macvendors:
+    if: ${{ endsWith(github.ref_name, '-MacVendors') }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v2
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Verify commit exists in origin/main or origin/develop
+        run: |
+          git fetch --no-tags --prune origin '+refs/heads/*:refs/remotes/origin/*'
+          if ! git branch --remote --contains HEAD | grep -qE 'origin/(main|develop)$'; then
+            echo "::error::Tagged commit is not contained in origin/main or origin/develop"
+            exit 1
+          fi
+
+      - name: Get version information from tag
+        id: get_version
+        run: echo "version=${GITHUB_REF_NAME%-MacVendors}" >> "$GITHUB_OUTPUT"
+
+      - name: Build
+        run: dotnet build src/WifiManager.MacVendors/WifiManager.MacVendors.csproj -c Release /p:Version=${{ steps.get_version.outputs.version }}
+
+      # A failing test stops the job here, so nothing is packed or pushed.
+      # Same /p:Version as Build, so the test build does not overwrite the output Pack picks up.
+      - name: Run unit tests
+        run: dotnet test tests/WifiManager.MacVendors.Tests/WifiManager.MacVendors.Tests.csproj -c Release /p:Version=${{ steps.get_version.outputs.version }}
+
+      - name: Pack
+        run: dotnet pack src/WifiManager.MacVendors/WifiManager.MacVendors.csproj -c Release /p:Version=${{ steps.get_version.outputs.version }} --no-build --output .
 
       - name: Push
         run: dotnet nuget push "*.nupkg" -s https://api.nuget.org/v3/index.json -k ${{ secrets.NUGET_API_KEY }} --skip-duplicate
