@@ -353,6 +353,8 @@ namespace MauiWifiManager
             }
         }
 
+        private static readonly TimeSpan MdnsReverseTimeout = TimeSpan.FromSeconds(1);
+
         internal static async Task<string?> TryReverseLookupAsync(IPAddress address, CancellationToken cancellationToken)
         {
             try
@@ -360,13 +362,44 @@ namespace MauiWifiManager
                 // WaitAsync: on Windows a failing reverse lookup ignores cancellation and takes ~5 s.
                 var entry = await Dns.GetHostEntryAsync(address.ToString(), cancellationToken)
                     .WaitAsync(TimeSpan.FromSeconds(2), cancellationToken).ConfigureAwait(false);
-                return entry.HostName == address.ToString() ? null : entry.HostName;
+                if (entry.HostName != address.ToString())
+                    return entry.HostName;
+            }
+            catch { }
+
+            // Android's resolver only asks the DNS server, which rarely knows DHCP clients; Windows also asks over mDNS,
+            // which is why it names far more devices. Ask the device itself: a unicast query (RFC 6762 §6.7) needs no
+            // multicast socket, so it also works where Android drops multicast.
+            return await TryMdnsReverseLookupAsync(address, cancellationToken).ConfigureAwait(false);
+        }
+
+        private static async Task<string?> TryMdnsReverseLookupAsync(IPAddress address, CancellationToken cancellationToken)
+        {
+            try
+            {
+                var name = ReverseName(address);
+                using var udp = new UdpClient(AddressFamily.InterNetwork);
+                using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                timeout.CancelAfter(MdnsReverseTimeout);
+                await udp.SendAsync(Mdns.BuildPtrQuery(name), new IPEndPoint(address, MdnsPort), timeout.Token).ConfigureAwait(false);
+                while (true)
+                {
+                    var result = await udp.ReceiveAsync(timeout.Token).ConfigureAwait(false);
+                    var ptr = Mdns.ParseRecords(result.Buffer).FirstOrDefault(r => r.Type == Mdns.TypePtr && r.Target != null
+                        && string.Equals(r.Name, name, StringComparison.OrdinalIgnoreCase));
+                    if (ptr != null)
+                        return ptr.Target;
+                }
             }
             catch
             {
                 return null;
             }
         }
+
+        /// <summary>The reverse-lookup name of an IPv4 address: 192.168.1.20 → 20.1.168.192.in-addr.arpa.</summary>
+        internal static string ReverseName(IPAddress address) =>
+            string.Join('.', Enumerable.Reverse(address.GetAddressBytes())) + ".in-addr.arpa";
 
         /// <summary>
         /// Every host address in the subnet. Subnets larger than /24 are limited to the /24 containing the
@@ -507,7 +540,7 @@ namespace MauiWifiManager
             try
             {
                 // Everything runs in parallel; each probe has its own short timeout, so a lookup takes about 3 seconds.
-                var hostTask = ReverseLookupAsync(address, cancellationToken);
+                var hostTask = NetworkTools.TryReverseLookupAsync(address, cancellationToken);
                 var netBiosTask = QueryNetBiosAsync(address, cancellationToken);
                 var portsTask = ScanPortsAsync(address, cancellationToken);
                 var upnpTask = QueryUpnpAsync(address, cancellationToken);
@@ -541,21 +574,6 @@ namespace MauiWifiManager
             catch (OperationCanceledException)
             {
                 return WifiManagerResponse<LanDeviceDetails>.ErrorResponse(WifiErrorCodes.OperationCanceled, "Operation was canceled.");
-            }
-        }
-
-        private static async Task<string?> ReverseLookupAsync(IPAddress address, CancellationToken cancellationToken)
-        {
-            try
-            {
-                // WaitAsync: on Windows a failing reverse lookup ignores cancellation and takes ~5 s.
-                var entry = await Dns.GetHostEntryAsync(address.ToString(), cancellationToken)
-                    .WaitAsync(ProbeTimeout, cancellationToken).ConfigureAwait(false);
-                return entry.HostName == address.ToString() ? null : entry.HostName;
-            }
-            catch (Exception ex) when (ex is SocketException or TimeoutException)
-            {
-                return null;
             }
         }
 

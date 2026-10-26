@@ -74,6 +74,12 @@ public class SweepHostTests
 
         Assert.Equal(new[] { "172.16.5.10" }, hosts.Select(h => h.ToString()));
     }
+
+    [Fact]
+    public void ReverseName_ReversesOctets()
+    {
+        Assert.Equal("20.1.168.192.in-addr.arpa", NetworkTools.ReverseName(IPAddress.Parse("192.168.1.20")));
+    }
 }
 
 public class MdnsTests
