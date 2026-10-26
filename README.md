@@ -624,8 +624,7 @@ Outside MAUI, use the registry directly: `MacVendorRegistry.Lookup("3C:CD:57:73:
 - Private (randomized) addresses, unknown prefixes and malformed input return `null`.
 - The registry (337 KB) loads on the first lookup, in tens of milliseconds, so make that first call off the UI thread.
 - To use your own copy or another source, pass any `Func<string, string?>` to `MacVendor.SetLookup`.
-- Maintainers: refresh the registry from IEEE with `python tools/update_oui.py`; it rewrites
-  `src/WifiManager.MacVendors/Resources/oui.tsv.gz`, which is also in the repository for anyone who wants the raw data.
+- The raw data is in the repository at `src/WifiManager.MacVendors/Resources/oui.tsv.gz`.
 
 ### Network Diagnostics
 

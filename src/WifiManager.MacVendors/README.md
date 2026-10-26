@@ -60,15 +60,9 @@ using WifiManager.MacVendors;       // MacVendorRegistry
 MacVendor.SetLookup(MacVendorRegistry.Lookup);
 ```
 
-## Updating the registry
+## Releasing
 
-The data comes from IEEE's public registry. Maintainers refresh it with:
-
-```shell
-python tools/update_oui.py
-```
-
-then release a new version of this package. Tags ending in `-MacVendors`, e.g. `1.0.1-MacVendors`,
+The data comes from IEEE's public registry. Tags ending in `-MacVendors`, e.g. `1.0.1-MacVendors`,
 publish this package only.
 
 ## License
