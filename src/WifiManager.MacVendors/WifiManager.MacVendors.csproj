@@ -35,7 +35,6 @@
 		<InternalsVisibleTo Include="WifiManager.MacVendors.Tests" />
 	</ItemGroup>
 
-	<!-- Regenerate with tools/update_oui.py. -->
 	<ItemGroup>
 		<EmbeddedResource Include="Resources\oui.tsv.gz" LogicalName="WifiManager.MacVendors.oui.tsv.gz" />
 		<None Include="README.md" Pack="true" PackagePath="\" />
