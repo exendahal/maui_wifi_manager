@@ -594,6 +594,39 @@ await CrossWifiManager.Current.StopHotspotAsync();
 
 ---
 
+### MAC Manufacturer Lookup
+
+Naming a device's manufacturer from its MAC address needs the IEEE MA-L registry (about 40,000
+prefixes). It ships as a separate package, [`WifiManager.MacVendors`](https://www.nuget.org/packages/WifiManager.MacVendors),
+so `WifiManager.Maui` stays small for apps that don't use it. The data package has no dependencies and
+works on any .NET platform, MAUI or not.
+
+```xml
+<PackageReference Include="WifiManager.MacVendors" Version="1.0.0" />
+```
+
+Plug it in once at startup:
+
+```csharp
+using MauiWifiManager.Abstractions;
+using WifiManager.MacVendors;
+
+builder.UseMauiWifiManager();
+MacVendor.SetLookup(MacVendorRegistry.Lookup);
+
+MacVendor.Lookup("3C:CD:57:73:6E:E2");       // "Xiaomi Mobile Software"
+details.Data?.Vendor;                        // filled in for LanDeviceDetails and HotspotClient
+```
+
+Outside MAUI, use the registry directly: `MacVendorRegistry.Lookup("3C:CD:57:73:6E:E2")`.
+
+**Notes:**
+- Private (randomized) addresses, unknown prefixes and malformed input return `null`.
+- The registry (337 KB) loads on the first lookup, in tens of milliseconds, so make that first call off the UI thread.
+- To use your own copy or another source, pass any `Func<string, string?>` to `MacVendor.SetLookup`.
+- Maintainers: refresh the registry from IEEE with `python tools/update_oui.py`; it rewrites
+  `src/WifiManager.MacVendors/Resources/oui.tsv.gz`, which is also in the repository for anyone who wants the raw data.
+
 ### Network Diagnostics
 
 ```csharp
@@ -604,6 +637,10 @@ Debug.WriteLine($"avg {ping.Data?.AverageMs} ms, loss {ping.Data?.PacketLossPerc
 // Speed test (Cloudflare's public endpoints by default; transfers up to ~30 MB)
 var speed = await CrossWifiManager.Current.MeasureSpeedAsync();
 Debug.WriteLine($"down {speed.Data?.DownloadMbps} Mbps, up {speed.Data?.UploadMbps} Mbps");
+
+// Follow it live, e.g. to drive a meter (about five reports a second)
+var live = new Progress<SpeedTestProgress>(p => Debug.WriteLine($"{p.Phase} {p.Mbps:0} Mbps ({p.Fraction:P0})"));
+await CrossWifiManager.Current.MeasureSpeedAsync(null, live);
 
 // Your own endpoints
 var custom = await CrossWifiManager.Current.MeasureSpeedAsync(new SpeedTestOptions
@@ -617,23 +654,55 @@ var devices = await CrossWifiManager.Current.DiscoverDevicesAsync();
 foreach (var device in devices.Data ?? [])
     Debug.WriteLine($"{device.IpAddress} {device.HostName}");
 
+// Or show each device as soon as it answers, instead of waiting for the whole sweep
+var live = new Progress<LanDevice>(device => Debug.WriteLine($"found {device.IpAddress}"));
+await CrossWifiManager.Current.DiscoverDevicesAsync(live);
+
 // Everything one device reveals: names, MAC, manufacturer/model, open ports, web page title, ping (about 3 s)
 var details = await CrossWifiManager.Current.GetDeviceDetailsAsync("192.168.1.1");
 Debug.WriteLine($"{details.Data?.HttpTitle} {details.Data?.MacAddress} ports: {string.Join(", ", details.Data?.OpenPorts ?? [])}");
+Debug.WriteLine($"made by {details.Data?.Vendor}"); // e.g. "Espressif", from the MAC address
+
+// Manufacturer of any MAC address, offline (needs WifiManager.MacVendors, see below)
+string? vendor = MacVendor.Lookup("3C:CD:57:73:6E:E2"); // "Xiaomi Mobile Software"
 
 // mDNS / Bonjour: list service types, then the devices for one type
 var types = await CrossWifiManager.Current.BrowseServicesAsync();
 var printers = await CrossWifiManager.Current.BrowseServicesAsync("_ipp._tcp");
 foreach (var printer in printers.Data ?? [])
     Debug.WriteLine($"{printer.Name} at {printer.IpAddress}:{printer.Port}");
+
+// Traceroute, with each hop as it answers
+var hops = new Progress<TracerouteHop>(hop =>
+    Debug.WriteLine($"{hop.Hop}  {hop.Address ?? "*"}  {hop.HostName}  {hop.RoundTripMs} ms"));
+var route = await CrossWifiManager.Current.TracerouteAsync("one.one.one.one", maxHops: 30, progress: hops);
+
+// DNS lookup straight against a server (the system's by default)
+var mx = await CrossWifiManager.Current.LookupDnsAsync("example.com", DnsRecordType.Mx, server: "8.8.8.8");
+foreach (var record in mx.Data?.Records ?? [])
+    Debug.WriteLine($"{record.Type} {record.Value} (TTL {record.TimeToLiveSeconds} s)");
+
+// Which TCP ports are open
+var ports = await CrossWifiManager.Current.CheckPortsAsync("192.168.1.1", [22, 80, 443, 8080]);
+foreach (var port in ports.Data ?? [])
+    Debug.WriteLine($"{port.Port} {port.Service} {(port.IsOpen ? "open" : "closed")}");
+
+// Wake a sleeping computer
+await CrossWifiManager.Current.WakeOnLanAsync("AA:BB:CC:DD:EE:FF", broadcastAddress: "192.168.1.255");
 ```
 
 **Notes:**
 - Device discovery only finds devices that answer ping, and on larger networks it covers only the /24 around this device.
 - `GetDeviceDetailsAsync` combines reverse DNS, NetBIOS (computer name and MAC), UPnP (manufacturer and model), a check of common ports (`LanDeviceDetails.KnownPorts`), the device's web page title and ping. Devices only reveal what they answer to, so many fields can be empty.
 - MAC addresses come from the ARP table on Windows. Android 10+ and iOS hide it, so there the MAC is only known when the device answers NetBIOS. `IsRandomizedMac` tells you when a device (typically a phone) uses a private address.
+- `Vendor` (on `LanDeviceDetails` and `HotspotClient`) and `MacVendor.Lookup` name the adapter's manufacturer. The registry behind them is **not** in this package, so apps that don't need it don't carry it; see [MAC Manufacturer Lookup](#mac-manufacturer-lookup). Without it they return `null`.
 - Android blocks plain `http://` requests by default, which stops the web page title and UPnP lookups. To allow them, add `android:usesCleartextTraffic="true"` to the `<application>` element in `AndroidManifest.xml`, or allow cleartext only for local addresses with a [network security config](https://developer.android.com/privacy-and-security/security-config).
-- Ping, speed test, device discovery and mDNS are shared .NET code. They also work for custom `IWifiNetworkService` implementations.
+- `TracerouteAsync` sends pings with increasing TTL. Routers that drop ICMP show as hops with a null `Address`. On Android .NET has no raw sockets and runs the system `ping` per hop, so intermediate hop times are approximate (the process start is measured and subtracted); the final hop's time is exact.
+- `LookupDnsAsync` supports A, AAAA, CNAME, MX, TXT and NS. `NameNotFound` is true when the name does not exist (NXDOMAIN). Android does not expose the system DNS server to .NET, so there it asks 1.1.1.1 unless you pass `server`.
+- `CheckPortsAsync` treats a port as open when a TCP connection succeeds within 800 ms. `Service` names well-known ports.
+- `WakeOnLanAsync` only sends the packet; the target must have Wake-on-LAN enabled and be on the same network.
+- The speed test's latency is the fastest of three requests to `SpeedTestOptions.LatencyUrl`, minus the server's own processing time from its `Server-Timing` header.
+- Ping, speed test, device discovery, mDNS, traceroute, DNS lookup, port check and Wake-on-LAN are shared .NET code. They also work for custom `IWifiNetworkService` implementations.
 
 ---
 
@@ -675,6 +744,8 @@ foreach (var printer in printers.Data ?? [])
 | Ping / Speed Test                    | ✅          | ✅          | ✅          |                                                           |
 | Local Network Device Discovery       | ✅          | ✅          | ✅          | Devices must answer ping                                  |
 | Device Details (name, MAC, model, ports) | ✅*     | ✅*         | ✅          | *MAC only via NetBIOS on Android 10+ and iOS              |
+| MAC Manufacturer Lookup              | ✅          | ✅          | ✅          | Opt-in: `WifiManager.MacVendors` package                  |
+| Traceroute / DNS / Port Check / Wake-on-LAN | ✅      | ✅          | ✅          | Shared .NET code                                          |
 | mDNS / Bonjour Browsing              | ✅          | ✅*         | ✅          | *Needs Apple's multicast entitlement                      |
 | Broadcast Address / Prefix Length    | ✅          | ✅          | ✅          |                                                           |
 

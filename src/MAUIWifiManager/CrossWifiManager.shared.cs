@@ -419,6 +419,14 @@ namespace MauiWifiManager
         }
 
         /// <summary>
+        /// Finds devices on the local network, reporting each one to <paramref name="progress"/> as soon as it answers.
+        /// </summary>
+        public static Task<Abstractions.WifiManagerResponse<List<Abstractions.LanDevice>>> DiscoverDevicesAsync(IProgress<Abstractions.LanDevice> progress, CancellationToken cancellationToken = default)
+        {
+            return Current.DiscoverDevicesAsync(progress, cancellationToken);
+        }
+
+        /// <summary>
         /// Collects everything a device on the local network reveals (names, MAC, manufacturer, model, open ports, ping).
         /// </summary>
         public static Task<Abstractions.WifiManagerResponse<Abstractions.LanDeviceDetails>> GetDeviceDetailsAsync(string ipAddress, CancellationToken cancellationToken = default)
@@ -448,6 +456,51 @@ namespace MauiWifiManager
         public static Task<Abstractions.WifiManagerResponse<Abstractions.SpeedTestResult>> MeasureSpeedAsync(Abstractions.SpeedTestOptions? options = null, CancellationToken cancellationToken = default)
         {
             return Current.MeasureSpeedAsync(options, cancellationToken);
+        }
+
+        /// <summary>
+        /// Measures download and upload speed and latency, reporting progress a few times a second.
+        /// </summary>
+        public static Task<Abstractions.WifiManagerResponse<Abstractions.SpeedTestResult>> MeasureSpeedAsync(Abstractions.SpeedTestOptions? options,
+            IProgress<Abstractions.SpeedTestProgress>? progress, CancellationToken cancellationToken = default)
+        {
+            return Current.MeasureSpeedAsync(options, progress, cancellationToken);
+        }
+
+        /// <summary>
+        /// Traces the route to a host, reporting each hop as it answers.
+        /// </summary>
+        public static Task<Abstractions.WifiManagerResponse<List<Abstractions.TracerouteHop>>> TracerouteAsync(string host, int maxHops = 30,
+            IProgress<Abstractions.TracerouteHop>? progress = null, CancellationToken cancellationToken = default)
+        {
+            return Current.TracerouteAsync(host, maxHops, progress, cancellationToken);
+        }
+
+        /// <summary>
+        /// Queries a DNS server for one record type.
+        /// </summary>
+        public static Task<Abstractions.WifiManagerResponse<Abstractions.DnsLookupResult>> LookupDnsAsync(string name,
+            Abstractions.DnsRecordType type = Abstractions.DnsRecordType.A, string? server = null, CancellationToken cancellationToken = default)
+        {
+            return Current.LookupDnsAsync(name, type, server, cancellationToken);
+        }
+
+        /// <summary>
+        /// Checks which TCP ports accept a connection on a host.
+        /// </summary>
+        public static Task<Abstractions.WifiManagerResponse<List<Abstractions.PortCheckResult>>> CheckPortsAsync(string host, IEnumerable<int> ports,
+            IProgress<Abstractions.PortCheckResult>? progress = null, CancellationToken cancellationToken = default)
+        {
+            return Current.CheckPortsAsync(host, ports, progress, cancellationToken);
+        }
+
+        /// <summary>
+        /// Sends a Wake-on-LAN magic packet.
+        /// </summary>
+        public static Task<Abstractions.WifiManagerResponse<bool>> WakeOnLanAsync(string macAddress, string? broadcastAddress = null,
+            CancellationToken cancellationToken = default)
+        {
+            return Current.WakeOnLanAsync(macAddress, broadcastAddress, cancellationToken);
         }
 
         /// <summary>

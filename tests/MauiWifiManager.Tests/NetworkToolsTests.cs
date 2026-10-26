@@ -74,6 +74,12 @@ public class SweepHostTests
 
         Assert.Equal(new[] { "172.16.5.10" }, hosts.Select(h => h.ToString()));
     }
+
+    [Fact]
+    public void ReverseName_ReversesOctets()
+    {
+        Assert.Equal("20.1.168.192.in-addr.arpa", NetworkTools.ReverseName(IPAddress.Parse("192.168.1.20")));
+    }
 }
 
 public class MdnsTests
@@ -395,5 +401,34 @@ internal static class TestServer
         public Uri Url { get; }
 
         public void Dispose() => _Listener.Close();
+    }
+}
+
+public class DeviceDiscoveryProgressTests
+{
+    private sealed class CollectingProgress : IProgress<LanDevice>
+    {
+        public System.Collections.Concurrent.ConcurrentBag<LanDevice> Reported { get; } = new();
+
+        public void Report(LanDevice value) => Reported.Add(value);
+    }
+
+    [Fact]
+    public async Task DiscoverDevicesAsync_ReportsEachAnsweringDevice()
+    {
+        var progress = new CollectingProgress();
+
+        // A /30 sweep is 127.0.0.1 and 127.0.0.2; only .2 "answers".
+        var response = await NetworkTools.DiscoverDevicesAsync(
+            CancellationToken.None,
+            (IPAddress.Parse("127.0.0.1"), 30),
+            (address, _) => address.Equals(IPAddress.Parse("127.0.0.2")) ? 7 : null,
+            progress);
+
+        Assert.Equal(WifiErrorCodes.Success, response.ErrorCode);
+        var reported = Assert.Single(progress.Reported);
+        Assert.Equal("127.0.0.2", reported.IpAddress);
+        Assert.Equal(7, reported.RoundTripMs);
+        Assert.Equal("127.0.0.2", Assert.Single(response.Data!).IpAddress);
     }
 }

@@ -1474,6 +1474,9 @@ namespace MauiWifiManager
 #pragma warning restore CA1422
 
         public Task<WifiManagerResponse<List<LanDevice>>> DiscoverDevicesAsync(CancellationToken cancellationToken = default)
+            => DiscoverDevicesAsync(null, cancellationToken);
+
+        public Task<WifiManagerResponse<List<LanDevice>>> DiscoverDevicesAsync(IProgress<LanDevice>? progress, CancellationToken cancellationToken = default)
         {
             // While the app is bound to a local-only network (ConnectLocalOnlyAsync), its pings go out on that
             // network, so sweep its subnet instead of the default network's.
@@ -1482,8 +1485,8 @@ namespace MauiWifiManager
                 && connectivityManager.BoundNetworkForProcess is Network bound
                 && connectivityManager.GetLinkProperties(bound)?.LinkAddresses.FirstOrDefault(la => la.Address is Java.Net.Inet4Address) is LinkAddress link
                 && link.Address?.GetAddress() is { Length: 4 } bytes)
-                return NetworkTools.DiscoverDevicesAsync(cancellationToken, (new IPAddress(bytes), link.PrefixLength), IsReachable);
-            return NetworkTools.DiscoverDevicesAsync(cancellationToken, blockingProbe: IsReachable);
+                return NetworkTools.DiscoverDevicesAsync(cancellationToken, (new IPAddress(bytes), link.PrefixLength), IsReachable, progress);
+            return NetworkTools.DiscoverDevicesAsync(cancellationToken, blockingProbe: IsReachable, progress: progress);
         }
 
         /// <summary>

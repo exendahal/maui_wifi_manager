@@ -85,17 +85,21 @@ namespace MauiWifiManager
             return WifiManagerResponse<PingStatistics>.SuccessResponse(stats, $"{stats.Received}/{stats.Sent} replies.");
         }
 
-        public static Task<WifiManagerResponse<SpeedTestResult>> MeasureSpeedAsync(SpeedTestOptions options, CancellationToken cancellationToken) =>
-            Task.Run(() => MeasureSpeedCoreAsync(options, cancellationToken));
+        private static readonly TimeSpan SpeedProgressInterval = TimeSpan.FromMilliseconds(200);
 
-        private static async Task<WifiManagerResponse<SpeedTestResult>> MeasureSpeedCoreAsync(SpeedTestOptions options, CancellationToken cancellationToken)
+        public static Task<WifiManagerResponse<SpeedTestResult>> MeasureSpeedAsync(SpeedTestOptions options, CancellationToken cancellationToken,
+            IProgress<SpeedTestProgress>? progress = null) =>
+            Task.Run(() => MeasureSpeedCoreAsync(options, progress, cancellationToken));
+
+        internal static async Task<WifiManagerResponse<SpeedTestResult>> MeasureSpeedCoreAsync(SpeedTestOptions options, IProgress<SpeedTestProgress>? progress,
+            CancellationToken cancellationToken)
         {
             try
             {
                 using var client = new HttpClient { Timeout = Timeout.InfiniteTimeSpan };
 
-                var (download, latency) = await MeasureDownloadAsync(client, options, cancellationToken).ConfigureAwait(false);
-                double? upload = options.UploadUrl == null ? null : await MeasureUploadAsync(client, options, cancellationToken).ConfigureAwait(false);
+                var (download, latency) = await MeasureDownloadAsync(client, options, progress, cancellationToken).ConfigureAwait(false);
+                double? upload = options.UploadUrl == null ? null : await MeasureUploadAsync(client, options, progress, cancellationToken).ConfigureAwait(false);
 
                 var result = new SpeedTestResult { DownloadMbps = download, UploadMbps = upload, LatencyMs = latency };
                 return WifiManagerResponse<SpeedTestResult>.SuccessResponse(result, "Speed test complete.");
@@ -111,58 +115,135 @@ namespace MauiWifiManager
         }
 
         /// <summary>
-        /// Returns throughput plus latency: the fastest time to first byte of a one-byte ranged request,
-        /// measured after a warm-up request so DNS and the TLS handshake are not counted.
+        /// Returns throughput plus latency: the fastest time to first byte of a tiny request, measured after
+        /// a warm-up request so DNS and the TLS handshake are not counted.
         /// </summary>
-        private static async Task<(double Mbps, double LatencyMs)> MeasureDownloadAsync(HttpClient client, SpeedTestOptions options, CancellationToken cancellationToken)
+        private static async Task<(double Mbps, double LatencyMs)> MeasureDownloadAsync(HttpClient client, SpeedTestOptions options,
+            IProgress<SpeedTestProgress>? progress, CancellationToken cancellationToken)
         {
+            progress?.Report(new SpeedTestProgress { Phase = SpeedTestPhase.Latency });
             double latency = double.MaxValue;
             for (int i = 0; i < 4; i++)
             {
-                using var request = new HttpRequestMessage(HttpMethod.Get, options.DownloadUrl);
-                request.Headers.Range = new System.Net.Http.Headers.RangeHeaderValue(0, 0);
+                using var request = new HttpRequestMessage(HttpMethod.Get, options.LatencyUrl ?? options.DownloadUrl);
+                if (options.LatencyUrl == null)
+                    request.Headers.Range = new System.Net.Http.Headers.RangeHeaderValue(0, 0);
                 var probe = Stopwatch.StartNew();
                 using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
                 response.EnsureSuccessStatusCode();
                 if (i > 0)
-                    latency = Math.Min(latency, probe.Elapsed.TotalMilliseconds);
+                    latency = Math.Min(latency, Math.Max(0, probe.Elapsed.TotalMilliseconds - ServerTimeMs(response)));
+
+                // Drained so the connection goes back to the pool: a connection dropped with its body
+                // unread makes the next probe pay for a new TLS handshake. Only the tiny probe; a
+                // download URL that ignored the range would be the whole file.
+                if (options.LatencyUrl != null)
+                    await response.Content.CopyToAsync(Stream.Null, cancellationToken).ConfigureAwait(false);
             }
+
+            double latencyMs = Math.Round(latency, 1);
+            progress?.Report(new SpeedTestProgress { Phase = SpeedTestPhase.Latency, Fraction = 1, LatencyMs = latencyMs });
 
             using var limit = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             limit.CancelAfter(options.MaxDurationPerDirection);
             var buffer = new byte[81920];
             long total = 0;
+            long expected = 0;
             var sw = Stopwatch.StartNew();
-            try
+
+            async Task ReadAsync()
             {
-                using var response = await client.GetAsync(options.DownloadUrl, HttpCompletionOption.ResponseHeadersRead, limit.Token).ConfigureAwait(false);
-                response.EnsureSuccessStatusCode();
-                using var stream = await response.Content.ReadAsStreamAsync(limit.Token).ConfigureAwait(false);
-                int read;
-                while ((read = await stream.ReadAsync(buffer, limit.Token).ConfigureAwait(false)) > 0)
-                    total += read;
+                try
+                {
+                    using var response = await client.GetAsync(options.DownloadUrl, HttpCompletionOption.ResponseHeadersRead, limit.Token).ConfigureAwait(false);
+                    response.EnsureSuccessStatusCode();
+                    Interlocked.Exchange(ref expected, response.Content.Headers.ContentLength ?? 0);
+                    using var stream = await response.Content.ReadAsStreamAsync(limit.Token).ConfigureAwait(false);
+                    int read;
+                    while ((read = await stream.ReadAsync(buffer, limit.Token).ConfigureAwait(false)) > 0)
+                        Interlocked.Add(ref total, read);
+                }
+                catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+                {
+                    // Hit the time limit: measure what arrived so far.
+                }
             }
-            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
-            {
-                // Hit the time limit: measure what arrived so far.
-            }
-            return (ToMbps(total, sw.Elapsed), Math.Round(latency, 1));
+
+            await ReportWhileAsync(ReadAsync(), progress,
+                () => Snapshot(SpeedTestPhase.Download, Interlocked.Read(ref total), Interlocked.Read(ref expected), sw.Elapsed, options, latencyMs))
+                .ConfigureAwait(false);
+            return (ToMbps(total, sw.Elapsed), latencyMs);
         }
 
-        private static async Task<double> MeasureUploadAsync(HttpClient client, SpeedTestOptions options, CancellationToken cancellationToken)
+        /// <summary>
+        /// Awaits <paramref name="work"/>, reporting a snapshot every <see cref="SpeedProgressInterval"/> while it runs.
+        /// </summary>
+        private static async Task ReportWhileAsync(Task work, IProgress<SpeedTestProgress>? progress, Func<SpeedTestProgress> snapshot)
+        {
+            while (progress != null && !work.IsCompleted)
+            {
+                await Task.WhenAny(work, Task.Delay(SpeedProgressInterval)).ConfigureAwait(false);
+                progress.Report(snapshot());
+            }
+            await work.ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// Speed so far, and how far through the phase: by bytes when the size is known, otherwise by time.
+        /// </summary>
+        internal static SpeedTestProgress Snapshot(SpeedTestPhase phase, long bytes, long expectedBytes, TimeSpan elapsed, SpeedTestOptions options,
+            double? latencyMs)
+        {
+            double byTime = elapsed / options.MaxDurationPerDirection;
+            double byBytes = expectedBytes > 0 ? (double)bytes / expectedBytes : 0;
+            return new SpeedTestProgress
+            {
+                Phase = phase,
+                Mbps = ToMbps(bytes, elapsed),
+                Fraction = Math.Clamp(Math.Max(byTime, byBytes), 0, 1),
+                LatencyMs = latencyMs
+            };
+        }
+
+        /// <summary>
+        /// Time the server says it spent on the request (the <c>dur</c> values of its Server-Timing headers),
+        /// so latency is the network's share of the wait rather than the server's.
+        /// </summary>
+        internal static double ServerTimeMs(HttpResponseMessage response)
+        {
+            if (!response.Headers.TryGetValues("Server-Timing", out var values))
+                return 0;
+            double total = 0;
+            foreach (var value in values)
+                foreach (System.Text.RegularExpressions.Match match in System.Text.RegularExpressions.Regex.Matches(value, @"dur=([0-9.]+)"))
+                    if (double.TryParse(match.Groups[1].Value, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var ms))
+                        total += ms;
+            return total;
+        }
+
+        private static async Task<double> MeasureUploadAsync(HttpClient client, SpeedTestOptions options, IProgress<SpeedTestProgress>? progress,
+            CancellationToken cancellationToken)
         {
             using var limit = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             limit.CancelAfter(options.MaxDurationPerDirection);
             var content = new CountingContent(new byte[options.UploadBytes]);
             var sw = Stopwatch.StartNew();
-            try
+
+            async Task PostAsync()
             {
-                using var response = await client.PostAsync(options.UploadUrl, content, limit.Token).ConfigureAwait(false);
-                response.EnsureSuccessStatusCode();
+                try
+                {
+                    using var response = await client.PostAsync(options.UploadUrl, content, limit.Token).ConfigureAwait(false);
+                    response.EnsureSuccessStatusCode();
+                }
+                catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+                {
+                }
             }
-            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
-            {
-            }
+
+            await ReportWhileAsync(PostAsync(), progress,
+                () => Snapshot(SpeedTestPhase.Upload, Interlocked.Read(ref content.BytesSent), options.UploadBytes, sw.Elapsed, options, null))
+                .ConfigureAwait(false);
             return ToMbps(content.BytesSent, sw.Elapsed);
         }
 
@@ -201,21 +282,35 @@ namespace MauiWifiManager
         /// from <see cref="BlockingProbeThreads"/> dedicated threads; Android uses it to avoid <see cref="Ping"/>,
         /// which there launches a <c>ping</c> process for every address.
         /// </param>
+        /// <param name="progress">Optional; receives each device as soon as it has answered and its name is looked up.</param>
         public static Task<WifiManagerResponse<List<LanDevice>>> DiscoverDevicesAsync(CancellationToken cancellationToken,
-            (IPAddress Address, int PrefixLength)? subnet = null, Func<IPAddress, TimeSpan, long?>? blockingProbe = null) =>
-            Task.Run(() => DiscoverDevicesCoreAsync(cancellationToken, subnet, blockingProbe));
+            (IPAddress Address, int PrefixLength)? subnet = null, Func<IPAddress, TimeSpan, long?>? blockingProbe = null,
+            IProgress<LanDevice>? progress = null) =>
+            Task.Run(() => DiscoverDevicesCoreAsync(cancellationToken, subnet, blockingProbe, progress));
 
         private const int BlockingProbeThreads = 32;
 
         private static async Task<WifiManagerResponse<List<LanDevice>>> DiscoverDevicesCoreAsync(CancellationToken cancellationToken,
-            (IPAddress Address, int PrefixLength)? subnet, Func<IPAddress, TimeSpan, long?>? blockingProbe)
+            (IPAddress Address, int PrefixLength)? subnet, Func<IPAddress, TimeSpan, long?>? blockingProbe, IProgress<LanDevice>? progress)
         {
             var local = subnet ?? GetLocalIpv4();
             if (local == null)
                 return WifiManagerResponse<List<LanDevice>>.ErrorResponse(WifiErrorCodes.NoConnection, "No active IPv4 network.");
 
             var hosts = GetSweepHosts(local.Value.Address, local.Value.PrefixLength);
-            var found = new System.Collections.Concurrent.ConcurrentBag<(IPAddress Address, long Ms)>();
+            // Each answer is resolved (reverse DNS) and reported right away, so a caller can show devices while the sweep runs.
+            var found = new System.Collections.Concurrent.ConcurrentBag<Task<LanDevice>>();
+            async Task<LanDevice> ResolveAsync(IPAddress address, long ms)
+            {
+                var device = new LanDevice
+                {
+                    IpAddress = address.ToString(),
+                    HostName = await TryReverseLookupAsync(address, cancellationToken).ConfigureAwait(false),
+                    RoundTripMs = ms
+                };
+                progress?.Report(device);
+                return device;
+            }
             using var gate = new SemaphoreSlim(SweepConcurrency);
             try
             {
@@ -227,7 +322,7 @@ namespace MauiWifiManager
                     {
                         while (!cancellationToken.IsCancellationRequested && queue.TryDequeue(out var host))
                             if (blockingProbe(host, SweepPingTimeout) is long ms)
-                                found.Add((host, ms));
+                                found.Add(ResolveAsync(host, ms));
                     }, cancellationToken, TaskCreationOptions.LongRunning, TaskScheduler.Default))).ConfigureAwait(false);
                     cancellationToken.ThrowIfCancellationRequested();
                 }
@@ -239,7 +334,7 @@ namespace MauiWifiManager
                         using var ping = new Ping();
                         var reply = await ping.SendPingAsync(host, SweepPingTimeout, cancellationToken: cancellationToken).ConfigureAwait(false);
                         if (reply.Status == IPStatus.Success)
-                            found.Add((host, reply.RoundtripTime));
+                            found.Add(ResolveAsync(host, reply.RoundtripTime));
                     }
                     catch (PingException) { }
                     finally
@@ -248,12 +343,7 @@ namespace MauiWifiManager
                     }
                 })).ConfigureAwait(false);
 
-                var devices = await Task.WhenAll(found.Select(async f => new LanDevice
-                {
-                    IpAddress = f.Address.ToString(),
-                    HostName = await TryReverseLookupAsync(f.Address, cancellationToken).ConfigureAwait(false),
-                    RoundTripMs = f.Ms
-                })).ConfigureAwait(false);
+                var devices = await Task.WhenAll(found).ConfigureAwait(false);
                 var sorted = devices.OrderBy(d => IPAddress.Parse(d.IpAddress).GetAddressBytes()[3]).ToList();
                 return WifiManagerResponse<List<LanDevice>>.SuccessResponse(sorted, $"Found {sorted.Count} device(s) on {hosts.Count} addresses.");
             }
@@ -263,20 +353,53 @@ namespace MauiWifiManager
             }
         }
 
-        private static async Task<string?> TryReverseLookupAsync(IPAddress address, CancellationToken cancellationToken)
+        private static readonly TimeSpan MdnsReverseTimeout = TimeSpan.FromSeconds(1);
+
+        internal static async Task<string?> TryReverseLookupAsync(IPAddress address, CancellationToken cancellationToken)
         {
             try
             {
                 // WaitAsync: on Windows a failing reverse lookup ignores cancellation and takes ~5 s.
                 var entry = await Dns.GetHostEntryAsync(address.ToString(), cancellationToken)
                     .WaitAsync(TimeSpan.FromSeconds(2), cancellationToken).ConfigureAwait(false);
-                return entry.HostName == address.ToString() ? null : entry.HostName;
+                if (entry.HostName != address.ToString())
+                    return entry.HostName;
+            }
+            catch { }
+
+            // Android's resolver only asks the DNS server, which rarely knows DHCP clients; Windows also asks over mDNS,
+            // which is why it names far more devices. Ask the device itself: a unicast query (RFC 6762 §6.7) needs no
+            // multicast socket, so it also works where Android drops multicast.
+            return await TryMdnsReverseLookupAsync(address, cancellationToken).ConfigureAwait(false);
+        }
+
+        private static async Task<string?> TryMdnsReverseLookupAsync(IPAddress address, CancellationToken cancellationToken)
+        {
+            try
+            {
+                var name = ReverseName(address);
+                using var udp = new UdpClient(AddressFamily.InterNetwork);
+                using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                timeout.CancelAfter(MdnsReverseTimeout);
+                await udp.SendAsync(Mdns.BuildPtrQuery(name), new IPEndPoint(address, MdnsPort), timeout.Token).ConfigureAwait(false);
+                while (true)
+                {
+                    var result = await udp.ReceiveAsync(timeout.Token).ConfigureAwait(false);
+                    var ptr = Mdns.ParseRecords(result.Buffer).FirstOrDefault(r => r.Type == Mdns.TypePtr && r.Target != null
+                        && string.Equals(r.Name, name, StringComparison.OrdinalIgnoreCase));
+                    if (ptr != null)
+                        return ptr.Target;
+                }
             }
             catch
             {
                 return null;
             }
         }
+
+        /// <summary>The reverse-lookup name of an IPv4 address: 192.168.1.20 → 20.1.168.192.in-addr.arpa.</summary>
+        internal static string ReverseName(IPAddress address) =>
+            string.Join('.', Enumerable.Reverse(address.GetAddressBytes())) + ".in-addr.arpa";
 
         /// <summary>
         /// Every host address in the subnet. Subnets larger than /24 are limited to the /24 containing the
@@ -417,7 +540,7 @@ namespace MauiWifiManager
             try
             {
                 // Everything runs in parallel; each probe has its own short timeout, so a lookup takes about 3 seconds.
-                var hostTask = ReverseLookupAsync(address, cancellationToken);
+                var hostTask = NetworkTools.TryReverseLookupAsync(address, cancellationToken);
                 var netBiosTask = QueryNetBiosAsync(address, cancellationToken);
                 var portsTask = ScanPortsAsync(address, cancellationToken);
                 var upnpTask = QueryUpnpAsync(address, cancellationToken);
@@ -451,21 +574,6 @@ namespace MauiWifiManager
             catch (OperationCanceledException)
             {
                 return WifiManagerResponse<LanDeviceDetails>.ErrorResponse(WifiErrorCodes.OperationCanceled, "Operation was canceled.");
-            }
-        }
-
-        private static async Task<string?> ReverseLookupAsync(IPAddress address, CancellationToken cancellationToken)
-        {
-            try
-            {
-                // WaitAsync: on Windows a failing reverse lookup ignores cancellation and takes ~5 s.
-                var entry = await Dns.GetHostEntryAsync(address.ToString(), cancellationToken)
-                    .WaitAsync(ProbeTimeout, cancellationToken).ConfigureAwait(false);
-                return entry.HostName == address.ToString() ? null : entry.HostName;
-            }
-            catch (Exception ex) when (ex is SocketException or TimeoutException)
-            {
-                return null;
             }
         }
 

@@ -1,3 +1,5 @@
+using System.Globalization;
+using System.IO.Compression;
 using System.Text;
 
 namespace MauiWifiManager.Abstractions
@@ -183,5 +185,32 @@ namespace MauiWifiManager.Abstractions
                 .ThenBy(u => u.ChannelNumber)
                 .ToList();
         }
+    }
+
+    /// <summary>
+    /// Names the manufacturer of a network adapter from its MAC address. The registry behind it is not part
+    /// of this package, to keep it small: add <c>WifiManager.MacVendors</c> and call
+    /// <c>MacVendor.SetLookup(MacVendorRegistry.Lookup)</c> once at startup, or plug in your own lookup.
+    /// Until then <see cref="Lookup"/> returns <see langword="null"/>, and so do the <c>Vendor</c> properties.
+    /// </summary>
+    public static class MacVendor
+    {
+        private static Func<string, string?>? _Lookup;
+
+        /// <summary>
+        /// Sets the function that names a MAC address's manufacturer, e.g. <c>MacVendorRegistry.Lookup</c>
+        /// from <c>WifiManager.MacVendors</c>. Pass <see langword="null"/> to turn lookups off.
+        /// </summary>
+        public static void SetLookup(Func<string, string?>? lookup) => Volatile.Write(ref _Lookup, lookup);
+
+        /// <summary>Whether a lookup has been set, so manufacturer names can be found.</summary>
+        public static bool IsAvailable => Volatile.Read(ref _Lookup) != null;
+
+        /// <summary>
+        /// The manufacturer for a MAC address such as <c>3C:CD:57:73:6E:E2</c>, e.g. <c>Xiaomi Mobile Software</c>,
+        /// or <see langword="null"/> when it is unknown, private (randomized) or no lookup is set.
+        /// </summary>
+        public static string? Lookup(string? macAddress) =>
+            macAddress == null ? null : Volatile.Read(ref _Lookup)?.Invoke(macAddress);
     }
 }

@@ -38,3 +38,6 @@ jobs:
 
     - name: Run unit tests
       run: dotnet test tests\MauiWifiManager.Tests\MauiWifiManager.Tests.csproj -c ${{ env.BUILD_CONFIGURATION }}
+
+    - name: Run WifiManager.MacVendors tests
+      run: dotnet test tests\WifiManager.MacVendors.Tests\WifiManager.MacVendors.Tests.csproj -c ${{ env.BUILD_CONFIGURATION }}
