@@ -19,7 +19,9 @@ namespace MauiWifiManager
 {
     public class WifiNetworkService : IWifiNetworkService
     {
-        private static Context _Context = null!;
+        // The application context until an activity calls Init, so a process started without one
+        // (a background job, a broadcast receiver) can still use the library.
+        private static Context _Context = Android.App.Application.Context;
         private static ConnectivityManager? _ConnectivityManager;
         private static bool _Requested;
         private static readonly char[] _TrimChars = new char[] { '"', '\"' };
